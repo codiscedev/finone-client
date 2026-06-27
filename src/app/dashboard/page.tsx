@@ -22,7 +22,8 @@ import {
   Sparkles,
   DollarSign,
   FileText,
-  MessageSquare
+  MessageSquare,
+  User
 } from "lucide-react";
 import WealthView from "./wealth-view";
 import MoneyFlowView from "./money-flow-view";
