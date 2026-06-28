@@ -23,10 +23,15 @@ import {
   DollarSign,
   FileText,
   MessageSquare,
-  User
+  User,
+  Menu,
+  Star,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import WealthView from "./wealth-view";
 import MoneyFlowView from "./money-flow-view";
+import WealthAddDrawer from "./wealth-add-drawer";
 import CollaborationView from "./collaboration-view";
 import SettingsView from "./settings-view";
 import TaxPlannerView from "./tax-planner-view";
@@ -37,6 +42,8 @@ export default function DashboardPage() {
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
+  const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
 
   const sidebarItems = [
     { name: "Dashboard", icon: LayoutDashboard },
@@ -60,7 +67,7 @@ export default function DashboardPage() {
       case "Dashboard":
         return <DashboardView />;
       case "Wealth":
-        return <WealthView />;
+        return <WealthView onAddClick={() => setIsAddDrawerOpen(true)} />;
       case "Money Flow":
         return <MoneyFlowView />;
       case "Tax Planner":
@@ -78,20 +85,29 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen w-full bg-zinc-50/50 text-zinc-900 font-sans antialiased overflow-hidden">
+      <WealthAddDrawer isOpen={isAddDrawerOpen} onClose={() => setIsAddDrawerOpen(false)} />
       {/* 1. Left Fixed Sidebar Navigation */}
-      <aside className="fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r border-zinc-200 bg-white">
+      <aside className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-zinc-200 bg-white transition-all duration-300 ${
+        isSidebarExpanded ? "w-[260px]" : "w-[72px]"
+      }`}>
         {/* Brand Header */}
-        <div className="flex h-16 items-center gap-2.5 px-6 border-b border-zinc-100">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
-            <TrendingUp className="h-4.5 w-4.5" />
+        <div className="flex h-16 items-center justify-center px-4 border-b border-zinc-100">
+          <div className={`flex items-center gap-2.5 overflow-hidden w-full ${
+            isSidebarExpanded ? "justify-start pl-1.5 animate-in fade-in duration-200" : "justify-center"
+          }`}>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+              <TrendingUp className="h-4.5 w-4.5" />
+            </div>
+            {isSidebarExpanded && (
+              <span className="text-base font-bold tracking-tight bg-gradient-to-r from-zinc-950 to-zinc-700 bg-clip-text text-transparent whitespace-nowrap">
+                FinOne
+              </span>
+            )}
           </div>
-          <span className="text-base font-bold tracking-tight bg-gradient-to-r from-zinc-950 to-zinc-700 bg-clip-text text-transparent">
-            FinOne client
-          </span>
         </div>
 
         {/* Navigation Menus */}
-        <nav className="flex-1 space-y-1.5 px-4 py-6">
+        <nav className={`flex-1 space-y-1.5 py-6 ${isSidebarExpanded ? "px-4" : "px-3"}`}>
           {sidebarItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeMenu === item.name;
@@ -99,45 +115,81 @@ export default function DashboardPage() {
               <button
                 key={item.name}
                 onClick={() => setActiveMenu(item.name)}
-                className={`group flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 outline-none ${
+                className={`group relative flex w-full items-center rounded-lg h-9 text-sm font-medium transition-all duration-200 outline-none ${
+                  isSidebarExpanded ? "px-3 justify-between" : "px-0 justify-center"
+                } ${
                   isActive
                     ? "bg-blue-50/70 text-blue-600"
                     : "text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-900"
                 }`}
               >
+                {/* Active left border indicator */}
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-blue-600 animate-in fade-in" />
+                )}
+
                 <div className="flex items-center gap-3">
                   <Icon
-                    className={`h-4.5 w-4.5 stroke-[1.8] transition-transform group-hover:scale-102 ${
+                    className={`h-4.5 w-4.5 stroke-[1.8] transition-transform group-hover:scale-105 shrink-0 ${
                       isActive ? "text-blue-600" : "text-zinc-400 group-hover:text-zinc-600"
-                    }`}
+                    } ${!isSidebarExpanded ? "mx-auto" : ""}`}
                   />
-                  <span>{item.name}</span>
+                  {isSidebarExpanded && (
+                    <span className="truncate flex items-center gap-1.5 animate-in fade-in duration-200">
+                      {item.name}
+                      {item.name === "AI Assistant" && (
+                        <Star className="h-3 w-3 fill-indigo-600 text-indigo-600 shrink-0" />
+                      )}
+                    </span>
+                  )}
                 </div>
-                {/* Active selection dot indicator */}
-                {isActive && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+
+
+
+                {/* Collapsed Tooltip */}
+                {!isSidebarExpanded && (
+                  <div className="absolute left-16 scale-0 rounded bg-zinc-950 px-2 py-1.5 text-xs font-semibold text-white shadow-md transition-all group-hover:scale-100 z-50 pointer-events-none whitespace-nowrap">
+                    {item.name}
+                    {item.name === "AI Assistant" && " ⭐"}
+                  </div>
                 )}
               </button>
             );
           })}
         </nav>
 
-        {/* Sidebar Footer / User Account Preview */}
-        <div className="border-t border-zinc-100 p-4">
-          <div className="flex items-center gap-3 rounded-xl bg-zinc-50 p-2.5">
-            <div className="h-9 w-9 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center font-bold text-blue-600 text-sm">
-              AM
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-zinc-900 truncate">Anand Member</p>
-              <p className="text-[10px] text-zinc-500 truncate">anand@finone.io</p>
-            </div>
-          </div>
+        {/* Bottom Collapse/Expand Toggle Button */}
+        <div className="px-3 py-1.5 border-t border-zinc-100/70">
+          <button
+            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+            className={`flex w-full items-center rounded-lg h-9 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-all outline-none relative group ${
+              isSidebarExpanded ? "justify-start gap-3 px-3" : "justify-center"
+            }`}
+            title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+          >
+            {isSidebarExpanded ? (
+              <>
+                <ChevronLeft className="h-4.5 w-4.5 shrink-0" />
+                <span className="truncate">Collapse Sidebar</span>
+              </>
+            ) : (
+              <>
+                <ChevronRight className="h-4.5 w-4.5 shrink-0" />
+                {/* Tooltip for bottom expand toggle */}
+                <div className="absolute left-16 scale-0 rounded bg-zinc-950 px-2 py-1.5 text-xs font-semibold text-white shadow-md transition-all group-hover:scale-100 z-50 pointer-events-none whitespace-nowrap">
+                  Expand Sidebar
+                </div>
+              </>
+            )}
+          </button>
         </div>
+
       </aside>
 
       {/* Main Container Area */}
-      <div className="flex flex-1 flex-col pl-64 overflow-hidden">
+      <div className={`flex flex-1 flex-col overflow-hidden transition-all duration-300 ${
+        isSidebarExpanded ? "pl-[260px]" : "pl-[72px]"
+      }`}>
         {/* 2. Top Navigation Bar */}
         <header className="flex h-16 w-full items-center justify-between border-b border-zinc-200 bg-white px-8 relative z-10">
           {/* Page title and navigation depth */}

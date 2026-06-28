@@ -21,7 +21,11 @@ import {
 import { Button } from "@/components/ui/button";
 import FinancialHealthView from "./financial-health-view";
 
-export default function WealthView() {
+interface WealthViewProps {
+  onAddClick: () => void;
+}
+
+export default function WealthView({ onAddClick }: WealthViewProps) {
   // Scenario Simulator state (Net Worth Card)
   const [showHealthDetails, setShowHealthDetails] = React.useState(false);
   const [monthlySavings, setMonthlySavings] = React.useState(2500); // Slider for monthly savings
@@ -87,9 +91,12 @@ export default function WealthView() {
           <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Wealth</h2>
           <p className="text-sm text-zinc-500 mt-1">Track, grow, and optimize your financial future with dynamic projections.</p>
         </div>
-        <Button className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]">
+        <Button
+          onClick={onAddClick}
+          className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98] outline-none"
+        >
           <Plus className="h-4 w-4 mr-1.5" />
-          Add Asset
+          Add
         </Button>
       </div>
 
