@@ -22,7 +22,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function CollaborationView() {
+interface CollaborationViewProps {
+  onUpgradeClick?: () => void;
+}
+
+export default function CollaborationView({ onUpgradeClick }: CollaborationViewProps) {
   // Couple Workspace interactive contributions
   const [husbandCont, setHusbandCont] = React.useState(2500000);
   const [wifeCont, setWifeCont] = React.useState(1500000);
@@ -58,6 +62,27 @@ export default function CollaborationView() {
           <Plus className="h-4 w-4 mr-1.5" />
           Create Workspace
         </Button>
+      </div>
+
+      {/* Collaboration Family Plan Upgrade Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-slate-800 to-indigo-800 p-5 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white border border-white/20">
+            <Users className="h-5 w-5 text-indigo-300" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold">Collaborate with Spouses & Families</h4>
+            <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed max-w-2xl">
+              You are currently viewing a basic sandbox preview. Upgrade to the **Family Plan** to add up to 6 members, set up joint net worth dashboards, and co-manage loans or travel splits.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onUpgradeClick}
+          className="h-9 px-4 shrink-0 rounded-xl bg-white text-indigo-900 hover:bg-zinc-50 text-xs font-bold transition-all shadow-sm cursor-pointer outline-none"
+        >
+          Start Family Plan
+        </button>
       </div>
 
       {/* Grid Layout of Shared Workspaces (2 per row on desktop) */}
@@ -437,7 +462,7 @@ export default function CollaborationView() {
               <div className="space-y-2 text-xs pt-3 border-t border-zinc-100">
                 <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Contribution Standings</p>
                 <div className="flex items-center justify-between bg-zinc-50 p-2 rounded-lg border border-zinc-100">
-                  <span className="text-zinc-700">Anand (Host):</span>
+                  <span className="text-zinc-700">Anandha (Host):</span>
                   <span className="font-bold text-emerald-600">{formatRupee(50000)} (Paid)</span>
                 </div>
                 <div className="flex items-center justify-between bg-zinc-50 p-2 rounded-lg border border-zinc-100">

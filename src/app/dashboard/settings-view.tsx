@@ -22,8 +22,8 @@ import { Button } from "@/components/ui/button";
 
 export default function SettingsView() {
   // Profile settings state
-  const [name, setName] = React.useState("Anand Member");
-  const [email, setEmail] = React.useState("anand@finone.io");
+  const [name, setName] = React.useState("Anandha Murthy");
+  const [email, setEmail] = React.useState("anandha@financeone.com");
   const [mobile, setMobile] = React.useState("+91 98765 43210");
   const [country, setCountry] = React.useState("India");
   const [currency, setCurrency] = React.useState("INR (₹)");

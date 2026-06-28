@@ -20,14 +20,28 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FinancialHealthView from "./financial-health-view";
+import AssetDetailView from "./asset-detail-view";
+import AssetsOverviewView from "./assets-overview-view";
+import NetWorthDetailView from "./net-worth-detail-view";
+import DebtDetailView from "./debt-detail-view";
+import InvestmentDetailView from "./investment-detail-view";
+import GoalsDetailView from "./goals-detail-view";
+import EmergencyDetailView from "./emergency-detail-view";
 
 interface WealthViewProps {
   onAddClick: () => void;
+  onUpgradeClick?: () => void;
 }
 
-export default function WealthView({ onAddClick }: WealthViewProps) {
+export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewProps) {
   // Scenario Simulator state (Net Worth Card)
   const [showHealthDetails, setShowHealthDetails] = React.useState(false);
+  const [selectedAsset, setSelectedAsset] = React.useState<string | null>(null);
+  const [showNetWorthDetails, setShowNetWorthDetails] = React.useState(false);
+  const [showDebtDetails, setShowDebtDetails] = React.useState(false);
+  const [showInvestmentDetails, setShowInvestmentDetails] = React.useState(false);
+  const [showGoalDetails, setShowGoalDetails] = React.useState(false);
+  const [showEmergencyDetails, setShowEmergencyDetails] = React.useState(false);
   const [monthlySavings, setMonthlySavings] = React.useState(2500); // Slider for monthly savings
   const [returnRate, setReturnRate] = React.useState(8); // Slider for return rate in %
 
@@ -83,6 +97,40 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
     return <FinancialHealthView onBack={() => setShowHealthDetails(false)} />;
   }
 
+  if (showNetWorthDetails) {
+    return <NetWorthDetailView onBack={() => setShowNetWorthDetails(false)} />;
+  }
+
+  if (showDebtDetails) {
+    return <DebtDetailView onBack={() => setShowDebtDetails(false)} onAddClick={onAddClick} />;
+  }
+
+  if (showInvestmentDetails) {
+    return <InvestmentDetailView onBack={() => setShowInvestmentDetails(false)} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+  }
+
+  if (showGoalDetails) {
+    return <GoalsDetailView onBack={() => setShowGoalDetails(false)} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+  }
+
+  if (showEmergencyDetails) {
+    return <EmergencyDetailView onBack={() => setShowEmergencyDetails(false)} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+  }
+
+  if (selectedAsset === "overview") {
+    return (
+      <AssetsOverviewView 
+        onBack={() => setSelectedAsset(null)} 
+        onAssetClick={(name) => setSelectedAsset(name)} 
+        onAddClick={onAddClick}
+      />
+    );
+  }
+
+  if (selectedAsset) {
+    return <AssetDetailView assetName={selectedAsset} onBack={() => setSelectedAsset(null)} />;
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
@@ -93,7 +141,7 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
         </div>
         <Button
           onClick={onAddClick}
-          className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98] outline-none"
+          className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98] outline-none cursor-pointer"
         >
           <Plus className="h-4 w-4 mr-1.5" />
           Add
@@ -112,11 +160,11 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
               <HeartPulse className="h-5 w-5" />
             </div>
             <div className="flex gap-2">
-              <button className="text-xs text-zinc-400 font-semibold hover:text-zinc-600 transition-colors">+ Add Data</button>
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Data</button>
               <span className="text-zinc-200">|</span>
               <button
                 onClick={() => setShowHealthDetails(true)}
-                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none"
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
               >
                 Details <ChevronRight className="h-3 w-3 ml-0.5" />
               </button>
@@ -204,9 +252,12 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
               <Coins className="h-5 w-5" />
             </div>
             <div className="flex gap-2">
-              <button className="text-xs text-zinc-400 font-semibold hover:text-zinc-600 transition-colors">+ Add Asset</button>
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Asset</button>
               <span className="text-zinc-200">|</span>
-              <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center">
+              <button
+                onClick={() => setSelectedAsset("overview")}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
+              >
                 Details <ChevronRight className="h-3 w-3 ml-0.5" />
               </button>
             </div>
@@ -268,9 +319,12 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
               <ShieldAlert className="h-5 w-5" />
             </div>
             <div className="flex gap-2">
-              <button className="text-xs text-zinc-400 font-semibold hover:text-zinc-600 transition-colors">+ Add Loan</button>
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Loan</button>
               <span className="text-zinc-200">|</span>
-              <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center">
+              <button 
+                onClick={() => setShowDebtDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
+              >
                 Details <ChevronRight className="h-3 w-3 ml-0.5" />
               </button>
             </div>
@@ -326,9 +380,12 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
               <TrendingUp className="h-5 w-5" />
             </div>
             <div className="flex gap-2">
-              <button className="text-xs text-zinc-400 font-semibold hover:text-zinc-600 transition-colors">+ Add Data</button>
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Data</button>
               <span className="text-zinc-200">|</span>
-              <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center">
+              <button 
+                onClick={() => setShowNetWorthDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
+              >
                 Simulation details <ChevronRight className="h-3 w-3 ml-0.5" />
               </button>
             </div>
@@ -414,9 +471,12 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
               <Briefcase className="h-5 w-5" />
             </div>
             <div className="flex gap-2">
-              <button className="text-xs text-zinc-400 font-semibold hover:text-zinc-600 transition-colors">+ Add Investment</button>
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Investment</button>
               <span className="text-zinc-200">|</span>
-              <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center">
+              <button
+                onClick={() => setShowInvestmentDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
+              >
                 Details <ChevronRight className="h-3 w-3 ml-0.5" />
               </button>
             </div>
@@ -488,9 +548,12 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
               <Target className="h-5 w-5" />
             </div>
             <div className="flex gap-2">
-              <button className="text-xs text-zinc-400 font-semibold hover:text-zinc-600 transition-colors">+ Add Goal</button>
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Goal</button>
               <span className="text-zinc-200">|</span>
-              <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center">
+              <button 
+                onClick={() => setShowGoalDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
+              >
                 Details <ChevronRight className="h-3 w-3 ml-0.5" />
               </button>
             </div>
@@ -572,9 +635,12 @@ export default function WealthView({ onAddClick }: WealthViewProps) {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div className="flex gap-2">
-              <button className="text-xs text-zinc-400 font-semibold hover:text-zinc-600 transition-colors">+ Add Essential</button>
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Essential</button>
               <span className="text-zinc-200">|</span>
-              <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center">
+              <button
+                onClick={() => setShowEmergencyDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
+              >
                 Details <ChevronRight className="h-3 w-3 ml-0.5" />
               </button>
             </div>

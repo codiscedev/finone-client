@@ -27,7 +27,8 @@ import {
   Menu,
   Star,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CreditCard
 } from "lucide-react";
 import WealthView from "./wealth-view";
 import MoneyFlowView from "./money-flow-view";
@@ -36,6 +37,7 @@ import CollaborationView from "./collaboration-view";
 import SettingsView from "./settings-view";
 import TaxPlannerView from "./tax-planner-view";
 import AIAssistantView from "./ai-assistant-view";
+import PricingView from "./pricing-view";
 
 export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = React.useState("Dashboard");
@@ -53,6 +55,7 @@ export default function DashboardPage() {
     { name: "Collaboration", icon: Users },
     { name: "AI Assistant", icon: BrainCircuit },
     { name: "Settings", icon: Settings },
+    { name: "Pricing", icon: CreditCard },
   ];
 
   const notifications = [
@@ -67,17 +70,19 @@ export default function DashboardPage() {
       case "Dashboard":
         return <DashboardView />;
       case "Wealth":
-        return <WealthView onAddClick={() => setIsAddDrawerOpen(true)} />;
+        return <WealthView onAddClick={() => setIsAddDrawerOpen(true)} onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Money Flow":
         return <MoneyFlowView />;
       case "Tax Planner":
         return <TaxPlannerView />;
       case "Collaboration":
-        return <CollaborationView />;
+        return <CollaborationView onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "AI Assistant":
-        return <AIAssistantView />;
+        return <AIAssistantView onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Settings":
         return <SettingsView />;
+      case "Pricing":
+        return <PricingView />;
       default:
         return <DashboardView />;
     }
@@ -264,7 +269,7 @@ export default function DashboardPage() {
                   A
                 </div>
                 <div className="hidden md:block">
-                  <p className="text-xs font-semibold text-zinc-900 leading-tight">Anand Member</p>
+                  <p className="text-xs font-semibold text-zinc-900 leading-tight">Anandha Murthy</p>
                   <p className="text-[10px] text-zinc-500 leading-none mt-0.5">Premium Plan</p>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
@@ -273,18 +278,18 @@ export default function DashboardPage() {
               {showProfileMenu && (
                 <div className="absolute right-0 mt-2 w-48 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-lg shadow-zinc-200/50">
                   <div className="px-3 py-1.5 border-b border-zinc-100 mb-1">
-                    <p className="text-xs text-zinc-500">Signed in as</p>
-                    <p className="text-xs font-bold text-zinc-900 truncate">anand@finone.io</p>
+                    <p className="text-xs font-bold text-zinc-900">Anandha Murthy</p>
+                    <p className="text-[9px] text-zinc-450 mt-0.5">anandha@financeone.com</p>
                   </div>
-                  <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-100">
-                    <User className="h-3.5 w-3.5" /> My Profile
+                  <button className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-650 hover:bg-zinc-50 hover:text-zinc-900 flex items-center gap-2 outline-none">
+                    <User className="h-3.5 w-3.5 text-zinc-400" /> Profile
                   </button>
-                  <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-100">
-                    <Settings className="h-3.5 w-3.5" /> Billing & Settings
+                  <button className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-650 hover:bg-zinc-50 hover:text-zinc-900 flex items-center gap-2 outline-none">
+                    <Settings className="h-3.5 w-3.5 text-zinc-400" /> Account Settings
                   </button>
-                  <div className="border-t border-zinc-100 my-1" />
-                  <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-red-600 hover:bg-red-50/50">
-                    Logout
+                  <div className="h-px bg-zinc-100 my-1" />
+                  <button className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50/50 flex items-center gap-2 outline-none">
+                    Log out
                   </button>
                 </div>
               )}
@@ -293,7 +298,7 @@ export default function DashboardPage() {
         </header>
 
         {/* 3. Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-zinc-50/50 p-8">
+        <main className="flex-1 overflow-y-auto bg-zinc-50/20 p-8 scrollbar-thin">
           {renderContent()}
         </main>
       </div>
@@ -310,22 +315,22 @@ function DashboardView() {
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-zinc-950">Welcome back, Anand</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-950">Welcome back, Anandha</h2>
           <p className="text-sm text-zinc-500 mt-1">Here is a quick breakdown of your portfolios and wealth indicators today.</p>
         </div>
         
         {/* Quick Utilities */}
         <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 transition-colors">
-            <Calendar className="h-3.5 w-3.5 text-zinc-500" />
+          <button className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 h-10 text-sm font-semibold text-zinc-750 shadow-sm hover:bg-zinc-50 transition-all outline-none active:scale-[0.98]">
+            <Calendar className="h-4 w-4 text-zinc-500" />
             Last 30 Days
           </button>
-          <button className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 transition-colors">
-            <Download className="h-3.5 w-3.5 text-zinc-500" />
+          <button className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 h-10 text-sm font-semibold text-zinc-750 shadow-sm hover:bg-zinc-50 transition-all outline-none active:scale-[0.98]">
+            <Download className="h-4 w-4 text-zinc-500" />
             Export Statement
           </button>
-          <button className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors">
-            <Plus className="h-3.5 w-3.5" />
+          <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 h-10 text-sm font-semibold text-white shadow-sm transition-all outline-none active:scale-[0.98]">
+            <Plus className="h-4 w-4" />
             Add Account
           </button>
         </div>

@@ -21,7 +21,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function AIAssistantView() {
+interface AIAssistantViewProps {
+  onUpgradeClick?: () => void;
+}
+
+export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps) {
   // Suggested Prompts list
   const suggestedPrompts = [
     "Analyze my portfolio",
@@ -36,7 +40,7 @@ export default function AIAssistantView() {
   const [messages, setMessages] = React.useState([
     {
       sender: "bot",
-      text: "Hello Anand. I have compiled your current financial profile (Health Score: 78, Net Worth: ₹1.24 Cr). Ask me anything about budgeting, retirement, tax-saving strategies, or portfolio rebalancing.",
+      text: "Hello Anandha. I have compiled your current financial profile (Health Score: 78, Net Worth: ₹1.24 Cr). Ask me anything about budgeting, retirement, tax-saving strategies, or portfolio rebalancing.",
       time: "10:15 AM"
     }
   ]);
@@ -58,12 +62,12 @@ export default function AIAssistantView() {
       return "To retire at age 60 with a corpus of ₹2.5 Crore (adjusted for 6% inflation), you need a monthly SIP of ₹12,500. Currently, your retirement SIP stands at ₹1,500. Incrementing this by ₹5,000 monthly will accelerate your goal timeline by 3 years.";
     }
     if (q.includes("tax") || q.includes("regime")) {
-      return "Under your salary profile, the New Tax Regime is recommended and saves you ₹64,000 annually. If you choose the Old Regime, ensure you exhaust Section 80C (ELSS/PPF) and Section 80CCD (NPS) fully to offset the liability difference.";
+      return "Based on your income of ₹24 Lakhs and deductions, the New Tax Regime is projected to save you ₹64,200 compared to the Old Tax Regime. I recommend opting for the New Regime during your tax declaration.";
     }
     if (q.includes("net worth") || q.includes("predict")) {
       return "At your current monthly savings rate of ₹25,000 and 8% returns, your net worth is projected to compound from ₹1.24 Cr to ₹2.18 Cr in 10 years. Boosting the yield rate to 12% via equity index funds yields ₹2.65 Cr.";
     }
-    return "Understood. That strategy could improve your overall compounding ratios. I recommend automating your monthly debt prepayment schedules to optimize interest write-offs.";
+    return "That's a great question about managing your capital. I suggest looking at your Net Worth trend projection inside the Wealth card simulator to visualize long-term compounding effects.";
   };
 
   const handleSend = (textToSend?: string) => {
@@ -125,19 +129,25 @@ export default function AIAssistantView() {
         <p className="text-sm text-zinc-500 mt-1">Reasoning-based wealth strategy planner and context-trained personal chatbot.</p>
       </div>
 
-      {/* Premium Hero Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-blue-50/50 p-5 border border-indigo-100/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Pro Upgrade Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 p-5 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md">
-            <Bot className="h-5.5 w-5.5" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white border border-white/20">
+            <Sparkles className="h-5 w-5 text-yellow-300 fill-yellow-300" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-indigo-950">Active Model: FinOne-Reasoning-v2.6</h4>
-            <p className="text-xs text-indigo-850 mt-0.5 leading-relaxed">
-              Your premium membership grants you access to deep capital assessment logs, custom retirement compounding projection tables, and tax offset calculations.
+            <h4 className="text-sm font-bold">Unlock Advanced AI Wealth Mentor</h4>
+            <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed max-w-2xl">
+              You are currently viewing a basic sandbox preview. Upgrade to **Pro** to unlock deep reasoning-based capital rebalancing, automated tax-saving audits, and unlimited chat questions.
             </p>
           </div>
         </div>
+        <button
+          onClick={onUpgradeClick}
+          className="h-9 px-4 shrink-0 rounded-xl bg-white text-blue-600 hover:bg-zinc-50 text-xs font-bold transition-all shadow-sm cursor-pointer outline-none"
+        >
+          Upgrade to Pro
+        </button>
       </div>
 
       {/* Split Dashboard: 1. Mentor, 2. Chatbot */}
