@@ -614,7 +614,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                         <div className="space-y-1">
                           <label className="font-semibold text-zinc-550 flex items-center gap-1">
-                            Total Value <Info className="h-3 w-3 text-zinc-400" title="Quantity × Price" />
+                            Total Value <span title="Quantity × Price" className="cursor-help"><Info className="h-3 w-3 text-zinc-400" /></span>
                           </label>
                           <input
                             type="text"
