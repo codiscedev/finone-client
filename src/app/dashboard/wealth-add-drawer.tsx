@@ -32,7 +32,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "../../components/ui/select";
 
 interface WealthAddDrawerProps {
   isOpen: boolean;

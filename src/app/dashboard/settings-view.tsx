@@ -19,7 +19,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "../../components/ui/select";
 
 export default function SettingsView() {
   // Profile settings state
