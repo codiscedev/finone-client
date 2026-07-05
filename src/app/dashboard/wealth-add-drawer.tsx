@@ -32,6 +32,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 
 interface WealthAddDrawerProps {
   isOpen: boolean;
@@ -670,7 +671,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                     <div className="space-y-1">
                       <label className="font-semibold text-zinc-500">Asset Type *</label>
-                      <select
+                      <Select
                         value={assetType}
                         onChange={(e) => { 
                           const newType = e.target.value as "APPRECIATION" | "DEPRECIATION";
@@ -681,7 +682,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       >
                         <option value="APPRECIATION">APPRECIATION</option>
                         <option value="DEPRECIATION">DEPRECIATION</option>
-                      </select>
+                      </Select>
                     </div>
 
                     <div className="space-y-1">
@@ -715,7 +716,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Property Type</label>
-                        <select
+                        <Select
                           value={propertyType}
                           onChange={(e) => { setPropertyType(e.target.value); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
@@ -723,7 +724,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                           <option value="Residential">Residential</option>
                           <option value="Commercial">Commercial</option>
                           <option value="Plot / Land">Plot / Land</option>
-                        </select>
+                        </Select>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -821,7 +822,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="font-semibold text-zinc-500">Market Region *</label>
-                          <select
+                          <Select
                             value={stockRegion}
                             onChange={(e) => { setStockRegion(e.target.value); triggerDraftSave(); }}
                             className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
@@ -831,7 +832,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             <option value="Europe">Europe</option>
                             <option value="UK">UK</option>
                             <option value="Other">Other</option>
-                          </select>
+                          </Select>
                         </div>
 
                         <div className="space-y-1">
@@ -905,7 +906,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="font-semibold text-zinc-500">Vehicle Type</label>
-                          <select
+                          <Select
                             value={vehicleType}
                             onChange={(e) => { setVehicleType(e.target.value); triggerDraftSave(); }}
                             className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
@@ -913,7 +914,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             <option value="Car">Car</option>
                             <option value="Bike">Bike / Two-Wheeler</option>
                             <option value="Commercial">Commercial Vehicle</option>
-                          </select>
+                          </Select>
                         </div>
 
                         <div className="space-y-1">
@@ -995,14 +996,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                         <div className="space-y-1">
                           <label className="font-semibold text-zinc-500">Account Type</label>
-                          <select
+                          <Select
                             value={bankAccType}
                             onChange={(e) => { setBankAccType(e.target.value); triggerDraftSave(); }}
                             className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
                           >
                             <option value="Savings">Savings</option>
                             <option value="Checking">Checking / Current</option>
-                          </select>
+                          </Select>
                         </div>
                       </div>
 
@@ -1335,7 +1336,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Loan Status</label>
-                        <select
+                        <Select
                           value={loanStatus}
                           onChange={(e) => { setLoanStatus(e.target.value as "Active" | "Closed" | "Foreclosed"); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
@@ -1343,7 +1344,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                           <option value="Active">Active</option>
                           <option value="Closed">Closed</option>
                           <option value="Foreclosed">Foreclosed</option>
-                        </select>
+                        </Select>
                       </div>
                     </div>
 
@@ -1443,14 +1444,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Tenure Unit *</label>
-                        <select
+                        <Select
                           value={loanTenureUnit}
                           onChange={(e) => { setLoanTenureUnit(e.target.value as "Years" | "Months"); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
                         >
                           <option value="Years">Years</option>
                           <option value="Months">Months</option>
-                        </select>
+                        </Select>
                       </div>
                     </div>
 
@@ -1572,26 +1573,26 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Interest Rate Type</label>
-                        <select
+                        <Select
                           value={interestRateType}
                           onChange={(e) => { setInterestRateType(e.target.value as "Floating" | "Fixed"); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
                         >
                           <option value="Floating">Floating Interest Rate</option>
                           <option value="Fixed">Fixed Interest Rate</option>
-                        </select>
+                        </Select>
                       </div>
 
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Prepayment Allowed</label>
-                        <select
+                        <Select
                           value={prepaymentAllowed}
                           onChange={(e) => { setPrepaymentAllowed(e.target.value as "Yes" | "No"); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
                         >
                           <option value="Yes">Yes, Prepayment Allowed</option>
                           <option value="No">No, Prepayment Blocked</option>
-                        </select>
+                        </Select>
                       </div>
                     </div>
 
@@ -1609,7 +1610,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Linked Asset</label>
-                        <select
+                        <Select
                           value={linkedAsset}
                           onChange={(e) => { setLinkedAsset(e.target.value as "Property" | "Vehicle" | "Gold" | "Other" | "None"); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
@@ -1619,7 +1620,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                           <option value="Vehicle">Linked Vehicle Asset</option>
                           <option value="Gold">Linked Gold Reserve</option>
                           <option value="Other">Other Linked Asset</option>
-                        </select>
+                        </Select>
                       </div>
                     </div>
 

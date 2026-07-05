@@ -19,6 +19,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 
 export default function SettingsView() {
   // Profile settings state
@@ -176,7 +177,7 @@ export default function SettingsView() {
               <label className="font-semibold text-zinc-500 flex items-center gap-1">
                 Country <Globe className="h-3 w-3 text-zinc-400" />
               </label>
-              <select
+              <Select
                 value={country}
                 onChange={(e) => handleCountryChange(e.target.value)}
                 className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white cursor-pointer font-medium"
@@ -185,13 +186,13 @@ export default function SettingsView() {
                 <option value="United States">United States 🇺🇸</option>
                 <option value="Germany">Germany 🇩🇪</option>
                 <option value="United Kingdom">United Kingdom 🇬🇧</option>
-              </select>
+              </Select>
             </div>
 
             {/* Auto currency */}
             <div className="space-y-1.5">
               <label className="font-semibold text-zinc-500">Preferred Currency</label>
-              <select
+              <Select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
                 className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white cursor-pointer font-medium"
@@ -200,7 +201,7 @@ export default function SettingsView() {
                 <option value="USD ($)">USD ($)</option>
                 <option value="EUR (€)">EUR (€)</option>
                 <option value="GBP (£)">GBP (£)</option>
-              </select>
+              </Select>
             </div>
 
             {/* Country Inflation rate */}
@@ -614,7 +615,7 @@ export default function SettingsView() {
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="space-y-1.5">
                 <label className="font-semibold text-zinc-500">Font Size</label>
-                <select
+                <Select
                   value={fontSize}
                   onChange={(e) => setFontSize(e.target.value)}
                   className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
@@ -622,18 +623,18 @@ export default function SettingsView() {
                   <option value="small">Small (Inter 12px)</option>
                   <option value="medium">Medium (Inter 14px)</option>
                   <option value="large">Large (Inter 16px)</option>
-                </select>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <label className="font-semibold text-zinc-500">Layout Density</label>
-                <select
+                <Select
                   value={density}
                   onChange={(e) => setDensity(e.target.value)}
                   className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
                 >
                   <option value="comfortable">Comfortable</option>
                   <option value="compact">Compact (Dense)</option>
-                </select>
+                </Select>
               </div>
             </div>
           </div>
