@@ -128,3 +128,21 @@
     @apply font-sans;
   }
 }
+
+/* Disable spinner up/down arrows globally on all type="number" inputs */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Globally adjust spacing between label (field title) and input/select/textarea/div (field box) when inside a space-y-1 container */
+.space-y-1 > label + input,
+.space-y-1 > label + select,
+.space-y-1 > label + textarea,
+.space-y-1 > label + div {
+  margin-top: 0.5rem !important; /* Increase vertical spacing from 4px to 8px */
+}

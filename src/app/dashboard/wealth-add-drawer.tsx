@@ -17,7 +17,19 @@ import {
   BookmarkCheck,
   CheckCircle2,
   Info,
-  ShieldCheck
+  ShieldCheck,
+  Car,
+  Landmark,
+  Lock,
+  RefreshCw,
+  PieChart,
+  PiggyBank,
+  Bitcoin,
+  Banknote,
+  HelpCircle,
+  HeartHandshake,
+  User,
+  GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -32,7 +44,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [recordType, setRecordType] = React.useState<"Asset" | "Debt" | "Investment" | "Goal" | "Emergency" | null>(null);
   const [assetCategory, setAssetCategory] = React.useState<string>("");
   const [assetType, setAssetType] = React.useState<"APPRECIATION" | "DEPRECIATION">("APPRECIATION");
-  
+
   // Auto-save draft state indicator
   const [showDraftBadge, setShowDraftBadge] = React.useState(false);
 
@@ -46,6 +58,18 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Prevent trackpad/mouse scroll wheel from changing number input values when focused
+  React.useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.tagName === "INPUT" && (activeEl as HTMLInputElement).type === "number") {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => window.removeEventListener("wheel", handleWheel);
+  }, []);
 
   // Trigger temporary draft auto-save indicators
   const triggerDraftSave = () => {
@@ -69,7 +93,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [purchaseValue, setPurchaseValue] = React.useState("");
   const [purchaseDate, setPurchaseDate] = React.useState("");
   const [currentMarketValue, setCurrentMarketValue] = React.useState("");
-  const [address, setAddress] = React.useState("");
+  const [assetNotes, setAssetNotes] = React.useState("");
+  const [assetRate, setAssetRate] = React.useState("");
   const [ownershipPercent, setOwnershipPercent] = React.useState("100");
   const [rentalIncome, setRentalIncome] = React.useState("");
 
@@ -79,7 +104,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [lendingBank, setLendingBank] = React.useState("");
   const [loanAccountNumber, setLoanAccountNumber] = React.useState("");
   const [loanStatus, setLoanStatus] = React.useState<"Active" | "Closed" | "Foreclosed">("Active");
-  
+
   const [sanctionedAmount, setSanctionedAmount] = React.useState("");
   const [outstandingPrincipal, setOutstandingPrincipal] = React.useState("");
   const [loanInterestRate, setLoanInterestRate] = React.useState("");
@@ -88,7 +113,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [loanStartDate, setLoanStartDate] = React.useState("");
   const [emiAmountInput, setEmiAmountInput] = React.useState("");
   const [emiDueDate, setEmiDueDate] = React.useState("");
-  
+
   const [prepaymentAllowed, setPrepaymentAllowed] = React.useState<"Yes" | "No">("Yes");
   const [interestRateType, setInterestRateType] = React.useState<"Floating" | "Fixed">("Floating");
   const [coBorrower, setCoBorrower] = React.useState("");
@@ -101,17 +126,17 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     const annualRate = Number(loanInterestRate) || 0;
     const tenureValue = Number(loanTenureValue) || 0;
     const n = loanTenureUnit === "Years" ? tenureValue * 12 : tenureValue;
-    
+
     if (P <= 0 || n <= 0) return { emi: 0, totalRepayment: 0, totalInterest: 0 };
     if (annualRate <= 0) {
       return { emi: Math.round(P / n), totalRepayment: P, totalInterest: 0 };
     }
-    
+
     const r = (annualRate / 100) / 12;
     const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
     const totalRepayment = emi * n;
     const totalInterest = totalRepayment - P;
-    
+
     return {
       emi: Math.round(emi),
       totalRepayment: Math.round(totalRepayment),
@@ -124,7 +149,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const sanctionedNum = Number(sanctionedAmount) || 0;
   const outstandingNum = Number(outstandingPrincipal) || 0;
   const completionPercent = sanctionedNum > 0 ? Math.max(0, Math.min(100, Math.round(((sanctionedNum - outstandingNum) / sanctionedNum) * 100))) : 0;
-  
+
   const totalMonths = loanTenureUnit === "Years" ? (Number(loanTenureValue) || 0) * 12 : (Number(loanTenureValue) || 0);
   const remainingMonths = sanctionedNum > 0 ? Math.max(0, Math.round(totalMonths * (outstandingNum / sanctionedNum))) : 0;
   const remainingInterest = Math.round(emiCalc.totalInterest * (sanctionedNum > 0 ? (outstandingNum / sanctionedNum) : 0));
@@ -132,9 +157,9 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const getAIInsights = () => {
     const rate = Number(loanInterestRate) || 0;
     const insights: Array<{ text: string; savings: string; priority: "High" | "Medium" | "Low"; action: string }> = [];
-    
+
     if (outstandingNum <= 0) return insights;
-    
+
     // Insight 1: Prepayment
     const prepayVal = outstandingNum > 500000 ? 200000 : Math.round(outstandingNum * 0.1);
     const savingsVal = Math.round(prepayVal * (rate / 100) * (remainingMonths / 12) * 0.75); // approx discount factor
@@ -146,7 +171,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
         action: "One-time Prepayment"
       });
     }
-    
+
     // Insight 2: Increase EMI
     const emiInc = Math.round(Math.max(1000, emiCalc.emi * 0.1));
     const monthsSaved = Math.round(remainingMonths * 0.12);
@@ -158,7 +183,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
         action: "Step-up EMI plan"
       });
     }
-    
+
     // Insight 3: High interest rate warning
     if (rate > 9.5) {
       insights.push({
@@ -175,7 +200,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
         action: "Set Auto-Pay"
       });
     }
-    
+
     return insights;
   };
 
@@ -228,7 +253,6 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [stockAvgPrice, setStockAvgPrice] = React.useState("");
   const [stockInvestedAmount, setStockInvestedAmount] = React.useState("");
   const [stockDate, setStockDate] = React.useState("");
-  const [stockNotes, setStockNotes] = React.useState("");
   const [showStockDropdown, setShowStockDropdown] = React.useState(false);
 
   // Mock Stock Search autocomplete data
@@ -266,14 +290,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Simple inline validation checks
     const valErrors: Record<string, string> = {};
     if (recordType === "Asset") {
       if (!assetCategory) {
         valErrors.category = "Please select an asset category.";
       }
-      
+
       if (assetCategory === "PROPERTY") {
         if (!propertyName.trim()) valErrors.propertyName = "Property name is required.";
         if (!purchaseValue) valErrors.purchaseValue = "Purchase value is required.";
@@ -292,19 +316,19 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     if (recordType === "Debt") {
       if (!loanName.trim()) valErrors.loanName = "Loan name is required.";
       if (!lendingBank.trim()) valErrors.lendingBank = "Lender/Bank is required.";
-      
+
       const sancAmt = Number(sanctionedAmount) || 0;
       const outAmt = Number(outstandingPrincipal) || 0;
       const rate = Number(loanInterestRate) || 0;
       const tenure = Number(loanTenureValue) || 0;
-      
+
       if (sancAmt <= 0) valErrors.sanctionedAmount = "Sanctioned amount must be greater than 0.";
       if (outAmt <= 0) {
         valErrors.outstandingPrincipal = "Outstanding principal must be greater than 0.";
       } else if (outAmt > sancAmt) {
         valErrors.outstandingPrincipal = "Outstanding principal cannot exceed sanctioned amount.";
       }
-      
+
       if (rate <= 0) valErrors.loanInterestRate = "Interest rate must be greater than 0%.";
       if (tenure <= 0) valErrors.loanTenureValue = "Loan tenure must be greater than 0.";
       if (!loanStartDate) valErrors.loanStartDate = "Loan start date is required.";
@@ -317,12 +341,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
     setErrors({});
     alert("Record created and added to portfolio registry successfully!");
-    
+
     // Reset steps and values, close drawer
     setStep(1);
     setRecordType(null);
     setAssetCategory("");
     setDebtCategory("");
+    setAssetRate("");
+    setAssetNotes("");
     clearDebtFields();
     onClose();
   };
@@ -348,24 +374,24 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     if (recordType === "Debt") {
       if (!loanName.trim()) valErrors.loanName = "Loan name is required.";
       if (!lendingBank.trim()) valErrors.lendingBank = "Lender/Bank is required.";
-      
+
       const sancAmt = Number(sanctionedAmount) || 0;
       const outAmt = Number(outstandingPrincipal) || 0;
       const rate = Number(loanInterestRate) || 0;
       const tenure = Number(loanTenureValue) || 0;
-      
+
       if (sancAmt <= 0) valErrors.sanctionedAmount = "Sanctioned amount must be greater than 0.";
       if (outAmt <= 0) {
         valErrors.outstandingPrincipal = "Outstanding principal must be greater than 0.";
       } else if (outAmt > sancAmt) {
         valErrors.outstandingPrincipal = "Outstanding principal cannot exceed sanctioned amount.";
       }
-      
+
       if (rate <= 0) valErrors.loanInterestRate = "Interest rate must be greater than 0%.";
       if (tenure <= 0) valErrors.loanTenureValue = "Loan tenure must be greater than 0.";
       if (!loanStartDate) valErrors.loanStartDate = "Loan start date is required.";
     }
-    
+
     if (Object.keys(valErrors).length > 0) {
       setErrors(valErrors);
       return;
@@ -373,7 +399,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
     setErrors({});
     alert("Record created successfully! Enter details for the next record.");
-    
+
     // Reset inputs, stay on step 2 for Debt category selection
     clearDebtFields();
     setStep(2);
@@ -396,46 +422,50 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
   const handleAssetCategorySelect = (category: string) => {
     setAssetCategory(category);
-    
+
     // Auto-set Asset Type: Depreciation for VEHICLE, Appreciation for others
     if (category === "VEHICLE") {
       setAssetType("DEPRECIATION");
     } else {
       setAssetType("APPRECIATION");
     }
-    
+
+    // Prefill default rate
+    const found = assetCategories.find((c) => c.code === category);
+    setAssetRate(found?.defaultRate || "5");
+
     setStep(3);
   };
 
   // Categories list
   const assetCategories = [
-    { code: "PROPERTY", label: "Property", desc: "Residential, commercial or plot properties" },
-    { code: "GOLD", label: "Gold", desc: "Physical gold bars, coins or jewelry" },
-    { code: "SILVER", label: "Silver", desc: "Physical silver bars or commodities" },
-    { code: "VEHICLE", label: "Vehicle", desc: "Cars, bikes or commercial transport assets" },
-    { code: "BANK_ACCOUNT", label: "Bank Account", desc: "Savings or checking cash balances" },
-    { code: "FIXED_DEPOSIT", label: "Fixed Deposit", desc: "Term deposits inside bank locks" },
-    { code: "RD", label: "Recurring Deposit", desc: "Monthly compounding deposits" },
-    { code: "STOCK", label: "Stock Investment", desc: "Publicly listed company equities" },
-    { code: "MUTUAL_FUND", label: "Mutual Fund", desc: "Equity index or debt mutual funds" },
-    { code: "EPF", label: "Employee Prov Fund", desc: "Retirement EPF account indexes" },
-    { code: "PPF", label: "Public Prov Fund", desc: "Post Office or bank PPF reserves" },
-    { code: "NPS", label: "National Pension", desc: "NPS pension fund manager portfolios" },
-    { code: "CRYPTO", label: "Cryptocurrency", desc: "DeFi coin wallets and tokens" },
-    { code: "CASH", label: "Liquid Cash", desc: "Physical currency cash reserves" },
-    { code: "OTHER", label: "Other Asset", desc: "Collectible art, variables, or items" }
+    { code: "PROPERTY", label: "Property", desc: "Residential, commercial or plot properties", icon: Home, color: "text-emerald-600 bg-emerald-50", defaultRate: "8" },
+    { code: "GOLD", label: "Gold", desc: "Physical gold bars, coins or jewelry", icon: Coins, color: "text-amber-500 bg-amber-50", defaultRate: "7" },
+    { code: "SILVER", label: "Silver", desc: "Physical silver bars or commodities", icon: Sparkles, color: "text-slate-400 bg-slate-50", defaultRate: "6" },
+    { code: "VEHICLE", label: "Vehicle", desc: "Cars, bikes or commercial transport assets", icon: Car, color: "text-blue-600 bg-blue-50", defaultRate: "15" },
+    { code: "BANK_ACCOUNT", label: "Bank Account", desc: "Savings or checking cash balances", icon: Landmark, color: "text-indigo-600 bg-indigo-50", defaultRate: "3" },
+    { code: "FIXED_DEPOSIT", label: "Fixed Deposit", desc: "Term deposits inside bank locks", icon: Lock, color: "text-teal-600 bg-teal-50", defaultRate: "6.5" },
+    { code: "RD", label: "Recurring Deposit", desc: "Monthly compounding deposits", icon: RefreshCw, color: "text-cyan-600 bg-cyan-50", defaultRate: "6.5" },
+    { code: "STOCK", label: "Stock Investment", desc: "Publicly listed company equities", icon: TrendingUp, color: "text-violet-600 bg-violet-50", defaultRate: "12" },
+    { code: "MUTUAL_FUND", label: "Mutual Fund", desc: "Equity index or debt mutual funds", icon: PieChart, color: "text-fuchsia-600 bg-fuchsia-50", defaultRate: "10" },
+    { code: "EPF", label: "Employee Prov Fund", desc: "Retirement EPF account indexes", icon: PiggyBank, color: "text-pink-600 bg-pink-50", defaultRate: "8.1" },
+    { code: "PPF", label: "Public Prov Fund", desc: "Post Office or bank PPF reserves", icon: Percent, color: "text-rose-600 bg-rose-50", defaultRate: "7.1" },
+    { code: "NPS", label: "National Pension", desc: "NPS pension fund manager portfolios", icon: Landmark, color: "text-sky-600 bg-sky-50", defaultRate: "9" },
+    { code: "CRYPTO", label: "Cryptocurrency", desc: "DeFi coin wallets and tokens", icon: Bitcoin, color: "text-orange-500 bg-orange-50", defaultRate: "15" },
+    { code: "CASH", label: "Liquid Cash", desc: "Physical currency cash reserves", icon: Banknote, color: "text-lime-600 bg-lime-50", defaultRate: "0" },
+    { code: "OTHER", label: "Other Asset", desc: "Collectible art, variables, or items", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50", defaultRate: "5" }
   ];
 
   const debtCategories = [
-    { code: "HOME_LOAN", label: "Home Loan", desc: "Mortgages or home construction financing" },
-    { code: "GOLD_LOAN", label: "Gold Loan", desc: "Borrowings backed by gold assets" },
-    { code: "VEHICLE_LOAN", label: "Vehicle Loan", desc: "Loans for cars, bikes or transport" },
-    { code: "SOFT_LOAN", label: "Soft Loan (Family/Friends)", desc: "Zero or low interest borrowings from family" },
-    { code: "MF_LOAN", label: "Mutual Fund Loan", desc: "Loans taken against mutual fund securities" },
-    { code: "PERSONAL_LOAN", label: "Personal Loan", desc: "Unsecured personal credits or lines" },
-    { code: "EDUCATION_LOAN", label: "Education Loan", desc: "Student loans for higher studies" },
-    { code: "CREDIT_CARD_LOAN", label: "Credit Card Loan", desc: "Credit card EMI conversion or loans" },
-    { code: "OTHERS", label: "Other Loan", desc: "Any other active liability or loan" }
+    { code: "HOME_LOAN", label: "Home Loan", desc: "Mortgages or home construction financing", icon: Home, color: "text-emerald-600 bg-emerald-50" },
+    { code: "GOLD_LOAN", label: "Gold Loan", desc: "Borrowings backed by gold assets", icon: Coins, color: "text-amber-500 bg-amber-50" },
+    { code: "VEHICLE_LOAN", label: "Vehicle Loan", desc: "Loans for cars, bikes or transport", icon: Car, color: "text-blue-600 bg-blue-50" },
+    { code: "SOFT_LOAN", label: "Soft Loan (Family/Friends)", desc: "Zero or low interest borrowings from family", icon: HeartHandshake, color: "text-rose-500 bg-rose-50" },
+    { code: "MF_LOAN", label: "Mutual Fund Loan", desc: "Loans taken against mutual fund securities", icon: PieChart, color: "text-fuchsia-600 bg-fuchsia-50" },
+    { code: "PERSONAL_LOAN", label: "Personal Loan", desc: "Unsecured personal credits or lines", icon: User, color: "text-indigo-600 bg-indigo-50" },
+    { code: "EDUCATION_LOAN", label: "Education Loan", desc: "Student loans for higher studies", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50" },
+    { code: "CREDIT_CARD_LOAN", label: "Credit Card Loan", desc: "Credit card EMI conversion or loans", icon: CreditCard, color: "text-violet-600 bg-violet-50" },
+    { code: "OTHERS", label: "Other Loan", desc: "Any other active liability or loan", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50" }
   ];
 
   if (!isOpen) return null;
@@ -443,22 +473,21 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop overlay */}
-      <div 
+      <div
         onClick={onClose}
-        className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in" 
+        className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
       />
 
       {/* Drawer panel */}
       <div className="relative flex flex-col h-screen w-full max-w-[540px] bg-white border-l border-zinc-200 shadow-2xl z-10 transition-transform duration-300 transform translate-x-0 animate-in slide-in-from-right overflow-hidden">
-        
+
         {/* Sticky Header */}
         <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-zinc-150/70 bg-zinc-50/50">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4.5 w-4.5 text-indigo-600 animate-pulse" />
             <div>
               <h3 className="text-sm font-black text-zinc-900 leading-none">Add Financial Record</h3>
               <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">
-                {step === 1 ? "What would you like to add?" : step === 2 ? "Select category category" : "Fill out details"}
+                {step === 1 ? "What would you like to add?" : step === 2 ? "Select Category" : "Fill out details"}
               </p>
             </div>
           </div>
@@ -479,14 +508,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
         {/* Scrollable Form Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
-          
+
           {/* ==========================================
               Step 1: Choose Record Type
               ========================================== */}
           {step === 1 && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
+
                 <button
                   onClick={() => handleRecordTypeSelect("Asset")}
                   className="rounded-xl border border-zinc-200 p-4 text-left hover:border-blue-600 hover:bg-blue-50/5/20 transition-all outline-none group"
@@ -559,34 +588,44 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   <ChevronLeft className="h-4 w-4 mr-0.5" /> Back
                 </button>
               </div>
-              
-              <span className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block">
+
+              <span className="text-[10px] font-black text-zinc-400 tracking-wider block">
                 Choose {recordType} Category
               </span>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {recordType === "Asset" ? (
-                  assetCategories.map((c) => (
-                    <button
-                      key={c.code}
-                      onClick={() => handleAssetCategorySelect(c.code)}
-                      className="rounded-xl border border-zinc-200 p-3.5 text-left hover:border-blue-600 hover:bg-blue-50/5/20 transition-all outline-none"
-                    >
-                      <span className="text-xs font-bold text-zinc-900">{c.label}</span>
-                      <p className="text-[9px] text-zinc-500 mt-1">{c.desc}</p>
-                    </button>
-                  ))
+                  assetCategories.map((c) => {
+                    const Icon = c.icon;
+                    return (
+                      <button
+                        key={c.code}
+                        onClick={() => handleAssetCategorySelect(c.code)}
+                        className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
+                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
+                        </div>
+                        <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
+                      </button>
+                    );
+                  })
                 ) : (
-                  debtCategories.map((c) => (
-                    <button
-                      key={c.code}
-                      onClick={() => handleDebtCategorySelect(c.code)}
-                      className="rounded-xl border border-zinc-200 p-3.5 text-left hover:border-blue-600 hover:bg-blue-50/5/20 transition-all outline-none"
-                    >
-                      <span className="text-xs font-bold text-zinc-900">{c.label}</span>
-                      <p className="text-[9px] text-zinc-500 mt-1">{c.desc}</p>
-                    </button>
-                  ))
+                  debtCategories.map((c) => {
+                    const Icon = c.icon;
+                    return (
+                      <button
+                        key={c.code}
+                        onClick={() => handleDebtCategorySelect(c.code)}
+                        className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
+                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
+                        </div>
+                        <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -597,7 +636,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
               ========================================== */}
           {step === 3 && (
             <div className="space-y-6">
-              
+
               {/* Back controls */}
               <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <button
@@ -612,20 +651,20 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                 >
                   <ChevronLeft className="h-4 w-4 mr-0.5" /> Back to Category
                 </button>
-                
+
               </div>
 
               {/* DYNAMIC FORMS ACCORDING TO SELECTION */}
 
               {recordType === "Asset" ? (
                 <form onSubmit={handleSave} className="space-y-4 text-xs">
-                  
-                  {/* Selected Category and Type Selection row */}
-                  <div className="grid grid-cols-2 gap-4 border-b border-zinc-100 pb-4">
+
+                  {/* Selected Category, Type, and Rate row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b border-zinc-100 pb-4">
                     <div className="space-y-1">
                       <label className="font-semibold text-zinc-500">Selected Category</label>
-                      <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] uppercase tracking-wide select-none">
-                        {assetCategory.replace("_", " ")}
+                      <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] tracking-wide select-none">
+                        {assetCategories.find((c) => c.code === assetCategory)?.label || assetCategory.replace("_", " ")}
                       </div>
                     </div>
 
@@ -633,15 +672,32 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       <label className="font-semibold text-zinc-500">Asset Type *</label>
                       <select
                         value={assetType}
-                        onChange={(e) => { setAssetType(e.target.value as "APPRECIATION" | "DEPRECIATION"); triggerDraftSave(); }}
+                        onChange={(e) => { 
+                          const newType = e.target.value as "APPRECIATION" | "DEPRECIATION";
+                          setAssetType(newType); 
+                          triggerDraftSave(); 
+                        }}
                         className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 font-bold cursor-pointer text-[11px] focus:border-blue-500 focus:bg-white"
                       >
                         <option value="APPRECIATION">APPRECIATION</option>
                         <option value="DEPRECIATION">DEPRECIATION</option>
                       </select>
                     </div>
+
+                    <div className="space-y-1">
+                      <label className="font-semibold text-zinc-500">
+                        {assetType === "APPRECIATION" ? "Appreciation Rate (%)" : "Depreciation Rate (%)"}
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="E.g. 5"
+                        value={assetRate}
+                        onChange={(e) => { setAssetRate(e.target.value); triggerDraftSave(); }}
+                        className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white font-semibold"
+                      />
+                    </div>
                   </div>
-                  
+
                   {/* Category = PROPERTY */}
                   {assetCategory === "PROPERTY" && (
                     <div className="space-y-4">
@@ -657,29 +713,17 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                         {errors.propertyName && <span className="text-[10px] text-red-500">{errors.propertyName}</span>}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Property Type</label>
-                          <select
-                            value={propertyType}
-                            onChange={(e) => { setPropertyType(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
-                          >
-                            <option value="Residential">Residential</option>
-                            <option value="Commercial">Commercial</option>
-                            <option value="Plot / Land">Plot / Land</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Ownership %</label>
-                          <input
-                            type="number"
-                            value={ownershipPercent}
-                            onChange={(e) => { setOwnershipPercent(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
-                          />
-                        </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Property Type</label>
+                        <select
+                          value={propertyType}
+                          onChange={(e) => { setPropertyType(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
+                        >
+                          <option value="Residential">Residential</option>
+                          <option value="Commercial">Commercial</option>
+                          <option value="Plot / Land">Plot / Land</option>
+                        </select>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -707,37 +751,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Current Market Value</label>
-                          <input
-                            type="number"
-                            placeholder="Current valuation"
-                            value={currentMarketValue}
-                            onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Monthly Rental Yield</label>
-                          <input
-                            type="number"
-                            placeholder="Optional monthly income"
-                            value={rentalIncome}
-                            onChange={(e) => { setRentalIncome(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
-                          />
-                        </div>
-                      </div>
-
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Property Address</label>
-                        <textarea
-                          placeholder="Complete physical address of property..."
-                          value={address}
-                          onChange={(e) => { setAddress(e.target.value); triggerDraftSave(); }}
-                          className="w-full rounded-lg border border-zinc-200 p-3 bg-zinc-50/50 outline-none text-zinc-900 h-16 resize-none"
+                        <label className="font-semibold text-zinc-500">Current Market Value</label>
+                        <input
+                          type="number"
+                          placeholder="Current valuation"
+                          value={currentMarketValue}
+                          onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
                         />
                       </div>
                     </div>
@@ -746,7 +767,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   {/* Category = STOCK */}
                   {assetCategory === "STOCK" && (
                     <div className="space-y-4">
-                      
+
                       {/* Search stock query */}
                       <div className="space-y-1 relative">
                         <label className="font-semibold text-zinc-500">Stock Name / Symbol *</label>
@@ -874,16 +895,6 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-500"
                           />
                         </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Notes (Optional)</label>
-                        <textarea
-                          placeholder="Notes or capital gains reminders..."
-                          value={stockNotes}
-                          onChange={(e) => { setStockNotes(e.target.value); triggerDraftSave(); }}
-                          className="w-full rounded-lg border border-zinc-200 p-3 bg-zinc-50/50 outline-none text-zinc-900 h-16 resize-none"
-                        />
                       </div>
                     </div>
                   )}
@@ -1275,6 +1286,17 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     </div>
                   )}
 
+                  {/* Note (optional) field for all assets */}
+                  <div className="space-y-1 mt-6">
+                    <label className="font-semibold text-zinc-500">Note (optional)</label>
+                    <textarea
+                      placeholder="Add any additional notes about this asset..."
+                      value={assetNotes}
+                      onChange={(e) => { setAssetNotes(e.target.value); triggerDraftSave(); }}
+                      className="w-full rounded-lg border border-zinc-200 p-3 bg-zinc-50/50 outline-none text-zinc-900 h-16 resize-none"
+                    />
+                  </div>
+
                   {/* Sticky Actions Footer */}
                   <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8">
                     <button
@@ -1298,16 +1320,16 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                 </form>
               ) : recordType === "Debt" ? (
                 <form onSubmit={handleSave} className="space-y-6 text-xs">
-                  
+
                   {/* Basic Information */}
                   <div className="space-y-4">
-                    <span className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block">Basic Information</span>
-                    
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Basic Information</span>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Loan Category</label>
-                        <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] uppercase tracking-wide select-none">
-                          {debtCategory.replace("_", " ")}
+                        <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] tracking-wide select-none">
+                          {debtCategories.find((c) => c.code === debtCategory)?.label || debtCategory.replace("_", " ")}
                         </div>
                       </div>
 
@@ -1365,8 +1387,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                   {/* Loan Details */}
                   <div className="space-y-4 pt-4 border-t border-zinc-100">
-                    <span className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block">Loan & Repayment Details</span>
-                    
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Loan & Repayment Details</span>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Sanctioned Amount *</label>
@@ -1460,22 +1482,22 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   {/* Calculated Repayment metrics */}
                   {sanctionedNum > 0 && Number(loanInterestRate) > 0 && Number(loanTenureValue) > 0 && (
                     <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200/60 space-y-3">
-                      <div className="flex items-center gap-1.5 text-zinc-900 font-bold text-[11px] uppercase tracking-wide">
+                      <div className="flex items-center gap-1.5 text-zinc-900 font-bold text-[11px] tracking-wide">
                         <Percent className="h-4 w-4 text-blue-600" />
                         Loan Amortization Summary
                       </div>
-                      
+
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div className="bg-white p-2 rounded-lg border border-zinc-200/50">
-                          <p className="text-[9px] text-zinc-400 uppercase font-semibold">Estimated EMI</p>
+                          <p className="text-[9px] text-zinc-400 font-semibold">Estimated EMI</p>
                           <p className="text-xs font-black text-blue-600 mt-0.5">{formatCurrency(emiCalc.emi)}</p>
                         </div>
                         <div className="bg-white p-2 rounded-lg border border-zinc-200/50">
-                          <p className="text-[9px] text-zinc-400 uppercase font-semibold">Total Interest</p>
+                          <p className="text-[9px] text-zinc-400 font-semibold">Total Interest</p>
                           <p className="text-xs font-black text-amber-600 mt-0.5">{formatCurrency(emiCalc.totalInterest)}</p>
                         </div>
                         <div className="bg-white p-2 rounded-lg border border-zinc-200/50">
-                          <p className="text-[9px] text-zinc-400 uppercase font-semibold">Total Repayment</p>
+                          <p className="text-[9px] text-zinc-400 font-semibold">Total Repayment</p>
                           <p className="text-xs font-black text-zinc-800 mt-0.5">{formatCurrency(emiCalc.totalRepayment)}</p>
                         </div>
                       </div>
@@ -1487,8 +1509,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                           <span>{formatCurrency(sanctionedNum - outstandingNum)} Paid</span>
                         </div>
                         <div className="w-full bg-zinc-200 h-2 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-emerald-500 h-full transition-all duration-500" 
+                          <div
+                            className="bg-emerald-500 h-full transition-all duration-500"
                             style={{ width: `${completionPercent}%` }}
                           />
                         </div>
@@ -1507,33 +1529,30 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   {/* AI Insights list */}
                   {aiInsights.length > 0 && (
                     <div className="space-y-2 pt-2">
-                      <div className="flex items-center gap-1.5 text-zinc-900 font-bold text-[10px] uppercase tracking-wide">
+                      <div className="flex items-center gap-1.5 text-zinc-900 font-bold text-[10px] tracking-wide">
                         <Sparkles className="h-4 w-4 text-indigo-600" />
                         AI Debt Optimization Insights
                       </div>
                       <div className="space-y-2.5">
                         {aiInsights.map((insight, idx) => (
-                          <div 
-                            key={idx} 
-                            className={`p-3 rounded-xl border flex items-start gap-2.5 transition-all ${
-                              insight.priority === "High" 
-                                ? "bg-red-50/50 border-red-150/50 text-red-950" 
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border flex items-start gap-2.5 transition-all ${insight.priority === "High"
+                                ? "bg-red-50/50 border-red-150/50 text-red-950"
                                 : insight.priority === "Medium"
-                                ? "bg-indigo-50/40 border-indigo-150/40 text-indigo-950"
-                                : "bg-emerald-50/40 border-emerald-150/40 text-emerald-950"
-                            }`}
+                                  ? "bg-indigo-50/40 border-indigo-150/40 text-indigo-950"
+                                  : "bg-emerald-50/40 border-emerald-150/40 text-emerald-950"
+                              }`}
                           >
-                            <Info className={`h-4 w-4 shrink-0 mt-0.5 ${
-                              insight.priority === "High" ? "text-red-500" : "text-indigo-500"
-                            }`} />
+                            <Info className={`h-4 w-4 shrink-0 mt-0.5 ${insight.priority === "High" ? "text-red-500" : "text-indigo-500"
+                              }`} />
                             <div className="flex-1 space-y-1">
                               <p className="text-[11px] font-medium leading-normal text-zinc-800">{insight.text}</p>
                               <div className="flex items-center gap-2 text-[9px] font-bold">
-                                <span className={`px-1.5 py-0.5 rounded-md uppercase ${
-                                  insight.priority === "High" 
-                                    ? "bg-red-100 text-red-700" 
+                                <span className={`px-1.5 py-0.5 rounded-md capitalize ${insight.priority === "High"
+                                    ? "bg-red-100 text-red-700"
                                     : "bg-indigo-100 text-indigo-700"
-                                }`}>
+                                  }`}>
                                   {insight.priority} Priority
                                 </span>
                                 <span className="text-zinc-500">•</span>
@@ -1548,8 +1567,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                   {/* Additional Information */}
                   <div className="space-y-4 pt-4 border-t border-zinc-100">
-                    <span className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block">Additional Details</span>
-                    
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Additional Details</span>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Interest Rate Type</label>
@@ -1627,7 +1646,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     >
                       Cancel
                     </button>
-                    
+
                     <button
                       type="button"
                       onClick={handleSaveAndAddAnother}
