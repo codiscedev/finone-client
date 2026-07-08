@@ -2,12 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+import { apiClient } from "@/lib/api";
 import { Eye, EyeOff, Lock, Mail, User, ArrowRight, Sparkles, TrendingUp, ShieldCheck, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -47,7 +52,7 @@ export default function SignUpPage() {
 
   const strength = getStrengthLabelAndColor();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -74,11 +79,55 @@ export default function SignUpPage() {
     }
 
     setLoading(true);
-    // Simulate API delay
-    setTimeout(() => {
+    try {
+      // 1. Create User in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // 2. Set display name in Firebase profile
+      await updateProfile(userCredential.user, { displayName: name });
+
+      // 3. Sync user with Spring Boot backend (optional fallback if backend offline)
+      try {
+        const idToken = await userCredential.user.getIdToken();
+        await apiClient.post("/auth/login", { idToken });
+      } catch (backendErr) {
+        console.warn("Backend sync notice:", backendErr);
+      }
+
+      // 4. Redirect to Dashboard
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("Firebase SignUp Error:", err);
+      if (err.code === "auth/email-already-in-use") {
+        setError("This email is already registered. Please sign in instead.");
+      } else if (err.code === "auth/invalid-api-key" || err.message?.includes("api-key")) {
+        setError("Missing valid Firebase API Key in .env.local. Please configure NEXT_PUBLIC_FIREBASE_API_KEY.");
+      } else {
+        setError(err.message || "Failed to create account. Please check your network and try again.");
+      }
+    } finally {
       setLoading(false);
-      alert(`Account successfully created for: ${name} (${email})`);
-    }, 1500);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      try {
+        const idToken = await userCredential.user.getIdToken();
+        await apiClient.post("/auth/login", { idToken });
+      } catch (backendErr) {
+        console.warn("Backend sync notice:", backendErr);
+      }
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("Google SignUp Error:", err);
+      setError(err.message || "Google sign-in failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -177,6 +226,7 @@ export default function SignUpPage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
+              onClick={handleGoogleSignUp}
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2 text-sm font-semibold text-foreground transition-all hover:bg-muted active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -189,6 +239,7 @@ export default function SignUpPage() {
             </button>
             <button
               type="button"
+              onClick={() => router.push("/dashboard")}
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2 text-sm font-semibold text-foreground transition-all hover:bg-muted active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
