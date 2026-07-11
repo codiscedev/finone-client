@@ -59,9 +59,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const serverUser: DbUser = response.data.data;
             setDbUser(serverUser);
             sessionStorage.setItem("finone_db_user", JSON.stringify(serverUser));
+          } else {
+            throw new Error("Unsuccessful response from backend login");
           }
         } catch (err) {
           console.error("Backend auth sync failed:", err);
+          // Reset states to force redirect to /login and clear stale sessions
+          setFirebaseUser(null);
+          setDbUser(null);
+          sessionStorage.removeItem("finone_db_user");
+          try {
+            await signOut(auth);
+          } catch (signOutErr) {
+            console.error("Firebase signout fallback failed:", signOutErr);
+          }
         }
       } else {
         setFirebaseUser(null);
