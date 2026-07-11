@@ -262,7 +262,7 @@ export default function MoneyFlowView() {
                 className="flex-1 sm:flex-none h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98] text-xs"
               >
                 <Plus className="h-4 w-4 mr-1.5" />
-                + Add Transaction
+                Add Transaction
               </Button>
             </div>
           </div>

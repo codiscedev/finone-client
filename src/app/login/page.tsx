@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
-import { apiClient } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Sparkles, TrendingUp, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -44,14 +45,8 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      try {
-        const idToken = await userCredential.user.getIdToken();
-        await apiClient.post("/auth/login", { idToken });
-      } catch (backendErr) {
-        console.warn("Backend sync notice:", backendErr);
-      }
-      router.push("/dashboard");
+      await signInWithEmailAndPassword(auth, email, password);
+      // AuthProvider will automatically capture state change, sync with backend, and redirect to /dashboard
     } catch (err: any) {
       console.error("Firebase Login Error:", err);
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
@@ -61,7 +56,6 @@ export default function LoginPage() {
       } else {
         setError(err.message || "Failed to sign in. Please check your credentials.");
       }
-    } finally {
       setLoading(false);
     }
   };
@@ -70,21 +64,22 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const userCredential = await signInWithPopup(auth, googleProvider);
-      try {
-        const idToken = await userCredential.user.getIdToken();
-        await apiClient.post("/auth/login", { idToken });
-      } catch (backendErr) {
-        console.warn("Backend sync notice:", backendErr);
-      }
-      router.push("/dashboard");
+      await signInWithPopup(auth, googleProvider);
+      // AuthProvider will automatically capture state change, sync with backend, and redirect to /dashboard
     } catch (err: any) {
       console.error("Google SignIn Error:", err);
       setError(err.message || "Google sign-in failed.");
-    } finally {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col lg:flex-row bg-background">

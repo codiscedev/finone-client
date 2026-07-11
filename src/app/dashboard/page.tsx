@@ -38,8 +38,12 @@ import SettingsView from "./settings-view";
 import TaxPlannerView from "./tax-planner-view";
 import AIAssistantView from "./ai-assistant-view";
 import PricingView from "./pricing-view";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { firebaseUser, dbUser, loading: authLoading, logout: handleLogout } = useAuth();
   const [activeMenu, setActiveMenu] = React.useState("Dashboard");
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
@@ -66,9 +70,10 @@ export default function DashboardPage() {
 
   // Helper component to render active menu screen
   const renderContent = () => {
+    const userName = dbUser?.name?.split(" ")[0] || firebaseUser?.displayName?.split(" ")[0] || "User";
     switch (activeMenu) {
       case "Dashboard":
-        return <DashboardView />;
+        return <DashboardView userName={userName} />;
       case "Wealth":
         return <WealthView onAddClick={() => setIsAddDrawerOpen(true)} onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Money Flow":
@@ -84,9 +89,20 @@ export default function DashboardPage() {
       case "Pricing":
         return <PricingView />;
       default:
-        return <DashboardView />;
+        return <DashboardView userName={userName} />;
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-950 text-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+          <p className="text-sm font-semibold tracking-wide text-zinc-400">Authenticating session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-zinc-50/50 text-zinc-900 font-sans antialiased overflow-hidden">
@@ -266,10 +282,12 @@ export default function DashboardPage() {
                 className="flex items-center gap-2.5 rounded-lg p-1 hover:bg-zinc-50 transition-colors text-left outline-none"
               >
                 <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white text-xs border border-zinc-100 shadow-sm">
-                  A
+                  {dbUser?.name ? dbUser.name[0].toUpperCase() : (firebaseUser?.displayName ? firebaseUser.displayName[0].toUpperCase() : (dbUser?.email ? dbUser.email[0].toUpperCase() : (firebaseUser?.email ? firebaseUser.email[0].toUpperCase() : "U")))}
                 </div>
                 <div className="hidden md:block">
-                  <p className="text-xs font-semibold text-zinc-900 leading-tight">Anandha Murthy</p>
+                  <p className="text-xs font-semibold text-zinc-900 leading-tight">
+                    {dbUser?.name || firebaseUser?.displayName || "FinOne User"}
+                  </p>
                   <p className="text-[10px] text-zinc-500 leading-none mt-0.5">Premium Plan</p>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
@@ -278,17 +296,30 @@ export default function DashboardPage() {
               {showProfileMenu && (
                 <div className="absolute right-0 mt-2 w-48 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-lg shadow-zinc-200/50">
                   <div className="px-3 py-1.5 border-b border-zinc-100 mb-1">
-                    <p className="text-xs font-bold text-zinc-900">Anandha Murthy</p>
-                    <p className="text-[9px] text-zinc-450 mt-0.5">anandha@financeone.com</p>
+                    <p className="text-xs font-bold text-zinc-900">
+                      {dbUser?.name || firebaseUser?.displayName || "FinOne User"}
+                    </p>
+                    <p className="text-[9px] text-zinc-400 truncate mt-0.5">
+                      {dbUser?.email || firebaseUser?.email || ""}
+                    </p>
                   </div>
                   <button className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-650 hover:bg-zinc-50 hover:text-zinc-900 flex items-center gap-2 outline-none">
                     <User className="h-3.5 w-3.5 text-zinc-400" /> Profile
                   </button>
-                  <button className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-650 hover:bg-zinc-50 hover:text-zinc-900 flex items-center gap-2 outline-none">
+                  <button
+                    onClick={() => {
+                      setActiveMenu("Settings");
+                      setShowProfileMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-650 hover:bg-zinc-50 hover:text-zinc-900 flex items-center gap-2 outline-none"
+                  >
                     <Settings className="h-3.5 w-3.5 text-zinc-400" /> Account Settings
                   </button>
                   <div className="h-px bg-zinc-100 my-1" />
-                  <button className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50/50 flex items-center gap-2 outline-none">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50/50 flex items-center gap-2 outline-none"
+                  >
                     Log out
                   </button>
                 </div>
@@ -309,13 +340,17 @@ export default function DashboardPage() {
 // ==========================================
 // Dashboard Component View (12-Column Grid)
 // ==========================================
-function DashboardView() {
+interface DashboardViewProps {
+  userName: string;
+}
+
+function DashboardView({ userName }: DashboardViewProps) {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-zinc-950">Welcome back, Anandha</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-950">Welcome back, {userName}</h2>
           <p className="text-sm text-zinc-500 mt-1">Here is a quick breakdown of your portfolios and wealth indicators today.</p>
         </div>
         

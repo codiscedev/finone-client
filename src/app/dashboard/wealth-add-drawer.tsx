@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "../../components/ui/select";
+import { apiClient } from "@/lib/api";
 
 interface WealthAddDrawerProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   // Steps: 1 = Choose Record Type, 2 = Select Category (for Assets), 3 = Input Form
   const [step, setStep] = React.useState(1);
   const [recordType, setRecordType] = React.useState<"Asset" | "Debt" | "Investment" | "Goal" | "Emergency" | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
   const [assetCategory, setAssetCategory] = React.useState<string>("");
   const [assetType, setAssetType] = React.useState<"APPRECIATION" | "DEPRECIATION">("APPRECIATION");
 
@@ -289,7 +291,116 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   // Generic asset error validation states
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-  const handleSave = (e: React.FormEvent) => {
+  const compileAssetPayload = () => {
+    const base: Record<string, any> = {
+      assetCategory,
+      assetType,
+      appreciationRate: Number(assetRate) || 0,
+      notes: assetNotes,
+    };
+
+    if (assetCategory === "PROPERTY") {
+      base.name = propertyName;
+      base.propertyType = propertyType;
+      base.purchaseValue = Number(purchaseValue) || 0;
+      base.purchaseDate = purchaseDate;
+      base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
+      base.ownershipPercent = Number(ownershipPercent) || 100;
+      base.rentalIncome = Number(rentalIncome) || 0;
+    } else if (assetCategory === "STOCK") {
+      base.name = stockQuery;
+      base.stockQty = Number(stockQty) || 0;
+      base.stockAvgPrice = Number(stockAvgPrice) || 0;
+      base.purchaseValue = Number(stockInvestedAmount) || (Number(stockQty) * Number(stockAvgPrice)) || 0;
+      base.purchaseDate = stockDate;
+      base.currentMarketValue = stockTotalValue;
+      base.stockRegion = stockRegion;
+    } else if (assetCategory === "GOLD" || assetCategory === "SILVER") {
+      base.name = metalName;
+      base.metalQty = Number(metalQty) || 0;
+      base.metalStorage = metalStorage;
+      base.purchaseValue = Number(purchaseValue) || 0;
+      base.purchaseDate = purchaseDate;
+      base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
+      base.ownershipPercent = Number(ownershipPercent) || 100;
+    } else if (assetCategory === "VEHICLE") {
+      base.name = `${vehicleBrand} ${vehicleModel}`.trim() || vehicleType;
+      base.vehicleType = vehicleType;
+      base.vehicleBrand = vehicleBrand;
+      base.vehicleModel = vehicleModel;
+      base.vehicleRegNo = vehicleRegNo;
+      base.vehicleInsurance = vehicleInsurance;
+      base.purchaseValue = Number(purchaseValue) || 0;
+      base.purchaseDate = purchaseDate;
+      base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
+      base.ownershipPercent = Number(ownershipPercent) || 100;
+    } else if (assetCategory === "BANK_ACCOUNT") {
+      base.name = bankName || "Savings Account";
+      base.bankAccType = bankAccType;
+      base.bankBalance = Number(bankBalance) || 0;
+      base.bankInterest = Number(bankInterest) || 0;
+      base.currentMarketValue = Number(bankBalance) || 0;
+    } else if (assetCategory === "FIXED_DEPOSIT" || assetCategory === "RD") {
+      base.name = `${assetCategory === "FIXED_DEPOSIT" ? "FD" : "RD"} - ${fdBank}`;
+      base.fdBank = fdBank;
+      base.fdAmount = Number(fdAmount) || 0;
+      base.fdInterest = Number(fdInterest) || 0;
+      base.fdMaturityAmount = Number(fdMaturityAmount) || 0;
+      base.fdMaturityDate = fdMaturityDate;
+      base.currentMarketValue = Number(fdAmount) || 0;
+    } else if (assetCategory === "EPF" || assetCategory === "PPF") {
+      base.name = `${assetCategory} Account`;
+      base.epfEmployer = epfEmployer;
+      base.epfUan = epfUan;
+      base.epfBalance = Number(epfBalance) || 0;
+      base.currentMarketValue = Number(epfBalance) || 0;
+    } else if (assetCategory === "NPS") {
+      base.name = "NPS Pension Fund";
+      base.npsPran = npsPran;
+      base.npsManager = npsManager;
+      base.currentMarketValue = Number(purchaseValue) || 0;
+    } else if (assetCategory === "CRYPTO") {
+      base.name = `${cryptoCoin} Wallet`;
+      base.cryptoCoin = cryptoCoin;
+      base.cryptoSymbol = cryptoSymbol;
+      base.cryptoQty = Number(cryptoQty) || 0;
+      base.cryptoPrice = Number(cryptoPrice) || 0;
+      base.cryptoExchange = cryptoExchange;
+      base.currentMarketValue = (Number(cryptoQty) || 0) * (Number(cryptoPrice) || 0);
+    } else {
+      base.name = metalName || "Generic Asset";
+      base.purchaseValue = Number(purchaseValue) || 0;
+      base.purchaseDate = purchaseDate;
+      base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
+      base.ownershipPercent = Number(ownershipPercent) || 100;
+    }
+    return base;
+  };
+
+  const compileDebtPayload = () => {
+    return {
+      debtCategory,
+      loanName,
+      lendingBank,
+      loanAccountNumber,
+      loanStatus,
+      sanctionedAmount: Number(sanctionedAmount) || 0,
+      outstandingPrincipal: Number(outstandingPrincipal) || 0,
+      loanInterestRate: Number(loanInterestRate) || 0,
+      loanTenureValue: Number(loanTenureValue) || 0,
+      loanTenureUnit,
+      loanStartDate,
+      emiAmountInput: Number(emiAmountInput) || 0,
+      emiDueDate,
+      prepaymentAllowed,
+      interestRateType,
+      coBorrower,
+      linkedAsset,
+      notes: loanNotes,
+    };
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Simple inline validation checks
@@ -341,17 +452,39 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     }
 
     setErrors({});
-    alert("Record created and added to portfolio registry successfully!");
+    setSubmitting(true);
 
-    // Reset steps and values, close drawer
-    setStep(1);
-    setRecordType(null);
-    setAssetCategory("");
-    setDebtCategory("");
-    setAssetRate("");
-    setAssetNotes("");
-    clearDebtFields();
-    onClose();
+    try {
+      if (recordType === "Asset") {
+        const payload = compileAssetPayload();
+        await apiClient.post("/assets", payload);
+      } else if (recordType === "Debt") {
+        const payload = compileDebtPayload();
+        await apiClient.post("/debts", payload);
+      } else {
+        await apiClient.post(`/wealth/${recordType?.toLowerCase()}`, {
+          recordType,
+          notes: assetNotes,
+        });
+      }
+
+      alert("Record created and added to portfolio registry successfully!");
+
+      // Reset steps and values, close drawer
+      setStep(1);
+      setRecordType(null);
+      setAssetCategory("");
+      setDebtCategory("");
+      setAssetRate("");
+      setAssetNotes("");
+      clearDebtFields();
+      onClose();
+    } catch (err: any) {
+      console.error("Error saving record:", err);
+      alert("Failed to save record to backend API: " + (err.response?.data?.message || err.message));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const clearDebtFields = () => {
@@ -369,7 +502,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     setLoanNotes("");
   };
 
-  const handleSaveAndAddAnother = (e: React.FormEvent) => {
+  const handleSaveAndAddAnother = async (e: React.FormEvent) => {
     e.preventDefault();
     const valErrors: Record<string, string> = {};
     if (recordType === "Debt") {
@@ -399,11 +532,22 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     }
 
     setErrors({});
-    alert("Record created successfully! Enter details for the next record.");
+    setSubmitting(true);
 
-    // Reset inputs, stay on step 2 for Debt category selection
-    clearDebtFields();
-    setStep(2);
+    try {
+      if (recordType === "Debt") {
+        const payload = compileDebtPayload();
+        await apiClient.post("/debts", payload);
+      }
+      alert("Record created successfully! Enter details for the next record.");
+      clearDebtFields();
+      setStep(2);
+    } catch (err: any) {
+      console.error("Error saving record:", err);
+      alert("Failed to save record to backend API: " + (err.response?.data?.message || err.message));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleRecordTypeSelect = (type: "Asset" | "Debt" | "Investment" | "Goal" | "Emergency") => {
@@ -1302,19 +1446,28 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8">
                     <button
                       type="button"
+                      disabled={submitting}
                       onClick={() => {
                         setStep(recordType === "Asset" ? 2 : 1);
                         setErrors({});
                       }}
-                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
+                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <Button
                       type="submit"
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98]"
+                      disabled={submitting}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
                     >
-                      Save Asset Record
+                      {submitting ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Asset Record"
+                      )}
                     </Button>
                   </div>
 
@@ -1639,28 +1792,38 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8">
                     <button
                       type="button"
+                      disabled={submitting}
                       onClick={() => {
                         setStep(2);
                         setErrors({});
                       }}
-                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
+                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors disabled:opacity-50"
                     >
                       Cancel
                     </button>
 
                     <button
                       type="button"
+                      disabled={submitting}
                       onClick={handleSaveAndAddAnother}
-                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-all active:scale-[0.98]"
+                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-all active:scale-[0.98] disabled:opacity-50"
                     >
-                      Save & Add Another
+                      {submitting ? "Saving..." : "Save & Add Another"}
                     </button>
 
                     <Button
                       type="submit"
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98]"
+                      disabled={submitting}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
                     >
-                      Save Debt
+                      {submitting ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Debt"
+                      )}
                     </Button>
                   </div>
 

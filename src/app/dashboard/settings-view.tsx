@@ -20,11 +20,33 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "../../components/ui/select";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export default function SettingsView() {
   // Profile settings state
-  const [name, setName] = React.useState("Anandha Murthy");
-  const [email, setEmail] = React.useState("anandha@financeone.com");
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setName(user.displayName || "FinOne User");
+        setEmail(user.email || "");
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      window.location.href = "/login";
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
+  };
+
   const [mobile, setMobile] = React.useState("+91 98765 43210");
   const [country, setCountry] = React.useState("India");
   const [currency, setCurrency] = React.useState("INR (₹)");
@@ -724,7 +746,7 @@ export default function SettingsView() {
               onClick={() => {
                 const conf = confirm("Sign out from all devices? You will be redirected back to the login page.");
                 if (conf) {
-                  window.location.href = "/login";
+                  handleSignOut();
                 }
               }}
               className="inline-flex h-9 items-center justify-center rounded-xl bg-red-600 hover:bg-red-700 px-4 text-xs font-bold text-white shadow-sm transition-colors"
@@ -751,7 +773,7 @@ export default function SettingsView() {
                   <button
                     onClick={() => {
                       setShowLogoutModal(false);
-                      window.location.href = "/login";
+                      handleSignOut();
                     }}
                     className="rounded-lg bg-red-600 hover:bg-red-700 px-3.5 py-1.5 font-bold text-white transition-colors"
                   >

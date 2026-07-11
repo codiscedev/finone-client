@@ -27,6 +27,8 @@ import {
   Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/firebase";
+
 
 interface NetWorthDetailViewProps {
   onBack: () => void;
@@ -52,12 +54,16 @@ export default function NetWorthDetailView({ onBack }: NetWorthDetailViewProps) 
   };
 
   const handleExportInfographic = () => {
+    const userDisplayName = auth.currentUser?.displayName || "FinOne User";
+    const nameForTitle = userDisplayName.toUpperCase();
+    const downloadName = `${userDisplayName.replace(/\s+/g, "_")}_NetWorth_Infographic.html`;
+
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Anandha's Net Worth Infographic - FinOne</title>
+  <title>${userDisplayName}'s Net Worth Infographic - FinOne</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -355,7 +361,7 @@ export default function NetWorthDetailView({ onBack }: NetWorthDetailViewProps) 
     <div class="brand-top"></div>
     <div class="header">
       <span class="header-tag">FINONE PORTFOLIO REGISTRY</span>
-      <h1 class="header-title">ANANDHA MURTHY</h1>
+      <h1 class="header-title">${nameForTitle}</h1>
       
       <div class="networth-box">
         <div class="networth-title">₹52,40,000</div>
@@ -531,7 +537,7 @@ export default function NetWorthDetailView({ onBack }: NetWorthDetailViewProps) 
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "Anandha_NetWorth_Infographic.html";
+    link.download = downloadName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
