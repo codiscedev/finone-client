@@ -25,7 +25,7 @@ const AuthContext = React.createContext<AuthContextType>({
   firebaseUser: null,
   dbUser: null,
   loading: true,
-  logout: async () => {},
+  logout: async () => { },
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setFirebaseUser(currentUser);
         try {
           const idToken = await currentUser.getIdToken();
-          // Call the backend /auth/login endpoint to sync/retrieve DB user context
-          const response = await apiClient.post("/auth/login", { idToken });
+          // Call the backend /login endpoint to sync/retrieve DB user context
+          const response = await apiClient.post("/login", { idToken });
           if (response.data?.success && response.data?.data) {
             const serverUser: DbUser = response.data.data;
             setDbUser(serverUser);
