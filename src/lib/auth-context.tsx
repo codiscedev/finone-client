@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setFirebaseUser(currentUser);
         try {
           const idToken = await currentUser.getIdToken();
-          // Call the backend /login endpoint to sync/retrieve DB user context
-          const response = await apiClient.post("/login", { idToken });
+          // Call the backend /auth/login endpoint to sync/retrieve DB user context
+          const response = await apiClient.post("/auth/login", { idToken });
           if (response.data?.success && response.data?.data) {
             const serverUser: DbUser = response.data.data;
             setDbUser(serverUser);
