@@ -711,16 +711,7 @@ export default function TransactionOnboardingDrawer({
                   />
                 </div>
 
-                {/* Account / Wallet */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-500">Account / Wallet *</label>
-                  <Select
-                    value={formData.account}
-                    onChange={e => setFormData(prev => ({ ...prev, account: e.target.value }))}
-                  >
-                    {MOCK_ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
-                  </Select>
-                </div>
+                {/* Account / Wallet removed — managed in account settings */}
 
                 {/* Payment Method */}
                 <div className="space-y-1">
@@ -846,43 +837,42 @@ export default function TransactionOnboardingDrawer({
                       />
                     </div>
                     {formData.isSplit && (
-                      <div className="space-y-2 animate-in fade-in duration-200">
-                        {formData.splits.map((s, idx) => (
-                          <div key={idx} className="flex gap-1.5 items-center">
-                            <input
-                              type="text"
-                              required
-                              placeholder="Payee name"
-                              value={s.name}
-                              onChange={e => handleSplitChange(idx, "name", e.target.value)}
-                              className="flex-1 h-8 rounded-lg border border-zinc-200 px-2 text-xs focus:outline-none focus:border-blue-500"
-                            />
-                            <input
-                              type="number"
-                              required
-                              placeholder="Amount"
-                              value={s.amount}
-                              onChange={e => handleSplitChange(idx, "amount", e.target.value)}
-                              className="w-20 h-8 rounded-lg border border-zinc-200 px-2 text-xs font-bold focus:outline-none focus:border-blue-500"
-                            />
-                            {formData.splits.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSplit(idx)}
-                                className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            )}
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        {/* Split count control */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-zinc-600">Number of parts:</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => formData.splits.length > 1 && handleRemoveSplit(formData.splits.length - 1)}
+                              className="h-6 w-6 rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 flex items-center justify-center text-sm font-bold cursor-pointer"
+                            >−</button>
+                            <span className="text-sm font-extrabold text-zinc-900 min-w-[20px] text-center">{formData.splits.length}</span>
+                            <button
+                              type="button"
+                              onClick={handleAddSplit}
+                              className="h-6 w-6 rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-100 flex items-center justify-center text-sm font-bold cursor-pointer"
+                            >+</button>
                           </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={handleAddSplit}
-                          className="text-[9px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Plus className="h-3 w-3" /> Add Splitee
-                        </button>
+                        </div>
+                        {/* Percentage breakdown */}
+                        <div className="space-y-1.5">
+                          {formData.splits.map((s, idx) => {
+                            const pct = Math.round((1 / formData.splits.length) * 100);
+                            const parsedTotal = parseFloat(formData.amount) || 0;
+                            const splitAmt = parsedTotal > 0 ? (parsedTotal / formData.splits.length).toFixed(2) : "—";
+                            return (
+                              <div key={idx} className="flex items-center justify-between bg-white border border-zinc-100 rounded-lg px-3 py-2">
+                                <span className="text-xs font-bold text-zinc-700">Part {idx + 1}</span>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[11px] font-semibold text-zinc-500">{splitAmt}</span>
+                                  <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{pct}%</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-zinc-400 font-medium">Amount split equally across {formData.splits.length} parts · Remaining goes back to total</p>
                       </div>
                     )}
                   </div>

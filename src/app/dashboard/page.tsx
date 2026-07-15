@@ -692,3 +692,4 @@ function PlaceholderView({ title, description, icon: Icon }: PlaceholderProps) {
     </div>
   );
 }
+

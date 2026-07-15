@@ -3,949 +3,1690 @@
 import * as React from "react";
 import {
   TrendingDown,
-  Sliders,
-  Eye,
-  CreditCard,
-  CalendarClock,
   TrendingUp,
   Plus,
   ChevronRight,
   AlertTriangle,
   CheckCircle,
   Sparkles,
-  ArrowUpRight,
   PieChart,
+  CreditCard,
+  CalendarClock,
+  Sliders,
   Activity,
-  Check,
   Search,
-  ChevronLeft,
   Trash2,
   Filter,
   SlidersHorizontal,
-  FolderSync
+  FolderSync,
+  MessageSquare,
+  Mail,
+  Tag,
+  X,
+  ChevronDown,
+  ArrowUpDown,
+  BarChart3,
+  Info,
+  Calendar,
+  Edit2,
+  Check,
+  Repeat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import TransactionOnboardingDrawer from "./transaction-onboarding-drawer";
+import { useAuth } from "@/lib/auth-context";
+import { formatCurrency } from "@/lib/use-currency";
 
-// Initial Mock Transactions
-const INITIAL_TRANSACTIONS = [
-  { id: "init_1", date: "2026-07-10", amount: 850.00, merchant: "Amazon Inc", category: "Shopping", description: "Office items and supplies", type: "expense", account: "Amex Gold (*1002)", paymentMethod: "Credit Card", tags: ["office", "supplies"] },
-  { id: "init_2", date: "2026-07-10", amount: 420.00, merchant: "Whole Foods Market", category: "Groceries", description: "Bi-weekly grocery restock", type: "expense", account: "Chase checking (*4829)", paymentMethod: "Debit Card", tags: ["grocery"] },
-  { id: "init_3", date: "2026-07-09", amount: 20.00, merchant: "Netflix.com", category: "Entertainment", description: "Monthly standard subscription renewal", type: "expense", account: "Amex Gold (*1002)", paymentMethod: "Credit Card", tags: ["subscription"] },
-  { id: "init_4", date: "2026-07-08", amount: 9500.00, merchant: "Acme Corp Salary", category: "Salary", description: "Primary direct deposit salary credit", type: "income", account: "Chase checking (*4829)", paymentMethod: "Net Banking", tags: ["salary"] },
-  { id: "init_5", date: "2026-07-08", amount: 1000.00, merchant: "Robinhood Dividends", category: "Dividend", description: "Quarterly stock yields payout", type: "income", account: "Chase checking (*4829)", paymentMethod: "Net Banking", tags: ["dividends"] },
-  { id: "init_6", date: "2026-07-07", amount: 1500.00, merchant: "Metropolitan Landlord", category: "Rent", description: "Monthly apartment rental lease payment", type: "expense", account: "Chase checking (*4829)", paymentMethod: "Net Banking", tags: ["rent"] },
-  { id: "init_7", date: "2026-07-06", amount: 500.00, merchant: "Sublet Rental Yield", category: "Rental Income", description: "Apartment room sub-rental payout", type: "income", account: "Capital One Wallet", paymentMethod: "UPI / Instant Pay", tags: ["rental", "passive"] },
-  { id: "init_8", date: "2026-07-05", amount: 580.00, merchant: "United Airlines Flight", category: "Travel", description: "Weekend flight booking trip", type: "expense", account: "Chase Sapphire (*9930)", paymentMethod: "Credit Card", tags: ["travel"] },
-  { id: "init_9", date: "2026-07-04", amount: 1800.00, merchant: "Fiverr Freelance Inward", category: "Freelance", description: "React UI Dashboard consultant project", type: "income", account: "Chase checking (*4829)", paymentMethod: "Net Banking", tags: ["freelance", "ui"] },
-  { id: "init_10", date: "2026-07-03", amount: 35.50, merchant: "Uber Rides", category: "Transportation", description: "Travel to corporate meeting", type: "expense", account: "Chase Sapphire (*9930)", paymentMethod: "Credit Card", tags: ["travel", "taxi"] }
+// ============================================================
+// TYPES
+// ============================================================
+interface Transaction {
+  id: string;
+  date: string;
+  amount: number;
+  merchant: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  type: "expense" | "income" | "transfer";
+  paymentMethod: string;
+  tags?: string[];
+  referenceId?: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  subcategories: { name: string; priority: "High" | "Medium" | "Low" }[];
+  maxCap: number;
+  description: string;
+  color: string;
+}
+
+interface RecurringBill {
+  id: string;
+  name: string;
+  dateOfDebit: string;
+  amount: number;
+  frequency: "Daily" | "Monthly" | "Yearly";
+  category: string;
+  subcategory: string;
+  paymentMethod: string;
+}
+
+interface BudgetItem {
+  id: string;
+  name: string;
+  budgetAmount: number;
+  category: string;
+}
+
+interface IncomeItem {
+  id: string;
+  source: string;
+  amount: number;
+  fetchType: "Manual" | "Auto";
+  dateOfCredit: string;
+  isFixed: boolean;
+}
+
+interface CreditCardItem {
+  id: string;
+  cardName: string;
+  lastFour: string;
+  creditLimit: number;
+  outstanding: number;
+  minDue: number;
+  dueDate: string;
+}
+
+// ============================================================
+// SEED DATA
+// ============================================================
+const INITIAL_TRANSACTIONS: Transaction[] = [
+  { id: "init_1", date: "2026-07-10", amount: 8500, merchant: "Amazon India", category: "Shopping", subcategory: "Electronics", description: "Office items and supplies", type: "expense", paymentMethod: "Credit Card", referenceId: "AMZ-9820", tags: ["office"] },
+  { id: "init_2", date: "2026-07-10", amount: 4200, merchant: "Big Bazaar", category: "Groceries", subcategory: "Food", description: "Bi-weekly grocery restock", type: "expense", paymentMethod: "Debit Card", tags: ["grocery"] },
+  { id: "init_3", date: "2026-07-09", amount: 199, merchant: "Netflix India", category: "Entertainment", subcategory: "Streaming", description: "Monthly standard subscription", type: "expense", paymentMethod: "Credit Card", referenceId: "NF-00291", tags: ["subscription"] },
+  { id: "init_4", date: "2026-07-08", amount: 95000, merchant: "Infosys Payroll", category: "Salary", subcategory: "Primary", description: "Primary direct deposit salary credit", type: "income", paymentMethod: "Net Banking", tags: ["salary"] },
+  { id: "init_5", date: "2026-07-08", amount: 10000, merchant: "Zerodha Dividends", category: "Dividend", subcategory: "Equity", description: "Quarterly stock yields payout", type: "income", paymentMethod: "Net Banking", tags: ["dividends"] },
+  { id: "init_6", date: "2026-07-07", amount: 15000, merchant: "Prestige Properties", category: "Rent", subcategory: "Housing", description: "Monthly apartment rental lease payment", type: "expense", paymentMethod: "Net Banking", tags: ["rent"] },
+  { id: "init_7", date: "2026-07-06", amount: 5000, merchant: "Sublet Rental Yield", category: "Rental Income", subcategory: "Passive", description: "Apartment room sub-rental payout", type: "income", paymentMethod: "UPI", tags: ["rental", "passive"] },
+  { id: "init_8", date: "2026-07-05", amount: 5800, merchant: "IndiGo Airlines", category: "Travel", subcategory: "Flights", description: "Weekend flight booking trip", type: "expense", paymentMethod: "Credit Card", tags: ["travel"] },
+  { id: "init_9", date: "2026-07-04", amount: 18000, merchant: "Fiverr Freelance", category: "Freelance", subcategory: "UI Design", description: "React UI Dashboard consultant project", type: "income", paymentMethod: "Net Banking", tags: ["freelance"] },
+  { id: "init_10", date: "2026-07-03", amount: 350, merchant: "Ola Cabs", category: "Transportation", subcategory: "Taxi", description: "Travel to corporate meeting", type: "expense", paymentMethod: "UPI", tags: ["travel", "taxi"] },
 ];
 
-export default function MoneyFlowView() {
-  // Navigation: Sub tabs
-  const [activeSubTab, setActiveSubTab] = React.useState<"transactions" | "analytics">("transactions");
+const INITIAL_CATEGORIES: Category[] = [
+  { id: "cat_1", name: "Shopping", subcategories: [{ name: "Electronics", priority: "Low" }, { name: "Clothing", priority: "Medium" }], maxCap: 10000, description: "General shopping", color: "#f59e0b" },
+  { id: "cat_2", name: "Groceries", subcategories: [{ name: "Food", priority: "High" }, { name: "Vegetables", priority: "High" }], maxCap: 8000, description: "Essential groceries", color: "#10b981" },
+  { id: "cat_3", name: "Entertainment", subcategories: [{ name: "Streaming", priority: "Low" }, { name: "Movies", priority: "Low" }], maxCap: 2000, description: "Entertainment & fun", color: "#8b5cf6" },
+  { id: "cat_4", name: "Travel", subcategories: [{ name: "Flights", priority: "Medium" }, { name: "Hotels", priority: "Medium" }], maxCap: 15000, description: "Travel & commute", color: "#3b82f6" },
+  { id: "cat_5", name: "Rent", subcategories: [{ name: "Housing", priority: "High" }], maxCap: 20000, description: "Housing rent", color: "#ef4444" },
+  { id: "cat_6", name: "Transportation", subcategories: [{ name: "Taxi", priority: "Medium" }, { name: "Fuel", priority: "High" }], maxCap: 5000, description: "Daily commute", color: "#06b6d4" },
+];
 
-  // Onboarding Drawer states
+const INITIAL_RECURRING: RecurringBill[] = [
+  { id: "rec_1", name: "Netflix", dateOfDebit: "05", amount: 199, frequency: "Monthly", category: "Entertainment", subcategory: "Streaming", paymentMethod: "Credit Card" },
+  { id: "rec_2", name: "Spotify Family", dateOfDebit: "12", amount: 179, frequency: "Monthly", category: "Entertainment", subcategory: "Music", paymentMethod: "Credit Card" },
+  { id: "rec_3", name: "Prestige Properties Rent", dateOfDebit: "01", amount: 15000, frequency: "Monthly", category: "Rent", subcategory: "Housing", paymentMethod: "Net Banking" },
+  { id: "rec_4", name: "Jio Fiber", dateOfDebit: "15", amount: 999, frequency: "Monthly", category: "Utilities", subcategory: "Internet", paymentMethod: "UPI" },
+  { id: "rec_5", name: "LIC Premium", dateOfDebit: "20", amount: 8400, frequency: "Yearly", category: "Insurance", subcategory: "Life", paymentMethod: "Net Banking" },
+];
+
+const INITIAL_BUDGETS: BudgetItem[] = [
+  { id: "bud_1", name: "Monthly Groceries", budgetAmount: 8000, category: "Groceries" },
+  { id: "bud_2", name: "Entertainment Cap", budgetAmount: 2000, category: "Entertainment" },
+  { id: "bud_3", name: "Travel Budget", budgetAmount: 15000, category: "Travel" },
+  { id: "bud_4", name: "Shopping Limit", budgetAmount: 10000, category: "Shopping" },
+];
+
+const INITIAL_INCOME: IncomeItem[] = [
+  { id: "inc_1", source: "Infosys Salary", amount: 95000, fetchType: "Manual", dateOfCredit: "2026-07-08", isFixed: true },
+  { id: "inc_2", source: "Zerodha Dividends", amount: 10000, fetchType: "Manual", dateOfCredit: "2026-07-08", isFixed: false },
+  { id: "inc_3", source: "Subletting Income", amount: 5000, fetchType: "Manual", dateOfCredit: "2026-07-06", isFixed: true },
+  { id: "inc_4", source: "Fiverr Freelance", amount: 18000, fetchType: "Manual", dateOfCredit: "2026-07-04", isFixed: false },
+];
+
+const INITIAL_CREDIT_CARDS: CreditCardItem[] = [
+  { id: "cc_1", cardName: "HDFC Regalia", lastFour: "4829", creditLimit: 300000, outstanding: 24500, minDue: 1225, dueDate: "2026-07-20" },
+  { id: "cc_2", cardName: "SBI SimplyCLICK", lastFour: "9930", outstanding: 11200, creditLimit: 100000, minDue: 560, dueDate: "2026-07-10" },
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Shopping: "#f59e0b",
+  Groceries: "#10b981",
+  Entertainment: "#8b5cf6",
+  Travel: "#3b82f6",
+  Rent: "#ef4444",
+  Transportation: "#06b6d4",
+  EMI: "#ec4899",
+  Utilities: "#f97316",
+  Healthcare: "#14b8a6",
+  Insurance: "#6366f1",
+  Other: "#94a3b8",
+};
+
+const PAYMENT_METHODS = ["UPI", "Net Banking", "Credit Card", "Debit Card", "Cash", "Cheque"];
+const FREQUENCIES = ["Daily", "Monthly", "Yearly"] as const;
+
+// ============================================================
+// DONUT CHART (Pure SVG)
+// ============================================================
+function DonutChart({ data, currency }: { data: { label: string; value: number; color: string }[]; currency: string }) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return (
+    <div className="flex flex-col items-center justify-center h-48 text-zinc-400 text-xs">
+      <PieChart className="h-10 w-10 mb-2 opacity-30" />
+      No expense data
+    </div>
+  );
+
+  const radius = 60;
+  const cx = 80;
+  const cy = 80;
+  let cumAngle = -Math.PI / 2;
+
+  const slices = data.filter(d => d.value > 0).map(d => {
+    const frac = d.value / total;
+    const angle = frac * 2 * Math.PI;
+    const x1 = cx + radius * Math.cos(cumAngle);
+    const y1 = cy + radius * Math.sin(cumAngle);
+    cumAngle += angle;
+    const x2 = cx + radius * Math.cos(cumAngle);
+    const y2 = cy + radius * Math.sin(cumAngle);
+    const largeArc = frac > 0.5 ? 1 : 0;
+    return {
+      ...d,
+      path: `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`,
+      pct: Math.round(frac * 100),
+    };
+  });
+
+  return (
+    <div className="flex flex-col lg:flex-row items-center gap-6">
+      <div className="relative shrink-0">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          {slices.map((s, i) => (
+            <path key={i} d={s.path} fill={s.color} className="hover:opacity-80 transition-opacity cursor-pointer" />
+          ))}
+          {/* Hole */}
+          <circle cx={cx} cy={cy} r={38} fill="white" />
+          <text x={cx} y={cy - 4} textAnchor="middle" className="text-[9px] font-bold" fill="#52525b" fontSize="9">Total</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fill="#18181b" fontSize="11" fontWeight="800">
+            {formatCurrency(total, currency).replace(/[^0-9.,₹$£€]/g, "").substring(0, 8)}
+          </text>
+        </svg>
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        {slices.map((s, i) => (
+          <div key={i} className="flex items-center gap-2 min-w-[120px]">
+            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+            <div>
+              <p className="text-[11px] font-bold text-zinc-800">{s.label}</p>
+              <p className="text-[10px] text-zinc-500">{formatCurrency(s.value, currency)} · {s.pct}%</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SMALL MODAL WRAPPER
+// ============================================================
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 z-10 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+          <h3 className="text-sm font-extrabold text-zinc-900">{title}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// FORM HELPERS
+// ============================================================
+function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-bold text-zinc-500">{label}{required && " *"}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "w-full h-9 rounded-lg border border-zinc-200 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all";
+const selectCls = "w-full h-9 rounded-lg border border-zinc-200 px-2 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all";
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+export default function MoneyFlowView() {
+  const { dbUser } = useAuth();
+  const currency = dbUser?.currency || "INR";
+  const fmt = (v: number) => formatCurrency(v, currency);
+
+  // ---- Sub-tab navigation ----
+  type SubTab = "spending" | "recurring" | "budget" | "income" | "creditcard" | "insights";
+  const [activeTab, setActiveTab] = React.useState<SubTab>("spending");
+
+  // ---- Drawer ----
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   const [drawerMode, setDrawerMode] = React.useState<"manual" | "import" | null>(null);
 
-  // Transactions State
-  const [transactions, setTransactions] = React.useState<any[]>(() => {
+  // ---- Transactions ----
+  const [transactions, setTransactions] = React.useState<Transaction[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("finone_transactions");
-      return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+      const s = localStorage.getItem("finone_transactions_v2");
+      return s ? JSON.parse(s) : INITIAL_TRANSACTIONS;
     }
     return INITIAL_TRANSACTIONS;
   });
+  React.useEffect(() => { localStorage.setItem("finone_transactions_v2", JSON.stringify(transactions)); }, [transactions]);
 
-  // Persist Transactions
-  React.useEffect(() => {
-    localStorage.setItem("finone_transactions", JSON.stringify(transactions));
-  }, [transactions]);
+  // ---- Categories ----
+  const [categories, setCategories] = React.useState<Category[]>(() => {
+    if (typeof window !== "undefined") {
+      const s = localStorage.getItem("finone_categories");
+      return s ? JSON.parse(s) : INITIAL_CATEGORIES;
+    }
+    return INITIAL_CATEGORIES;
+  });
+  React.useEffect(() => { localStorage.setItem("finone_categories", JSON.stringify(categories)); }, [categories]);
 
-  // Budget Limit Simulator (Analytics Tab)
-  const [budgetLimit, setBudgetLimit] = React.useState(6000);
-  // Income Simulator Freelance state (Analytics Tab)
-  const [extraFreelanceIncome, setExtraFreelanceIncome] = React.useState(1800);
+  // ---- Recurring ----
+  const [recurringBills, setRecurringBills] = React.useState<RecurringBill[]>(() => {
+    if (typeof window !== "undefined") {
+      const s = localStorage.getItem("finone_recurring");
+      return s ? JSON.parse(s) : INITIAL_RECURRING;
+    }
+    return INITIAL_RECURRING;
+  });
+  React.useEffect(() => { localStorage.setItem("finone_recurring", JSON.stringify(recurringBills)); }, [recurringBills]);
 
-  // Filters State
-  const [search, setSearch] = React.useState("");
-  const [typeFilter, setTypeFilter] = React.useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = React.useState<string>("all");
-  const [accountFilter, setAccountFilter] = React.useState<string>("all");
+  // ---- Budget ----
+  const [budgets, setBudgets] = React.useState<BudgetItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const s = localStorage.getItem("finone_budgets");
+      return s ? JSON.parse(s) : INITIAL_BUDGETS;
+    }
+    return INITIAL_BUDGETS;
+  });
+  React.useEffect(() => { localStorage.setItem("finone_budgets", JSON.stringify(budgets)); }, [budgets]);
 
-  // Pagination State
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const itemsPerPage = 8;
+  // ---- Income ----
+  const [incomeItems, setIncomeItems] = React.useState<IncomeItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const s = localStorage.getItem("finone_income");
+      return s ? JSON.parse(s) : INITIAL_INCOME;
+    }
+    return INITIAL_INCOME;
+  });
+  React.useEffect(() => { localStorage.setItem("finone_income", JSON.stringify(incomeItems)); }, [incomeItems]);
 
-  // Derived Values - Expenses & Income
-  const expensesList = React.useMemo(() => transactions.filter(t => t.type === "expense"), [transactions]);
+  // ---- Credit Cards ----
+  const [creditCards, setCreditCards] = React.useState<CreditCardItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const s = localStorage.getItem("finone_credit_cards");
+      return s ? JSON.parse(s) : INITIAL_CREDIT_CARDS;
+    }
+    return INITIAL_CREDIT_CARDS;
+  });
+  React.useEffect(() => { localStorage.setItem("finone_credit_cards", JSON.stringify(creditCards)); }, [creditCards]);
+
+  // ---- Derived Totals ----
+  const expenseList = React.useMemo(() => transactions.filter(t => t.type === "expense"), [transactions]);
   const incomeList = React.useMemo(() => transactions.filter(t => t.type === "income"), [transactions]);
+  const totalSpending = React.useMemo(() => expenseList.reduce((s, t) => s + t.amount, 0), [expenseList]);
+  const totalIncome = React.useMemo(() => incomeList.reduce((s, t) => s + t.amount, 0), [incomeList]);
 
-  const totalSpending = React.useMemo(() => {
-    return expensesList.reduce((sum, t) => sum + t.amount, 0);
-  }, [expensesList]);
-
-  const totalIncomeVal = React.useMemo(() => {
-    return incomeList.reduce((sum, t) => sum + t.amount, 0);
-  }, [incomeList]);
-
-  // Spending Distributions (dynamic calculation for distribution bar)
-  const distribution = React.useMemo(() => {
-    if (totalSpending === 0) return { Rent: 0, Food: 0, Shopping: 0, Travel: 0, Misc: 0 };
-    
-    let rent = 0;
-    let food = 0;
-    let shopping = 0;
-    let travel = 0;
-    let misc = 0;
-
-    expensesList.forEach(t => {
-      if (t.category === "Rent" || t.category === "EMI") rent += t.amount;
-      else if (t.category === "Food & Dining" || t.category === "Groceries") food += t.amount;
-      else if (t.category === "Shopping" || t.category === "Entertainment") shopping += t.amount;
-      else if (t.category === "Travel" || t.category === "Transportation" || t.category === "Fuel") travel += t.amount;
-      else misc += t.amount;
-    });
-
-    return {
-      Rent: Math.round((rent / totalSpending) * 100),
-      Food: Math.round((food / totalSpending) * 100),
-      Shopping: Math.round((shopping / totalSpending) * 100),
-      Travel: Math.round((travel / totalSpending) * 100),
-      Misc: Math.round((misc / totalSpending) * 100)
-    };
-  }, [expensesList, totalSpending]);
-
-  // Top Merchants Calculation
-  const topMerchants = React.useMemo(() => {
-    const merchantMap: Record<string, number> = {};
-    expensesList.forEach(t => {
-      merchantMap[t.merchant] = (merchantMap[t.merchant] || 0) + t.amount;
-    });
-
-    return Object.entries(merchantMap)
-      .map(([name, val]) => ({ name, value: val }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 2);
-  }, [expensesList]);
-
-  // Dynamic budget category totals
-  const budgetUtilization = Math.round((totalSpending / budgetLimit) * 100);
-
-  const budgetCategoryTotals = React.useMemo(() => {
-    let food = 0;
-    let travel = 0;
-    let entertainment = 0;
-
-    expensesList.forEach(t => {
-      if (t.category === "Food & Dining" || t.category === "Groceries") food += t.amount;
-      else if (t.category === "Travel" || t.category === "Transportation" || t.category === "Fuel") travel += t.amount;
-      else if (t.category === "Entertainment") entertainment += t.amount;
-    });
-
-    return { food, travel, entertainment };
-  }, [expensesList]);
-
-  // Handle new items import/add
-  const handleImportTransactions = (newItems: any[]) => {
-    setTransactions(prev => [...newItems, ...prev]);
+  // ---- Handle import from drawer ----
+  const handleImport = (items: any[]) => {
+    setTransactions(prev => [...items.map(i => ({ ...i, referenceId: i.referenceId || undefined })), ...prev]);
   };
 
-  // Delete transaction action
-  const handleDeleteTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
-  };
-
-  // Get unique categories and accounts for filter selectors
-  const uniqueCategories = React.useMemo(() => {
-    const set = new Set<string>();
-    transactions.forEach(t => set.add(t.category));
-    return Array.from(set);
-  }, [transactions]);
-
-  const uniqueAccounts = React.useMemo(() => {
-    const set = new Set<string>();
-    transactions.forEach(t => set.add(t.account));
-    return Array.from(set);
-  }, [transactions]);
-
-  // Filtered transactions list
-  const filteredTransactions = React.useMemo(() => {
-    return transactions.filter(t => {
-      const matchSearch =
-        t.merchant.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase()) ||
-        t.category.toLowerCase().includes(search.toLowerCase());
-      
-      const matchType = typeFilter === "all" ? true : t.type === typeFilter;
-      const matchCategory = categoryFilter === "all" ? true : t.category === categoryFilter;
-      const matchAccount = accountFilter === "all" ? true : t.account === accountFilter;
-
-      return matchSearch && matchType && matchCategory && matchAccount;
-    });
-  }, [transactions, search, typeFilter, categoryFilter, accountFilter]);
-
-  // Paginated Sliced Transactions
-  const paginatedTransactions = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredTransactions, currentPage]);
-
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0
-    }).format(val);
-  };
+  const SUB_TABS: { key: SubTab; label: string; icon: React.ElementType }[] = [
+    { key: "spending", label: "Spending", icon: TrendingDown },
+    { key: "recurring", label: "Recurring Bills", icon: Repeat },
+    { key: "budget", label: "Budget", icon: Sliders },
+    { key: "income", label: "Income", icon: TrendingUp },
+    { key: "creditcard", label: "Credit Cards", icon: CreditCard },
+    { key: "insights", label: "Cash Flow", icon: Activity },
+  ];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
-      
-      {/* Sub Tab Navigation Menu */}
-      <div className="flex justify-between items-center border-b border-zinc-200 pb-2">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveSubTab("transactions")}
-            className={`h-9 px-4 text-xs font-bold rounded-lg transition-all ${
-              activeSubTab === "transactions"
-                ? "bg-zinc-950 text-white shadow-xs"
-                : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
-            }`}
-          >
-            Transactions Ledger
-          </button>
-          <button
-            onClick={() => setActiveSubTab("analytics")}
-            className={`h-9 px-4 text-xs font-bold rounded-lg transition-all ${
-              activeSubTab === "analytics"
-                ? "bg-zinc-950 text-white shadow-xs"
-                : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
-            }`}
-          >
-            Cash Flow & Budgets
-          </button>
+
+      {/* ── Sub-tab Navigation ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-zinc-200 pb-3">
+        <div className="flex flex-wrap gap-1">
+          {SUB_TABS.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold rounded-lg transition-all ${
+                  activeTab === tab.key
+                    ? "bg-zinc-950 text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
-        <div className="text-[10px] text-zinc-400 font-semibold flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-blue-600 shrink-0" /> AI Classification Active
+        <div className="text-[10px] text-zinc-400 font-semibold flex items-center gap-1.5 shrink-0">
+          <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+          AI Classification Active
         </div>
       </div>
 
-      {/* ==========================================
-          TAB 1: TRANSACTIONS LIST
-          ========================================== */}
-      {activeSubTab === "transactions" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          
-          {/* Page Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Transactions</h2>
-              <p className="text-sm text-zinc-500 mt-1">Manage your income and expenses from multiple sources.</p>
-            </div>
-            
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <Button
-                onClick={() => { setDrawerMode("import"); setIsDrawerOpen(true); }}
-                variant="outline"
-                className="flex-1 sm:flex-none h-10 px-4 rounded-xl border-zinc-250 font-semibold transition-all active:scale-[0.98] text-xs"
-              >
-                <FolderSync className="h-4 w-4 mr-1.5 text-zinc-500" />
-                Import Transactions
-              </Button>
-              <Button
-                onClick={() => { setDrawerMode("manual"); setIsDrawerOpen(true); }}
-                className="flex-1 sm:flex-none h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98] text-xs"
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Add Transaction
-              </Button>
-            </div>
+      {/* ════════════════════════════════════════
+          TAB 1 — SPENDING
+          ════════════════════════════════════════ */}
+      {activeTab === "spending" && (
+        <SpendingTab
+          transactions={transactions}
+          setTransactions={setTransactions}
+          expenseList={expenseList}
+          totalSpending={totalSpending}
+          categories={categories}
+          setCategories={setCategories}
+          budgets={budgets}
+          fmt={fmt}
+          currency={currency}
+          onOpenDrawer={(mode) => { setDrawerMode(mode); setIsDrawerOpen(true); }}
+        />
+      )}
+
+      {/* ════════════════════════════════════════
+          TAB 2 — RECURRING BILLS
+          ════════════════════════════════════════ */}
+      {activeTab === "recurring" && (
+        <RecurringBillsTab
+          bills={recurringBills}
+          setBills={setRecurringBills}
+          categories={categories}
+          fmt={fmt}
+        />
+      )}
+
+      {/* ════════════════════════════════════════
+          TAB 3 — BUDGET
+          ════════════════════════════════════════ */}
+      {activeTab === "budget" && (
+        <BudgetTab
+          budgets={budgets}
+          setBudgets={setBudgets}
+          categories={categories}
+          expenseList={expenseList}
+          fmt={fmt}
+        />
+      )}
+
+      {/* ════════════════════════════════════════
+          TAB 4 — INCOME
+          ════════════════════════════════════════ */}
+      {activeTab === "income" && (
+        <IncomeTab
+          incomeItems={incomeItems}
+          setIncomeItems={setIncomeItems}
+          fmt={fmt}
+        />
+      )}
+
+      {/* ════════════════════════════════════════
+          TAB 5 — CREDIT CARDS
+          ════════════════════════════════════════ */}
+      {activeTab === "creditcard" && (
+        <CreditCardTab
+          cards={creditCards}
+          setCards={setCreditCards}
+          fmt={fmt}
+          currency={currency}
+        />
+      )}
+
+      {/* ════════════════════════════════════════
+          TAB 6 — CASH FLOW INSIGHTS
+          ════════════════════════════════════════ */}
+      {activeTab === "insights" && (
+        <InsightsTab
+          expenseList={expenseList}
+          incomeList={incomeList}
+          totalSpending={totalSpending}
+          totalIncome={totalIncome}
+          categories={categories}
+          budgets={budgets}
+          fmt={fmt}
+        />
+      )}
+
+      {/* Transaction Drawer */}
+      <TransactionOnboardingDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onImport={handleImport}
+        initialMode={drawerMode}
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// SPENDING TAB
+// ============================================================
+function SpendingTab({
+  transactions, setTransactions, expenseList, totalSpending,
+  categories, setCategories, budgets, fmt, currency, onOpenDrawer
+}: {
+  transactions: Transaction[];
+  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  expenseList: Transaction[];
+  totalSpending: number;
+  categories: Category[];
+  setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
+  budgets: BudgetItem[];
+  fmt: (v: number) => string;
+  currency: string;
+  onOpenDrawer: (mode: "manual" | "import") => void;
+}) {
+  const [search, setSearch] = React.useState("");
+  const [categoryFilter, setCategoryFilter] = React.useState("all");
+  const [paymentFilter, setPaymentFilter] = React.useState("all");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [showSubcategory, setShowSubcategory] = React.useState(true);
+  const [showRefId, setShowRefId] = React.useState(false);
+  const [showColMenu, setShowColMenu] = React.useState(false);
+  const [showAddCategory, setShowAddCategory] = React.useState(false);
+  const itemsPerPage = 10;
+
+  // Spending by category for donut
+  const donutData = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    expenseList.forEach(t => {
+      map[t.category] = (map[t.category] || 0) + t.amount;
+    });
+    return Object.entries(map).map(([label, value]) => ({
+      label,
+      value,
+      color: CATEGORY_COLORS[label] || CATEGORY_COLORS.Other,
+    })).sort((a, b) => b.value - a.value);
+  }, [expenseList]);
+
+  // Filtered list
+  const filtered = React.useMemo(() => {
+    return transactions.filter(t => {
+      if (t.type !== "expense") return false;
+      const q = search.toLowerCase();
+      const matchSearch = !q || t.merchant.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
+      const matchCat = categoryFilter === "all" || t.category === categoryFilter;
+      const matchPay = paymentFilter === "all" || t.paymentMethod === paymentFilter;
+      return matchSearch && matchCat && matchPay;
+    });
+  }, [transactions, search, categoryFilter, paymentFilter]);
+
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const uniqueCategories = [...new Set(expenseList.map(t => t.category))];
+  const uniquePayments = [...new Set(transactions.map(t => t.paymentMethod))];
+
+  // Check over-limit for a transaction
+  const getWarning = (t: Transaction) => {
+    const budget = budgets.find(b => b.category === t.category);
+    if (budget) {
+      const catTotal = expenseList.filter(e => e.category === t.category).reduce((s, e) => s + e.amount, 0);
+      if (catTotal > budget.budgetAmount) return "Category over budget limit";
+    }
+    // Duplicate detection: same merchant + same amount within 3 days
+    const dupls = transactions.filter(other =>
+      other.id !== t.id &&
+      other.merchant === t.merchant &&
+      other.amount === t.amount &&
+      Math.abs(new Date(t.date).getTime() - new Date(other.date).getTime()) < 3 * 24 * 60 * 60 * 1000
+    );
+    if (dupls.length > 0) return "Possible duplicate entry";
+    return null;
+  };
+
+  // Add Category state
+  const [newCat, setNewCat] = React.useState({
+    name: "", subcatName: "", subcatPriority: "Medium" as "High" | "Medium" | "Low",
+    maxCap: "", description: "", color: "#6366f1",
+  });
+
+  const handleAddCategory = () => {
+    if (!newCat.name.trim()) return;
+    const cat: Category = {
+      id: "cat_" + Date.now(),
+      name: newCat.name,
+      subcategories: newCat.subcatName ? [{ name: newCat.subcatName, priority: newCat.subcatPriority }] : [],
+      maxCap: parseFloat(newCat.maxCap) || 0,
+      description: newCat.description,
+      color: newCat.color,
+    };
+    setCategories(prev => [...prev, cat]);
+    setNewCat({ name: "", subcatName: "", subcatPriority: "Medium", maxCap: "", description: "", color: "#6366f1" });
+    setShowAddCategory(false);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-extrabold tracking-tight text-zinc-950">Spending</h2>
+          <p className="text-sm text-zinc-500 mt-0.5">Track, categorize and analyze all your cash outflows.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={() => onOpenDrawer("import")}
+            variant="outline"
+            className="h-9 px-3 rounded-xl border-zinc-200 font-semibold text-xs transition-all active:scale-[0.98]"
+          >
+            <FolderSync className="h-3.5 w-3.5 mr-1.5 text-zinc-500" />
+            Import
+          </Button>
+          <Button
+            onClick={() => onOpenDrawer("manual")}
+            className="h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs transition-all active:scale-[0.98]"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add Manually
+          </Button>
+          <Button
+            onClick={() => setShowAddCategory(true)}
+            variant="outline"
+            className="h-9 px-3 rounded-xl border-zinc-200 font-semibold text-xs transition-all active:scale-[0.98]"
+          >
+            <Tag className="h-3.5 w-3.5 mr-1.5 text-zinc-500" />
+            Add Category
+          </Button>
+          <button
+            onClick={() => onOpenDrawer("import")}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all"
+            title="Import via SMS"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            SMS
+          </button>
+          <button
+            onClick={() => onOpenDrawer("import")}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
+            title="Import via Gmail"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            Gmail
+          </button>
+        </div>
+      </div>
+
+      {/* Donut Chart + Summary row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 mb-4">Spending by Category</p>
+          <DonutChart data={donutData} currency={currency} />
+        </div>
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm space-y-5">
+          <div>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Outflow</p>
+            <p className="text-3xl font-extrabold tracking-tight text-red-600 mt-1">{fmt(totalSpending)}</p>
+            <p className="text-[11px] text-zinc-400 mt-0.5">This month's total expenses</p>
           </div>
-
-          {/* Quick Metrics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Outflow</span>
-              <p className="text-2xl font-extrabold tracking-tight text-red-600 mt-1">{formatCurrency(totalSpending)}</p>
-              <p className="text-[10px] text-zinc-400 mt-0.5">Spent across calendar transactions</p>
-            </div>
-            <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Inward</span>
-              <p className="text-2xl font-extrabold tracking-tight text-emerald-600 mt-1">{formatCurrency(totalIncomeVal)}</p>
-              <p className="text-[10px] text-zinc-400 mt-0.5">Direct salary & passive payouts</p>
-            </div>
-            <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Net Position</span>
-              <p className={`text-2xl font-extrabold tracking-tight mt-1 ${
-                (totalIncomeVal - totalSpending) >= 0 ? "text-blue-600" : "text-amber-600"
-              }`}>{formatCurrency(totalIncomeVal - totalSpending)}</p>
-              <p className="text-[10px] text-zinc-400 mt-0.5">Current month savings buffer</p>
-            </div>
+          <div className="space-y-2 pt-3 border-t border-zinc-100">
+            <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Top Categories</p>
+            {donutData.slice(0, 4).map(d => (
+              <div key={d.label} className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: d.color }} />
+                <span className="flex-1 text-xs font-medium text-zinc-700 truncate">{d.label}</span>
+                <span className="text-xs font-bold text-zinc-900">{fmt(d.value)}</span>
+              </div>
+            ))}
           </div>
+        </div>
+      </div>
 
-          {/* Filters Panel */}
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-4 space-y-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-zinc-650">
-              <Filter className="h-4 w-4 text-zinc-400" /> Filter Ledger Rows
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              {/* Search input */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search merchant, notes..."
-                  value={search}
-                  onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                  className="w-full h-8.5 rounded-lg border border-zinc-200 px-3 pl-8 bg-white text-xs font-medium focus:border-blue-500 focus:outline-none"
-                />
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
-              </div>
-
-              {/* Type selector */}
-              <div>
-                <Select
-                  value={typeFilter}
-                  onChange={e => { setTypeFilter(e.target.value); setCurrentPage(1); }}
-                  className="h-8.5 text-xs font-semibold"
-                >
-                  <option value="all">All Types</option>
-                  <option value="expense">Expenses</option>
-                  <option value="income">Income Streams</option>
-                  <option value="transfer">Transfers</option>
-                </Select>
-              </div>
-
-              {/* Category selector */}
-              <div>
-                <Select
-                  value={categoryFilter}
-                  onChange={e => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
-                  className="h-8.5 text-xs font-semibold"
-                >
-                  <option value="all">All Categories</option>
-                  {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                </Select>
-              </div>
-
-              {/* Account selector */}
-              <div>
-                <Select
-                  value={accountFilter}
-                  onChange={e => { setAccountFilter(e.target.value); setCurrentPage(1); }}
-                  className="h-8.5 text-xs font-semibold"
-                >
-                  <option value="all">All Accounts</option>
-                  {uniqueAccounts.map(a => <option key={a} value={a}>{a}</option>)}
-                </Select>
-              </div>
-            </div>
+      {/* Filters + Column Toggle */}
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search transactions..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+              className="w-full h-8.5 rounded-lg border border-zinc-200 px-3 pl-8 bg-white text-xs font-medium focus:border-blue-500 focus:outline-none"
+            />
           </div>
+          <select
+            value={categoryFilter}
+            onChange={e => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
+            className="h-8.5 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-semibold focus:outline-none"
+          >
+            <option value="all">All Categories</option>
+            {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select
+            value={paymentFilter}
+            onChange={e => { setPaymentFilter(e.target.value); setCurrentPage(1); }}
+            className="h-8.5 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-semibold focus:outline-none"
+          >
+            <option value="all">All Payment Methods</option>
+            {uniquePayments.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
 
-          {/* Transactions Table */}
-          <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-zinc-150 bg-zinc-50/50 font-bold text-zinc-500 select-none text-[10px] tracking-wider uppercase">
-                    <th className="p-4 w-28">Date</th>
-                    <th className="p-4">Merchant / Details</th>
-                    <th className="p-4">Category</th>
-                    <th className="p-4">Account / Wallet</th>
-                    <th className="p-4 w-24">Type</th>
-                    <th className="p-4 w-32 text-right">Amount</th>
-                    <th className="p-4 w-12 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 font-medium text-zinc-800">
-                  {paginatedTransactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-8 text-center text-zinc-400">
-                        No transactions found matching active filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedTransactions.map((t) => (
-                      <tr key={t.id} className="hover:bg-zinc-50/30 transition-colors">
-                        <td className="p-4 whitespace-nowrap text-zinc-500 font-mono">{t.date}</td>
-                        <td className="p-4">
-                          <div className="font-extrabold text-zinc-900">{t.merchant}</div>
-                          <div className="text-[10px] text-zinc-400 truncate max-w-xs font-medium mt-0.5">{t.description}</div>
-                        </td>
-                        <td className="p-4">
-                          <span className="inline-flex items-center gap-1 text-[11px] text-zinc-800">
-                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
-                            {t.category}
-                          </span>
-                        </td>
-                        <td className="p-4 whitespace-nowrap text-zinc-650">{t.account}</td>
-                        <td className="p-4">
-                          <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                            t.type === "income"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : t.type === "transfer"
-                              ? "bg-blue-50 text-blue-700"
-                              : "bg-red-50 text-red-700"
-                          }`}>
-                            {t.type}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right whitespace-nowrap font-bold text-zinc-955 text-sm">
-                          <span className={t.type === "income" ? "text-emerald-600" : "text-zinc-900"}>
-                            {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount)}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
-                          <button
-                            onClick={() => handleDeleteTransaction(t.id)}
-                            className="p-1 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50/50 transition-colors cursor-pointer"
-                            title="Delete transaction"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex justify-between items-center p-4 border-t border-zinc-150 bg-zinc-50/50 text-xs font-bold text-zinc-500">
-                <span>
-                  Showing {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    variant="outline"
-                    className="h-8.5 rounded-lg text-xs"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    variant="outline"
-                    className="h-8.5 rounded-lg text-xs"
-                  >
-                    Next
-                  </Button>
-                </div>
+          {/* Column toggle dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowColMenu(v => !v)}
+              className="flex items-center gap-1.5 h-8.5 px-3 rounded-lg border border-zinc-200 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+              Columns
+              <ChevronDown className="h-3 w-3 text-zinc-400" />
+            </button>
+            {showColMenu && (
+              <div className="absolute right-0 top-10 z-20 bg-white border border-zinc-200 rounded-xl shadow-lg p-3 space-y-2 min-w-[160px]">
+                <label className="flex items-center gap-2 text-xs font-medium text-zinc-700 cursor-pointer">
+                  <input type="checkbox" checked={showSubcategory} onChange={e => setShowSubcategory(e.target.checked)} className="rounded" />
+                  Sub-category
+                </label>
+                <label className="flex items-center gap-2 text-xs font-medium text-zinc-700 cursor-pointer">
+                  <input type="checkbox" checked={showRefId} onChange={e => setShowRefId(e.target.checked)} className="rounded" />
+                  Reference ID
+                </label>
               </div>
             )}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* ==========================================
-          TAB 2: ANALYTICS & WIDGETS
-          ========================================== */}
-      {activeSubTab === "analytics" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-300">
-          
-          {/* Heading */}
-          <div className="lg:col-span-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-100 pb-4">
-            <div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Money Flow</h2>
-              <p className="text-sm text-zinc-500 mt-1">Monitor your cash flow, optimize spending, and improve financial discipline.</p>
-            </div>
-            <Button
-              onClick={() => { setDrawerMode("manual"); setIsDrawerOpen(true); }}
-              className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98] text-xs"
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Add Transaction
-            </Button>
-          </div>
-
-          {/* Spending Card (6 Columns) */}
-          <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-650">
-                <TrendingDown className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setDrawerMode("manual"); setIsDrawerOpen(true); }}
-                  className="text-xs text-zinc-400 font-bold hover:text-zinc-650 transition-colors cursor-pointer"
-                >
-                  + Add Expense
-                </button>
-                <span className="text-zinc-250">|</span>
-                <button
-                  onClick={() => setActiveSubTab("transactions")}
-                  className="text-xs text-blue-600 font-bold hover:text-blue-700 transition-colors flex items-center cursor-pointer"
-                >
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <h3 className="text-lg font-bold text-zinc-900">Spending</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Track and categorize historical cash outflows</p>
-            </div>
-
-            <div className="my-5">
-              <p className="text-3xl font-extrabold tracking-tight text-zinc-900">{formatCurrency(totalSpending)}</p>
-              <p className="text-xs mt-1 text-zinc-500">Total spent this calendar month</p>
-            </div>
-
-            {/* Allocation Details */}
-            <div className="space-y-4 pt-4 border-t border-zinc-100">
-              <div>
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 mb-2">Outflow Distribution</p>
-                
-                <div className="h-3.5 w-full bg-zinc-100 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-red-500" style={{ width: `${Math.max(distribution.Rent, 5)}%` }} title={`Rent (${distribution.Rent}%)`} />
-                  <div className="h-full bg-orange-400" style={{ width: `${Math.max(distribution.Food, 5)}%` }} title={`Food (${distribution.Food}%)`} />
-                  <div className="h-full bg-yellow-500" style={{ width: `${Math.max(distribution.Shopping, 5)}%` }} title={`Shopping (${distribution.Shopping}%)`} />
-                  <div className="h-full bg-blue-500" style={{ width: `${Math.max(distribution.Travel, 5)}%` }} title={`Travel (${distribution.Travel}%)`} />
-                  <div className="h-full bg-zinc-400" style={{ width: `${Math.max(distribution.Misc, 5)}%` }} title={`Misc (${distribution.Misc}%)`} />
-                </div>
-                
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-[9px] text-zinc-400 font-bold mt-2">
-                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Rent ({distribution.Rent}%)</span>
-                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-orange-400" /> Food ({distribution.Food}%)</span>
-                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-yellow-500" /> Shop ({distribution.Shopping}%)</span>
-                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Travel ({distribution.Travel}%)</span>
-                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-zinc-400" /> Misc ({distribution.Misc}%)</span>
-                </div>
-              </div>
-
-              {/* Merchant info & Anomaly Detection */}
-              <div className="grid grid-cols-2 gap-4 text-xs pt-2">
-                <div>
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Top Merchants</p>
-                  <div className="space-y-1.5 mt-1 font-bold text-zinc-800">
-                    {topMerchants.length === 0 ? (
-                      <span className="text-[10px] text-zinc-400">No merchant logs</span>
-                    ) : (
-                      topMerchants.map(m => (
-                        <div key={m.name} className="flex justify-between">
-                          <span>{m.name}</span>
-                          <span>{formatCurrency(m.value)}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-                
-                <div className="rounded-xl bg-red-50/50 p-3 border border-red-100/50">
-                  <div className="flex items-center gap-1 text-red-655 mb-1">
-                    <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-                    <span className="text-[10px] font-bold">Anomaly Alert</span>
-                  </div>
-                  <p className="text-[10px] text-zinc-650 leading-tight">
-                    Food and grocery spending ({formatCurrency(budgetCategoryTotals.food)}) is higher than your trailing average.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Budgets Card (6 Columns) */}
-          <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <Sliders className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2">
-                <button className="text-xs text-zinc-400 font-bold hover:text-zinc-650 transition-colors">+ Add Budget</button>
-                <span className="text-zinc-250">|</span>
-                <button
-                  onClick={() => setActiveSubTab("transactions")}
-                  className="text-xs text-blue-600 font-bold hover:text-blue-700 transition-colors flex items-center cursor-pointer"
-                >
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <h3 className="text-lg font-bold text-zinc-900">Budgets</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Control spending using active category allocations</p>
-            </div>
-
-            {/* Interactive Budget Limit Slider */}
-            <div className="my-5 bg-zinc-50 p-4 rounded-xl border border-zinc-100 space-y-3">
-              <div className="flex justify-between items-center text-xs font-semibold text-zinc-700">
-                <span>Monthly Budget Cap Limit:</span>
-                <span className="text-blue-600 font-bold">{formatCurrency(budgetLimit)}</span>
-              </div>
-              <input
-                type="range"
-                min="3000"
-                max="10000"
-                step="250"
-                value={budgetLimit}
-                onChange={(e) => setBudgetLimit(Number(e.target.value))}
-                className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-650"
-              />
-              <div className="flex justify-between items-center text-[10px] text-zinc-400 pt-1 font-bold">
-                <span>Utilization rate: {budgetUtilization}%</span>
-                <span>Remaining: {formatCurrency(Math.max(budgetLimit - totalSpending, 0))}</span>
-              </div>
-            </div>
-
-            {/* Budget Progress bars */}
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between items-center text-xs font-semibold text-zinc-800 mb-1">
-                  <span>Food & Groceries ({formatCurrency(budgetCategoryTotals.food)} / $1,500)</span>
-                  <span className={`font-bold text-[10px] ${
-                    budgetCategoryTotals.food > 1500 ? "text-red-600" : "text-amber-600"
-                  }`}>{Math.round((budgetCategoryTotals.food / 1500) * 100)}% Utilized</span>
-                </div>
-                <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${budgetCategoryTotals.food > 1500 ? "bg-red-500" : "bg-amber-500"}`}
-                    style={{ width: `${Math.min((budgetCategoryTotals.food / 1500) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center text-xs font-semibold text-zinc-800 mb-1">
-                  <span>Entertainment & Dinout ({formatCurrency(budgetCategoryTotals.entertainment)} / $500)</span>
-                  <span className={`font-bold text-[10px] ${
-                    budgetCategoryTotals.entertainment > 500 ? "text-red-600" : "text-emerald-600"
-                  }`}>{Math.round((budgetCategoryTotals.entertainment / 500) * 100)}% Utilized</span>
-                </div>
-                <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${budgetCategoryTotals.entertainment > 500 ? "bg-red-500" : "bg-emerald-500"}`}
-                    style={{ width: `${Math.min((budgetCategoryTotals.entertainment / 500) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center text-xs font-semibold text-zinc-800 mb-1">
-                  <span>Transport & Travel ({formatCurrency(budgetCategoryTotals.travel)} / $600)</span>
-                  <span className={`font-bold text-[10px] ${
-                    budgetCategoryTotals.travel > 600 ? "text-red-655" : "text-emerald-600"
-                  }`}>{Math.round((budgetCategoryTotals.travel / 600) * 100)}% Utilized</span>
-                </div>
-                <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${budgetCategoryTotals.travel > 600 ? "bg-red-500" : "bg-emerald-500"}`}
-                    style={{ width: `${Math.min((budgetCategoryTotals.travel / 600) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Insights Card (4 Columns) */}
-          <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <Sparkles className="h-5 w-5 animate-pulse" />
-              </div>
-              <div className="flex gap-2">
-                <button className="text-xs text-blue-650 font-bold hover:text-blue-700 transition-colors flex items-center cursor-pointer">
-                  View Insights <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <h3 className="text-lg font-bold text-zinc-900">AI Insights</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Financial behavioral indices & forecast analysis</p>
-            </div>
-
-            {/* Core Insights Metrics */}
-            <div className="my-5 grid grid-cols-2 gap-4 pt-2">
-              <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Savings Rate</span>
-                <p className="text-xl font-bold text-zinc-900 mt-0.5">
-                  {totalIncomeVal > 0 ? Math.round(((totalIncomeVal - totalSpending) / totalIncomeVal) * 100) : 0}%
-                </p>
-                <span className="text-[10px] text-emerald-600 font-bold">Stable margin</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Behavior Score</span>
-                <p className="text-xl font-bold text-zinc-900 mt-0.5">88/100</p>
-                <span className="text-[10px] text-blue-655 font-bold">Excellent index</span>
-              </div>
-            </div>
-
-            {/* Text based recommendations & forecasts */}
-            <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Personalized Opportunities</p>
-                <div className="flex items-start gap-2 text-zinc-650">
-                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Cancel unused SaaS subscriptions to save $84/mo.</span>
-                </div>
-                <div className="flex items-start gap-2 text-zinc-650">
-                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Consolidate credit balances to reduce interest costs.</span>
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-zinc-50 p-3 border border-zinc-100">
-                <span className="text-[10px] font-bold text-zinc-400">Next Month Projection</span>
-                <p className="font-bold text-zinc-800 mt-0.5">Forecasted outflow: $4,200</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Credit Card Management Card (4 Columns) */}
-          <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <CreditCard className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2">
-                <button className="text-xs text-zinc-400 font-bold hover:text-zinc-600 transition-colors">+ Add Card</button>
-                <span className="text-zinc-250">|</span>
-                <button className="text-xs text-blue-605 font-bold hover:text-blue-700 transition-colors flex items-center cursor-pointer">
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <h3 className="text-lg font-bold text-zinc-900">Credit Cards</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Outstanding limits and due dates summary</p>
-            </div>
-
-            {/* Aggregated Credit metrics */}
-            <div className="my-5 flex justify-between items-end">
-              <div>
-                <p className="text-2xl font-bold tracking-tight text-zinc-900">$3,570</p>
-                <p className="text-[10px] text-zinc-400 mt-0.5">Total Outstanding Balance</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-semibold text-zinc-700">35% Utilization</p>
-                <div className="h-1.5 w-20 bg-zinc-100 rounded-full overflow-hidden mt-1 inline-block">
-                  <div className="h-full bg-blue-600" style={{ width: "35%" }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Credit card list */}
-            <div className="space-y-3 pt-4 border-t border-zinc-100 text-xs">
-              <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                <div>
-                  <p className="font-bold text-zinc-900">Amex Gold</p>
-                  <p className="text-[9px] text-zinc-400 mt-0.5">Due Jul 14 • Min $40</p>
-                </div>
-                <span className="font-bold text-zinc-800">$2,450</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                <div>
-                  <p className="font-bold text-zinc-900">Chase Sapphire</p>
-                  <p className="text-[9px] text-zinc-400 mt-0.5">Due Jul 10 • Min $35</p>
-                </div>
-                <span className="font-bold text-zinc-800">$1,120</span>
-              </div>
-
-              <div className="flex justify-between items-center text-[10px] text-zinc-500 font-bold pt-1">
-                <span>Total Rewards Points:</span>
-                <span className="text-blue-600 font-bold">127,000 pts ($1,270 value)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Recurring Bills & Subscriptions (4 Columns) */}
-          <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <CalendarClock className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2">
-                <button className="text-xs text-zinc-400 font-bold hover:text-zinc-600 transition-colors">+ Add Bill</button>
-                <span className="text-zinc-250">|</span>
-                <button className="text-xs text-blue-600 font-bold hover:text-blue-700 transition-colors flex items-center cursor-pointer">
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <h3 className="text-lg font-bold text-zinc-900">Recurring Bills</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Active subscriptions and renewal timelines</p>
-            </div>
-
-            <div className="my-5">
-              <p className="text-2xl font-bold tracking-tight text-zinc-900">$340 / mo</p>
-              <p className="text-xs mt-1 text-zinc-500">Across 6 active recurring subscriptions</p>
-            </div>
-
-            {/* Subscriptions list and warnings */}
-            <div className="space-y-3.5 pt-4 border-t border-zinc-100 text-xs">
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Upcoming Renewals</p>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Netflix:</span>
-                  <span className="font-semibold text-zinc-900">Jul 05 • $20.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Spotify Family:</span>
-                  <span className="font-semibold text-zinc-900">Jul 12 • $17.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Notion Pro:</span>
-                  <span className="font-semibold text-zinc-900">Jul 18 • $10.00</span>
-                </div>
-              </div>
-
-              {/* Unused detection alert */}
-              <div className="rounded-xl bg-blue-50/50 p-3 border border-blue-100/50 flex items-start gap-2">
-                <Sparkles className="h-4 w-4 text-blue-605 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-zinc-650 leading-tight font-medium">
-                  We detected zero logins to Acrobat Pro ($20/mo) in the last 60 days. Cancel to optimize cash reserves.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Income Card (12 Columns) */}
-          <div className="lg:col-span-12 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-650">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setDrawerMode("manual"); setIsDrawerOpen(true); }}
-                  className="text-xs text-zinc-400 font-bold hover:text-zinc-600 transition-colors cursor-pointer"
-                >
-                  + Add Income
-                </button>
-                <span className="text-zinc-250">|</span>
-                <button
-                  onClick={() => setActiveSubTab("transactions")}
-                  className="text-xs text-blue-600 font-bold hover:text-blue-700 transition-colors flex items-center cursor-pointer"
-                >
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <h3 className="text-lg font-bold text-zinc-900">Income</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Salary streams, dividends, and passive revenue cash flows</p>
-            </div>
-
-            {/* Dynamic salary summary */}
-            <div className="my-5 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-              <div>
-                <p className="text-3xl font-extrabold tracking-tight text-zinc-900">
-                  {formatCurrency(totalIncomeVal + extraFreelanceIncome)}
-                </p>
-                <p className="text-xs mt-1 text-zinc-500">Simulated monthly intake across all active categories</p>
-              </div>
-              
-              {/* Interactive slide contribution simulator */}
-              <div className="w-full md:w-80 bg-zinc-50 p-4 rounded-xl border border-zinc-100 space-y-3">
-                <div className="flex justify-between items-center text-xs font-semibold text-zinc-700">
-                  <span>Freelance / Secondary Outflow Income:</span>
-                  <span className="text-blue-600 font-bold">{formatCurrency(extraFreelanceIncome)}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="5000"
-                  step="200"
-                  value={extraFreelanceIncome}
-                  onChange={(e) => setExtraFreelanceIncome(Number(e.target.value))}
-                  className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-              </div>
-            </div>
-
-            {/* Multi stream breakdowns and SVG trend chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-4 border-t border-zinc-100">
-              {/* Diversification lists */}
-              <div className="lg:col-span-5 space-y-3 text-xs">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Diversification Analysis</p>
-                
-                <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                  <span className="font-bold text-zinc-800">Primary Salary:</span>
-                  <span className="font-extrabold text-zinc-900">
-                    {formatCurrency(incomeList.filter(t => t.category === "Salary").reduce((sum, t) => sum + t.amount, 0))}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                  <span className="font-bold text-zinc-800">Freelance Portfolio (Simulated):</span>
-                  <span className="font-extrabold text-zinc-900">{formatCurrency(extraFreelanceIncome)}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                  <span className="font-bold text-zinc-800">Dividends & Capital yields:</span>
-                  <span className="font-extrabold text-zinc-900">
-                    {formatCurrency(incomeList.filter(t => t.category === "Dividend" || t.category === "Interest" || t.category === "Capital Gains").reduce((sum, t) => sum + t.amount, 0))}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                  <span className="font-bold text-zinc-800">Rental Passive Yield:</span>
-                  <span className="font-extrabold text-zinc-900">
-                    {formatCurrency(incomeList.filter(t => t.category === "Rental Income").reduce((sum, t) => sum + t.amount, 0))}
-                  </span>
-                </div>
-              </div>
-
-              {/* Income Stability mini SVG chart */}
-              <div className="lg:col-span-7 flex flex-col justify-between">
-                <div>
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 mb-2">Payout stability index</p>
-                  <div className="h-32 w-full relative">
-                    <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
-                      <path
-                        d="M 0 80 Q 50 60, 100 70 T 200 40 T 300 30 L 300 100 L 0 100 Z"
-                        fill="#e0f2fe"
-                        opacity="0.5"
-                      />
-                      <path
-                        d="M 0 80 Q 50 60, 100 70 T 200 40 T 300 30"
-                        fill="none"
-                        stroke="#0284c7"
-                        strokeWidth="2"
-                      />
-                      <circle cx="300" cy="30" r="3" fill="#0284c7" />
-                    </svg>
-                  </div>
-                </div>
-                
-                <div className="rounded-xl bg-blue-50/50 p-3 border border-blue-100/50 text-xs">
-                  <div className="flex items-center gap-1.5 text-blue-600 mb-1">
-                    <Sparkles className="h-4 w-4 text-blue-600" />
-                    <span className="font-bold">AI Cash Flow Tip</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-650">
-                    Investing 20% of freelance earnings into high-yield dividend funds can increase passive inflow by $80/mo over 12 months.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
+      {/* Table */}
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-150 bg-zinc-50 font-bold text-zinc-400 select-none text-[10px] tracking-wider uppercase">
+                <th className="p-3.5 w-28">Date</th>
+                <th className="p-3.5">Name</th>
+                <th className="p-3.5">Category</th>
+                {showSubcategory && <th className="p-3.5">Sub-category</th>}
+                <th className="p-3.5 text-right">Amount</th>
+                <th className="p-3.5">Payment Method</th>
+                <th className="p-3.5">Comments</th>
+                {showRefId && <th className="p-3.5">Reference ID</th>}
+                <th className="p-3.5 w-12 text-center">⚠</th>
+                <th className="p-3.5 w-12 text-center">Del</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 font-medium text-zinc-800">
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="p-8 text-center text-zinc-400 text-xs">
+                    No spending transactions found.
+                  </td>
+                </tr>
+              ) : (
+                paginated.map(t => {
+                  const warning = getWarning(t);
+                  return (
+                    <tr key={t.id} className="hover:bg-zinc-50/40 transition-colors group">
+                      <td className="p-3.5 whitespace-nowrap text-zinc-500 font-mono text-[11px]">{t.date}</td>
+                      <td className="p-3.5">
+                        <div className="font-bold text-zinc-900 text-[12px]">{t.merchant}</div>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-800 font-semibold">
+                          <span className="h-2 w-2 rounded-full" style={{ background: CATEGORY_COLORS[t.category] || CATEGORY_COLORS.Other }} />
+                          {t.category}
+                        </span>
+                      </td>
+                      {showSubcategory && (
+                        <td className="p-3.5 text-[11px] text-zinc-500">{t.subcategory || "—"}</td>
+                      )}
+                      <td className="p-3.5 text-right whitespace-nowrap font-bold text-zinc-900 text-[12px]">
+                        -{fmt(t.amount)}
+                      </td>
+                      <td className="p-3.5 text-[11px] text-zinc-600 whitespace-nowrap">{t.paymentMethod}</td>
+                      <td className="p-3.5 text-[11px] text-zinc-400 max-w-[140px] truncate" title={t.description}>{t.description || "—"}</td>
+                      {showRefId && (
+                        <td className="p-3.5 text-[11px] text-zinc-400 font-mono">{t.referenceId || "—"}</td>
+                      )}
+                      <td className="p-3.5 text-center">
+                        {warning ? (
+                          <div className="relative group/warn flex justify-center">
+                            <AlertTriangle className="h-4 w-4 text-amber-500 cursor-help" />
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-zinc-950 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg opacity-0 group-hover/warn:opacity-100 transition-opacity pointer-events-none">
+                              {warning}
+                            </div>
+                          </div>
+                        ) : (
+                          <CheckCircle className="h-4 w-4 text-zinc-200" />
+                        )}
+                      </td>
+                      <td className="p-3.5 text-center">
+                        <button
+                          onClick={() => setTransactions(prev => prev.filter(x => x.id !== t.id))}
+                          className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center p-4 border-t border-zinc-100 bg-zinc-50/50 text-xs font-bold text-zinc-500">
+            <span>Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length}</span>
+            <div className="flex gap-2">
+              <Button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} variant="outline" className="h-8 text-xs rounded-lg">Prev</Button>
+              <Button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages} variant="outline" className="h-8 text-xs rounded-lg">Next</Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Add Category Modal */}
+      {showAddCategory && (
+        <Modal title="Add Category" onClose={() => setShowAddCategory(false)}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Category Name" required>
+                <input className={inputCls} value={newCat.name} onChange={e => setNewCat(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Food & Dining" />
+              </FormField>
+              <FormField label="Color">
+                <div className="flex items-center gap-2">
+                  <input type="color" value={newCat.color} onChange={e => setNewCat(p => ({ ...p, color: e.target.value }))}
+                    className="h-9 w-14 rounded-lg border border-zinc-200 cursor-pointer p-1" />
+                  <span className="text-xs font-mono text-zinc-500">{newCat.color}</span>
+                </div>
+              </FormField>
+              <FormField label="Sub-category Name">
+                <input className={inputCls} value={newCat.subcatName} onChange={e => setNewCat(p => ({ ...p, subcatName: e.target.value }))} placeholder="e.g. Restaurants" />
+              </FormField>
+              <FormField label="Sub-category Priority">
+                <select className={selectCls} value={newCat.subcatPriority} onChange={e => setNewCat(p => ({ ...p, subcatPriority: e.target.value as any }))}>
+                  <option>High</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </FormField>
+              <FormField label="Max Cap (Monthly)">
+                <input className={inputCls} type="number" min="0" value={newCat.maxCap} onChange={e => setNewCat(p => ({ ...p, maxCap: e.target.value }))} placeholder="e.g. 5000" />
+              </FormField>
+            </div>
+            <FormField label="Description">
+              <textarea className={`${inputCls} h-16 resize-none`} value={newCat.description} onChange={e => setNewCat(p => ({ ...p, description: e.target.value }))} placeholder="Brief category description..." />
+            </FormField>
+            <div className="flex gap-3 pt-2">
+              <Button onClick={handleAddCategory} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Save Category</Button>
+              <Button onClick={() => setShowAddCategory(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
+            </div>
+          </div>
+        </Modal>
       )}
+    </div>
+  );
+}
 
-      {/* Transaction Onboarding Slider Drawer */}
-      <TransactionOnboardingDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        onImport={handleImportTransactions}
-        initialMode={drawerMode}
-      />
+// ============================================================
+// RECURRING BILLS TAB
+// ============================================================
+function RecurringBillsTab({
+  bills, setBills, categories, fmt
+}: {
+  bills: RecurringBill[];
+  setBills: React.Dispatch<React.SetStateAction<RecurringBill[]>>;
+  categories: Category[];
+  fmt: (v: number) => string;
+}) {
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [form, setForm] = React.useState({
+    name: "", dateOfDebit: "", amount: "", frequency: "Monthly" as "Daily" | "Monthly" | "Yearly",
+    category: "", subcategory: "", paymentMethod: "UPI",
+  });
 
+  const totalMonthly = React.useMemo(() => {
+    return bills.reduce((sum, b) => {
+      if (b.frequency === "Monthly") return sum + b.amount;
+      if (b.frequency === "Yearly") return sum + b.amount / 12;
+      return sum + b.amount * 30;
+    }, 0);
+  }, [bills]);
+
+  const handleAdd = () => {
+    if (!form.name || !form.amount) return;
+    setBills(prev => [...prev, {
+      id: "rec_" + Date.now(),
+      name: form.name, dateOfDebit: form.dateOfDebit, amount: parseFloat(form.amount),
+      frequency: form.frequency, category: form.category, subcategory: form.subcategory,
+      paymentMethod: form.paymentMethod,
+    }]);
+    setForm({ name: "", dateOfDebit: "", amount: "", frequency: "Monthly", category: "", subcategory: "", paymentMethod: "UPI" });
+    setShowAdd(false);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-extrabold tracking-tight text-zinc-950">Recurring Bills</h2>
+          <p className="text-sm text-zinc-500 mt-0.5">Active subscriptions and recurring payments.</p>
+        </div>
+        <Button onClick={() => setShowAdd(true)} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs active:scale-[0.98]">
+          <Plus className="h-3.5 w-3.5 mr-1.5" /> Add New Bill
+        </Button>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Est. Monthly Total</p>
+          <p className="text-2xl font-extrabold text-red-600 mt-1">{fmt(Math.round(totalMonthly))}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Active Bills</p>
+          <p className="text-2xl font-extrabold text-zinc-900 mt-1">{bills.length}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Yearly Commitment</p>
+          <p className="text-2xl font-extrabold text-zinc-900 mt-1">{fmt(Math.round(totalMonthly * 12))}</p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                <th className="p-3.5">Name</th>
+                <th className="p-3.5">Debit Day</th>
+                <th className="p-3.5 text-right">Amount</th>
+                <th className="p-3.5">Frequency</th>
+                <th className="p-3.5">Category</th>
+                <th className="p-3.5">Sub-category</th>
+                <th className="p-3.5">Payment Method</th>
+                <th className="p-3.5 w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {bills.map(b => (
+                <tr key={b.id} className="hover:bg-zinc-50/40 transition-colors group">
+                  <td className="p-3.5 font-bold text-zinc-900">{b.name}</td>
+                  <td className="p-3.5 text-zinc-600 font-mono">{b.dateOfDebit ? `${b.dateOfDebit}th` : "—"}</td>
+                  <td className="p-3.5 text-right font-bold text-zinc-900">{fmt(b.amount)}</td>
+                  <td className="p-3.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      b.frequency === "Monthly" ? "bg-blue-50 text-blue-700" :
+                      b.frequency === "Yearly" ? "bg-purple-50 text-purple-700" :
+                      "bg-amber-50 text-amber-700"
+                    }`}>{b.frequency}</span>
+                  </td>
+                  <td className="p-3.5 text-zinc-600">{b.category || "—"}</td>
+                  <td className="p-3.5 text-zinc-500">{b.subcategory || "—"}</td>
+                  <td className="p-3.5 text-zinc-500">{b.paymentMethod}</td>
+                  <td className="p-3.5 text-center">
+                    <button onClick={() => setBills(prev => prev.filter(x => x.id !== b.id))}
+                      className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {/* Total row */}
+              <tr className="border-t-2 border-zinc-200 bg-zinc-50">
+                <td className="p-3.5 font-extrabold text-zinc-900" colSpan={2}>Monthly Total</td>
+                <td className="p-3.5 text-right font-extrabold text-red-600">{fmt(Math.round(totalMonthly))}</td>
+                <td colSpan={5} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showAdd && (
+        <Modal title="Add Recurring Bill" onClose={() => setShowAdd(false)}>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Bill Name" required>
+              <input className={inputCls} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Netflix" />
+            </FormField>
+            <FormField label="Day of Debit" required>
+              <input className={inputCls} type="number" min="1" max="31" value={form.dateOfDebit} onChange={e => setForm(p => ({ ...p, dateOfDebit: e.target.value }))} placeholder="e.g. 5" />
+            </FormField>
+            <FormField label="Amount" required>
+              <input className={inputCls} type="number" min="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="e.g. 499" />
+            </FormField>
+            <FormField label="Frequency">
+              <select className={selectCls} value={form.frequency} onChange={e => setForm(p => ({ ...p, frequency: e.target.value as any }))}>
+                {FREQUENCIES.map(f => <option key={f}>{f}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Category">
+              <select className={selectCls} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
+                <option value="">Select category</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Sub-category">
+              <input className={inputCls} value={form.subcategory} onChange={e => setForm(p => ({ ...p, subcategory: e.target.value }))} placeholder="e.g. Streaming" />
+            </FormField>
+            <FormField label="Payment Method">
+              <select className={selectCls} value={form.paymentMethod} onChange={e => setForm(p => ({ ...p, paymentMethod: e.target.value }))}>
+                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+              </select>
+            </FormField>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Save Bill</Button>
+            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// BUDGET TAB
+// ============================================================
+function BudgetTab({
+  budgets, setBudgets, categories, expenseList, fmt
+}: {
+  budgets: BudgetItem[];
+  setBudgets: React.Dispatch<React.SetStateAction<BudgetItem[]>>;
+  categories: Category[];
+  expenseList: Transaction[];
+  fmt: (v: number) => string;
+}) {
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [form, setForm] = React.useState({ name: "", budgetAmount: "", category: "" });
+
+  const totalBudget = budgets.reduce((s, b) => s + b.budgetAmount, 0);
+
+  const getSpent = (cat: string) => expenseList.filter(t => t.category === cat).reduce((s, t) => s + t.amount, 0);
+
+  const handleAdd = () => {
+    if (!form.name || !form.budgetAmount) return;
+    setBudgets(prev => [...prev, { id: "bud_" + Date.now(), name: form.name, budgetAmount: parseFloat(form.budgetAmount), category: form.category }]);
+    setForm({ name: "", budgetAmount: "", category: "" });
+    setShowAdd(false);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-extrabold tracking-tight text-zinc-950">Budget</h2>
+          <p className="text-sm text-zinc-500 mt-0.5">Set spending limits by category and track utilization.</p>
+        </div>
+        <Button onClick={() => setShowAdd(true)} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs active:scale-[0.98]">
+          <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Budget
+        </Button>
+      </div>
+
+      {/* Summary card */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Budget</p>
+          <p className="text-2xl font-extrabold text-blue-600 mt-1">{fmt(totalBudget)}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Spent</p>
+          <p className="text-2xl font-extrabold text-red-600 mt-1">
+            {fmt(budgets.reduce((s, b) => s + getSpent(b.category), 0))}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Budgets Set</p>
+          <p className="text-2xl font-extrabold text-zinc-900 mt-1">{budgets.length}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Over Limit</p>
+          <p className="text-2xl font-extrabold text-amber-600 mt-1">
+            {budgets.filter(b => getSpent(b.category) > b.budgetAmount).length}
+          </p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                <th className="p-3.5">Name</th>
+                <th className="p-3.5">Category</th>
+                <th className="p-3.5 text-right">Budget</th>
+                <th className="p-3.5 text-right">Spent</th>
+                <th className="p-3.5 text-right">Remaining</th>
+                <th className="p-3.5 w-40">Utilization</th>
+                <th className="p-3.5 w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {budgets.map(b => {
+                const spent = getSpent(b.category);
+                const pct = Math.round((spent / b.budgetAmount) * 100);
+                const over = spent > b.budgetAmount;
+                return (
+                  <tr key={b.id} className="hover:bg-zinc-50/40 transition-colors group">
+                    <td className="p-3.5 font-bold text-zinc-900">{b.name}</td>
+                    <td className="p-3.5">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-700 font-semibold">
+                        <span className="h-2 w-2 rounded-full" style={{ background: CATEGORY_COLORS[b.category] || "#94a3b8" }} />
+                        {b.category || "—"}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-right font-bold text-zinc-900">{fmt(b.budgetAmount)}</td>
+                    <td className={`p-3.5 text-right font-bold ${over ? "text-red-600" : "text-zinc-700"}`}>{fmt(spent)}</td>
+                    <td className={`p-3.5 text-right font-semibold ${over ? "text-red-500" : "text-emerald-600"}`}>
+                      {over ? `-${fmt(spent - b.budgetAmount)}` : fmt(b.budgetAmount - spent)}
+                    </td>
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 rounded-full bg-zinc-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"}`}
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
+                        <span className={`text-[10px] font-bold w-8 ${over ? "text-red-600" : pct > 80 ? "text-amber-600" : "text-emerald-600"}`}>{pct}%</span>
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-center">
+                      <button onClick={() => setBudgets(prev => prev.filter(x => x.id !== b.id))}
+                        className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="border-t-2 border-zinc-200 bg-zinc-50">
+                <td className="p-3.5 font-extrabold text-zinc-900" colSpan={2}>Total Budget</td>
+                <td className="p-3.5 text-right font-extrabold text-blue-600">{fmt(totalBudget)}</td>
+                <td colSpan={4} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showAdd && (
+        <Modal title="Add Budget" onClose={() => setShowAdd(false)}>
+          <div className="grid grid-cols-1 gap-4">
+            <FormField label="Budget Name" required>
+              <input className={inputCls} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Monthly Groceries" />
+            </FormField>
+            <FormField label="Budget Amount" required>
+              <input className={inputCls} type="number" min="0" value={form.budgetAmount} onChange={e => setForm(p => ({ ...p, budgetAmount: e.target.value }))} placeholder="e.g. 8000" />
+            </FormField>
+            <FormField label="Category">
+              <select className={selectCls} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
+                <option value="">Select category</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </FormField>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Save Budget</Button>
+            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// INCOME TAB
+// ============================================================
+function IncomeTab({
+  incomeItems, setIncomeItems, fmt
+}: {
+  incomeItems: IncomeItem[];
+  setIncomeItems: React.Dispatch<React.SetStateAction<IncomeItem[]>>;
+  fmt: (v: number) => string;
+}) {
+  const [viewMode, setViewMode] = React.useState<"monthly" | "yearly">("monthly");
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [form, setForm] = React.useState({
+    source: "", amount: "", fetchType: "Manual" as "Manual" | "Auto",
+    dateOfCredit: new Date().toISOString().split("T")[0], isFixed: true,
+  });
+
+  const calcAmount = (item: IncomeItem) => {
+    if (viewMode === "yearly") return item.isFixed ? item.amount * 12 : item.amount;
+    return item.amount;
+  };
+
+  const total = incomeItems.reduce((s, i) => s + calcAmount(i), 0);
+
+  const handleAdd = () => {
+    if (!form.source || !form.amount) return;
+    setIncomeItems(prev => [...prev, {
+      id: "inc_" + Date.now(),
+      source: form.source, amount: parseFloat(form.amount),
+      fetchType: form.fetchType, dateOfCredit: form.dateOfCredit, isFixed: form.isFixed,
+    }]);
+    setForm({ source: "", amount: "", fetchType: "Manual", dateOfCredit: new Date().toISOString().split("T")[0], isFixed: true });
+    setShowAdd(false);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center flex-wrap gap-3">
+        <div>
+          <h2 className="text-2xl font-extrabold tracking-tight text-zinc-950">Income</h2>
+          <p className="text-sm text-zinc-500 mt-0.5">All income streams — salary, dividends, rental, freelance.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Monthly / Yearly Toggle */}
+          <div className="flex items-center bg-zinc-100 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setViewMode("monthly")}
+              className={`h-7 px-3 rounded-lg text-xs font-bold transition-all ${viewMode === "monthly" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500"}`}
+            >Monthly</button>
+            <button
+              onClick={() => setViewMode("yearly")}
+              className={`h-7 px-3 rounded-lg text-xs font-bold transition-all ${viewMode === "yearly" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500"}`}
+            >Yearly</button>
+          </div>
+          <Button onClick={() => setShowAdd(true)} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs active:scale-[0.98]">
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Income
+          </Button>
+        </div>
+      </div>
+
+      {/* Total card */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm col-span-2 sm:col-span-1">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+            Total {viewMode === "monthly" ? "Monthly" : "Yearly"} Income
+          </p>
+          <p className="text-3xl font-extrabold text-emerald-600 mt-1">{fmt(total)}</p>
+          <p className="text-[11px] text-zinc-400 mt-0.5">Across {incomeItems.length} active streams</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Fixed Income</p>
+          <p className="text-2xl font-extrabold text-zinc-900 mt-1">
+            {fmt(incomeItems.filter(i => i.isFixed).reduce((s, i) => s + calcAmount(i), 0))}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Variable Income</p>
+          <p className="text-2xl font-extrabold text-zinc-900 mt-1">
+            {fmt(incomeItems.filter(i => !i.isFixed).reduce((s, i) => s + calcAmount(i), 0))}
+          </p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                <th className="p-3.5">Income Source</th>
+                <th className="p-3.5 text-right">Amount</th>
+                <th className="p-3.5">Type</th>
+                <th className="p-3.5">Fetch Type</th>
+                <th className="p-3.5">Date of Credit</th>
+                <th className="p-3.5 w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {incomeItems.map(item => (
+                <tr key={item.id} className="hover:bg-zinc-50/40 transition-colors group">
+                  <td className="p-3.5 font-bold text-zinc-900">{item.source}</td>
+                  <td className="p-3.5 text-right font-bold text-emerald-600">{fmt(calcAmount(item))}</td>
+                  <td className="p-3.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      item.isFixed ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"
+                    }`}>
+                      {item.isFixed ? "Fixed" : "One-time"}
+                    </span>
+                  </td>
+                  <td className="p-3.5">
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
+                      item.fetchType === "Auto" ? "text-emerald-600" : "text-zinc-500"
+                    }`}>
+                      {item.fetchType === "Auto" ? <Sparkles className="h-3 w-3" /> : <Edit2 className="h-3 w-3" />}
+                      {item.fetchType}
+                    </span>
+                  </td>
+                  <td className="p-3.5 font-mono text-zinc-500">{item.dateOfCredit}</td>
+                  <td className="p-3.5 text-center">
+                    <button onClick={() => setIncomeItems(prev => prev.filter(x => x.id !== item.id))}
+                      className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-zinc-200 bg-zinc-50">
+                <td className="p-3.5 font-extrabold text-zinc-900">
+                  Total {viewMode === "monthly" ? "Monthly" : "Yearly"} Income
+                </td>
+                <td className="p-3.5 text-right font-extrabold text-emerald-600">{fmt(total)}</td>
+                <td colSpan={4} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showAdd && (
+        <Modal title="Add Income" onClose={() => setShowAdd(false)}>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Income Source" required>
+              <input className={inputCls} value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} placeholder="e.g. Salary, Freelance" />
+            </FormField>
+            <FormField label="Amount" required>
+              <input className={inputCls} type="number" min="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="e.g. 50000" />
+            </FormField>
+            <FormField label="Date of Credit">
+              <input className={inputCls} type="date" value={form.dateOfCredit} onChange={e => setForm(p => ({ ...p, dateOfCredit: e.target.value }))} />
+            </FormField>
+            <FormField label="Fetch Type">
+              <select className={selectCls} value={form.fetchType} onChange={e => setForm(p => ({ ...p, fetchType: e.target.value as any }))}>
+                <option value="Manual">Manual</option>
+                <option value="Auto">Auto (API)</option>
+              </select>
+            </FormField>
+            <div className="col-span-2">
+              <FormField label="Income Type">
+                <div className="flex items-center gap-3 p-1 bg-zinc-100 rounded-xl">
+                  <button type="button" onClick={() => setForm(p => ({ ...p, isFixed: true }))}
+                    className={`flex-1 h-8 rounded-lg text-xs font-bold transition-all ${form.isFixed ? "bg-white shadow-sm text-zinc-900" : "text-zinc-500"}`}>
+                    Fixed (Recurring)
+                  </button>
+                  <button type="button" onClick={() => setForm(p => ({ ...p, isFixed: false }))}
+                    className={`flex-1 h-8 rounded-lg text-xs font-bold transition-all ${!form.isFixed ? "bg-white shadow-sm text-zinc-900" : "text-zinc-500"}`}>
+                    One-time
+                  </button>
+                </div>
+              </FormField>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Save Income</Button>
+            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// CREDIT CARD TAB
+// ============================================================
+function CreditCardTab({
+  cards, setCards, fmt, currency
+}: {
+  cards: CreditCardItem[];
+  setCards: React.Dispatch<React.SetStateAction<CreditCardItem[]>>;
+  fmt: (v: number) => string;
+  currency: string;
+}) {
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [form, setForm] = React.useState({
+    cardName: "", lastFour: "", creditLimit: "", outstanding: "", minDue: "", dueDate: "",
+  });
+
+  const totalOutstanding = cards.reduce((s, c) => s + c.outstanding, 0);
+  const totalLimit = cards.reduce((s, c) => s + c.creditLimit, 0);
+  const overallUtilization = totalLimit > 0 ? Math.round((totalOutstanding / totalLimit) * 100) : 0;
+
+  const handleAdd = () => {
+    if (!form.cardName || !form.creditLimit) return;
+    setCards(prev => [...prev, {
+      id: "cc_" + Date.now(),
+      cardName: form.cardName, lastFour: form.lastFour,
+      creditLimit: parseFloat(form.creditLimit), outstanding: parseFloat(form.outstanding) || 0,
+      minDue: parseFloat(form.minDue) || 0, dueDate: form.dueDate,
+    }]);
+    setForm({ cardName: "", lastFour: "", creditLimit: "", outstanding: "", minDue: "", dueDate: "" });
+    setShowAdd(false);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-extrabold tracking-tight text-zinc-950">Credit Cards</h2>
+          <p className="text-sm text-zinc-500 mt-0.5">Outstanding balances, limits, and due dates.</p>
+        </div>
+        <Button onClick={() => setShowAdd(true)} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs active:scale-[0.98]">
+          <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Card
+        </Button>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Outstanding</p>
+          <p className="text-2xl font-extrabold text-red-600 mt-1">{fmt(totalOutstanding)}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Limit</p>
+          <p className="text-2xl font-extrabold text-zinc-900 mt-1">{fmt(totalLimit)}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Overall Utilization</p>
+          <p className={`text-2xl font-extrabold mt-1 ${overallUtilization > 60 ? "text-red-600" : overallUtilization > 30 ? "text-amber-600" : "text-emerald-600"}`}>
+            {overallUtilization}%
+          </p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Cards Active</p>
+          <p className="text-2xl font-extrabold text-zinc-900 mt-1">{cards.length}</p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                <th className="p-3.5">Card Name</th>
+                <th className="p-3.5">Last 4</th>
+                <th className="p-3.5 text-right">Credit Limit</th>
+                <th className="p-3.5 text-right">Outstanding</th>
+                <th className="p-3.5 text-right">Min Due</th>
+                <th className="p-3.5">Due Date</th>
+                <th className="p-3.5 w-40">Utilization</th>
+                <th className="p-3.5 w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {cards.map(c => {
+                const util = c.creditLimit > 0 ? Math.round((c.outstanding / c.creditLimit) * 100) : 0;
+                const isOverdue = c.dueDate && new Date(c.dueDate) < new Date();
+                return (
+                  <tr key={c.id} className="hover:bg-zinc-50/40 transition-colors group">
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center">
+                          <CreditCard className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span className="font-bold text-zinc-900">{c.cardName}</span>
+                      </div>
+                    </td>
+                    <td className="p-3.5 font-mono text-zinc-600">••{c.lastFour}</td>
+                    <td className="p-3.5 text-right font-bold text-zinc-900">{fmt(c.creditLimit)}</td>
+                    <td className="p-3.5 text-right font-bold text-red-600">{fmt(c.outstanding)}</td>
+                    <td className="p-3.5 text-right font-semibold text-zinc-700">{fmt(c.minDue)}</td>
+                    <td className="p-3.5">
+                      <span className={`font-mono text-xs ${isOverdue ? "text-red-600 font-bold" : "text-zinc-500"}`}>
+                        {c.dueDate || "—"}
+                        {isOverdue && <span className="ml-1 text-[10px]">⚠ Overdue</span>}
+                      </span>
+                    </td>
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 rounded-full bg-zinc-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${util > 60 ? "bg-red-500" : util > 30 ? "bg-amber-500" : "bg-emerald-500"}`}
+                            style={{ width: `${Math.min(util, 100)}%` }}
+                          />
+                        </div>
+                        <span className={`text-[10px] font-bold w-8 ${util > 60 ? "text-red-600" : util > 30 ? "text-amber-600" : "text-emerald-600"}`}>{util}%</span>
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-center">
+                      <button onClick={() => setCards(prev => prev.filter(x => x.id !== c.id))}
+                        className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="border-t-2 border-zinc-200 bg-zinc-50">
+                <td className="p-3.5 font-extrabold text-zinc-900" colSpan={3}>Total Outstanding</td>
+                <td className="p-3.5 text-right font-extrabold text-red-600">{fmt(totalOutstanding)}</td>
+                <td colSpan={4} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showAdd && (
+        <Modal title="Add Credit Card" onClose={() => setShowAdd(false)}>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Card Name" required>
+              <input className={inputCls} value={form.cardName} onChange={e => setForm(p => ({ ...p, cardName: e.target.value }))} placeholder="e.g. HDFC Regalia" />
+            </FormField>
+            <FormField label="Last 4 Digits">
+              <input className={inputCls} maxLength={4} value={form.lastFour} onChange={e => setForm(p => ({ ...p, lastFour: e.target.value.replace(/\D/, "") }))} placeholder="e.g. 4829" />
+            </FormField>
+            <FormField label="Credit Limit" required>
+              <input className={inputCls} type="number" min="0" value={form.creditLimit} onChange={e => setForm(p => ({ ...p, creditLimit: e.target.value }))} placeholder="e.g. 300000" />
+            </FormField>
+            <FormField label="Outstanding Balance">
+              <input className={inputCls} type="number" min="0" value={form.outstanding} onChange={e => setForm(p => ({ ...p, outstanding: e.target.value }))} placeholder="e.g. 24500" />
+            </FormField>
+            <FormField label="Minimum Due">
+              <input className={inputCls} type="number" min="0" value={form.minDue} onChange={e => setForm(p => ({ ...p, minDue: e.target.value }))} placeholder="e.g. 1225" />
+            </FormField>
+            <FormField label="Due Date">
+              <input className={inputCls} type="date" value={form.dueDate} onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} />
+            </FormField>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Add Card</Button>
+            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// CASH FLOW INSIGHTS TAB
+// ============================================================
+function InsightsTab({
+  expenseList, incomeList, totalSpending, totalIncome, categories, budgets, fmt
+}: {
+  expenseList: Transaction[];
+  incomeList: Transaction[];
+  totalSpending: number;
+  totalIncome: number;
+  categories: Category[];
+  budgets: BudgetItem[];
+  fmt: (v: number) => string;
+}) {
+  const savingsRate = totalIncome > 0 ? Math.round(((totalIncome - totalSpending) / totalIncome) * 100) : 0;
+  const netFlow = totalIncome - totalSpending;
+
+  // Spending nature score (0-100): based on savings rate, over-budget categories
+  const overBudgetCount = budgets.filter(b => {
+    const spent = expenseList.filter(t => t.category === b.category).reduce((s, t) => s + t.amount, 0);
+    return spent > b.budgetAmount;
+  }).length;
+  const spendingScore = Math.max(0, Math.min(100, savingsRate + 50 - overBudgetCount * 10));
+  const confidence = Math.min(95, 60 + expenseList.length * 3);
+
+  // Category cut suggestions (High-priority subcats with most spending)
+  const cutSuggestions = React.useMemo(() => {
+    return categories
+      .flatMap(cat =>
+        cat.subcategories
+          .filter(s => s.priority === "Low" || s.priority === "Medium")
+          .map(s => ({
+            category: cat.name,
+            subcategory: s.name,
+            priority: s.priority,
+            spent: expenseList.filter(t => t.category === cat.name && t.subcategory === s.name).reduce((sum, t) => sum + t.amount, 0),
+            maxCap: cat.maxCap,
+          }))
+      )
+      .filter(s => s.spent > 0)
+      .sort((a, b) => b.spent - a.spent)
+      .slice(0, 4);
+  }, [categories, expenseList]);
+
+  // Mock month-over-month bars
+  const months = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
+  const mockExpenses = [28000, 32000, 27500, 35000, 31000, totalSpending];
+  const mockIncome = [95000, 95000, 113000, 95000, 100000, totalIncome];
+  const maxVal = Math.max(...mockExpenses, ...mockIncome);
+
+  const scoreColor = spendingScore >= 70 ? "text-emerald-600" : spendingScore >= 40 ? "text-amber-600" : "text-red-600";
+  const scoreBg = spendingScore >= 70 ? "bg-emerald-50 border-emerald-100" : spendingScore >= 40 ? "bg-amber-50 border-amber-100" : "bg-red-50 border-red-100";
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div>
+        <h2 className="text-2xl font-extrabold tracking-tight text-zinc-950">Cash Flow & Insights</h2>
+        <p className="text-sm text-zinc-500 mt-0.5">AI-powered analysis of your spending behavior and financial forecast.</p>
+      </div>
+
+      {/* Score Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className={`rounded-2xl border p-5 shadow-sm ${scoreBg}`}>
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Spending Nature Score</p>
+          <p className={`text-3xl font-extrabold mt-1 ${scoreColor}`}>{spendingScore}<span className="text-base">/100</span></p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            {spendingScore >= 70 ? "Disciplined spender" : spendingScore >= 40 ? "Moderate spender" : "High spender"}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Confidence Level</p>
+          <p className="text-3xl font-extrabold text-blue-600 mt-1">{confidence}%</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Based on {expenseList.length} transactions</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Savings Rate</p>
+          <p className={`text-3xl font-extrabold mt-1 ${savingsRate >= 20 ? "text-emerald-600" : "text-amber-600"}`}>{savingsRate}%</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Net: {fmt(netFlow)}</p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Over-Budget Categories</p>
+          <p className={`text-3xl font-extrabold mt-1 ${overBudgetCount > 0 ? "text-red-600" : "text-emerald-600"}`}>{overBudgetCount}</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">{overBudgetCount === 0 ? "All within limits" : "Needs attention"}</p>
+        </div>
+      </div>
+
+      {/* Bar Chart + Cut Suggestions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Month-over-month bar chart */}
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-5">
+            <BarChart3 className="h-4 w-4 text-zinc-400" />
+            <p className="text-sm font-bold text-zinc-900">Income vs. Expenses (6 Month)</p>
+          </div>
+          <div className="flex items-end gap-3 h-36">
+            {months.map((m, i) => (
+              <div key={m} className="flex-1 flex flex-col items-center gap-1">
+                <div className="w-full flex flex-col items-center gap-0.5">
+                  <div
+                    className="w-full rounded-t bg-emerald-400/70 transition-all"
+                    style={{ height: `${(mockIncome[i] / maxVal) * 120}px` }}
+                    title={`Income: ${fmt(mockIncome[i])}`}
+                  />
+                  <div
+                    className="w-full rounded-t bg-red-400/70"
+                    style={{ height: `${(mockExpenses[i] / maxVal) * 120}px` }}
+                    title={`Expenses: ${fmt(mockExpenses[i])}`}
+                  />
+                </div>
+                <span className="text-[9px] font-bold text-zinc-400">{m}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-4 mt-3">
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-zinc-500"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Income</span>
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-zinc-500"><span className="h-2 w-2 rounded-full bg-red-400" /> Expenses</span>
+          </div>
+        </div>
+
+        {/* Cut Suggestions */}
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-5">
+            <Sparkles className="h-4 w-4 text-blue-600 animate-pulse" />
+            <p className="text-sm font-bold text-zinc-900">AI Cut Suggestions</p>
+          </div>
+          {cutSuggestions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 text-zinc-400 text-xs text-center">
+              <CheckCircle className="h-8 w-8 mb-2 text-emerald-400" />
+              No low-priority spending detected — great discipline!
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {cutSuggestions.map((s, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 border border-zinc-100">
+                  <div>
+                    <p className="text-xs font-bold text-zinc-900">{s.category} › {s.subcategory}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        s.priority === "Low" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
+                      }`}>{s.priority} Priority</span>
+                      <span className="text-[10px] text-zinc-400">Consider reducing</span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-extrabold text-red-600">{fmt(s.spent)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Next Month Forecast */}
+      <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/60 to-indigo-50/40 p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="h-4 w-4 text-blue-600" />
+          <p className="text-sm font-bold text-blue-900">Next Month Forecast</p>
+          <span className="text-[10px] font-bold text-blue-400 ml-auto">Based on trailing 3-month average</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+          <div>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-blue-400">Forecasted Outflow</p>
+            <p className="text-2xl font-extrabold text-zinc-900 mt-1">{fmt(Math.round(totalSpending * 1.05))}</p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">±5% confidence band</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-blue-400">Forecasted Income</p>
+            <p className="text-2xl font-extrabold text-emerald-600 mt-1">{fmt(Math.round(totalIncome * 0.98))}</p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">Based on fixed streams</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-blue-400">Projected Net</p>
+            <p className={`text-2xl font-extrabold mt-1 ${netFlow >= 0 ? "text-blue-600" : "text-red-600"}`}>
+              {fmt(Math.round((totalIncome * 0.98) - (totalSpending * 1.05)))}
+            </p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">Estimated monthly savings</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
