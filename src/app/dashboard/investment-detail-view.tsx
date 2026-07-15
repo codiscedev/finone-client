@@ -26,6 +26,7 @@ import {
   BarChart2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 
 interface InvestmentDetailViewProps {
   onBack: () => void;
@@ -34,6 +35,7 @@ interface InvestmentDetailViewProps {
 }
 
 export default function InvestmentDetailView({ onBack, onAddClick, onUpgradeClick }: InvestmentDetailViewProps) {
+  const { showSuccess } = useCustomAlert();
   // Value states
   const invested = 1345000; // ₹13,45,000
   const currentValue = 1580000; // ₹15,80,000
@@ -209,7 +211,7 @@ export default function InvestmentDetailView({ onBack, onAddClick, onUpgradeClic
             Back to Wealth
           </Button>
           <Button
-            onClick={() => alert("Record Dividend popup trigger. Complete!")}
+            onClick={() => showSuccess("Success", "Record Dividend popup trigger. Complete!")}
             className="h-9 px-4 border border-zinc-250 hover:bg-zinc-50 text-zinc-700 rounded-xl shadow-sm text-xs font-bold transition-all outline-none cursor-pointer"
           >
             + Record Dividend

@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select } from "../../components/ui/select";
 import { apiClient } from "@/lib/api";
+import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 
 interface WealthAddDrawerProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ interface WealthAddDrawerProps {
 }
 
 export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProps) {
+  const { showSuccess, showWarning } = useCustomAlert();
   // Steps: 1 = Choose Record Type, 2 = Select Category (for Assets), 3 = Input Form
   const [step, setStep] = React.useState(1);
   const [recordType, setRecordType] = React.useState<"Asset" | "Debt" | "Investment" | "Goal" | "Emergency" | null>(null);
@@ -468,7 +470,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
         });
       }
 
-      alert("Record created and added to portfolio registry successfully!");
+      showSuccess("Success", "Record created and added to portfolio registry successfully!");
 
       // Reset steps and values, close drawer
       setStep(1);
@@ -481,7 +483,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       onClose();
     } catch (err: any) {
       console.error("Error saving record:", err);
-      alert("Failed to save record to backend API: " + (err.response?.data?.message || err.message));
+      showWarning("Warning", "Failed to save record to backend API: " + (err.response?.data?.message || err.message));
     } finally {
       setSubmitting(false);
     }
@@ -539,12 +541,12 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
         const payload = compileDebtPayload();
         await apiClient.post("/debts", payload);
       }
-      alert("Record created successfully! Enter details for the next record.");
+      showSuccess("Success", "Record created successfully! Enter details for the next record.");
       clearDebtFields();
       setStep(2);
     } catch (err: any) {
       console.error("Error saving record:", err);
-      alert("Failed to save record to backend API: " + (err.response?.data?.message || err.message));
+      showWarning("Warning", "Failed to save record to backend API: " + (err.response?.data?.message || err.message));
     } finally {
       setSubmitting(false);
     }

@@ -20,12 +20,14 @@ import {
   Bot
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 
 interface AIAssistantViewProps {
   onUpgradeClick?: () => void;
 }
 
 export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps) {
+  const { showSuccess } = useCustomAlert();
   // Suggested Prompts list
   const suggestedPrompts = [
     "Analyze my portfolio",
@@ -112,7 +114,7 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
   };
 
   const handleExport = () => {
-    alert("Exporting chat transcript as PDF document... Download started.");
+    showSuccess("Success", "Exporting chat transcript as PDF document... Download started.");
   };
 
   return (

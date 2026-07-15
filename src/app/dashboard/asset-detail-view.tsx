@@ -27,6 +27,7 @@ import {
   Scale
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 
 interface AssetDetailViewProps {
   assetName: string;
@@ -34,6 +35,7 @@ interface AssetDetailViewProps {
 }
 
 export default function AssetDetailView({ assetName, onBack }: AssetDetailViewProps) {
+  const { showSuccess, showWarning, showDelete } = useCustomAlert();
   // Check which mock asset is selected to customize values
   const isProperty = assetName.toLowerCase().includes("apartment") || assetName.toLowerCase().includes("flat") || assetName.toLowerCase().includes("property");
   
@@ -67,7 +69,7 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
         date: new Date().toISOString().split('T')[0]
       };
       setDocuments([newDoc, ...documents]);
-      alert(`File "${file.name}" uploaded securely to Vault!`);
+      showSuccess("Success", `File "${file.name}" uploaded securely to Vault!`);
     }
   };
 
@@ -119,13 +121,13 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
     e.preventDefault();
     const val = Number(newValueInput);
     if (!val || val <= 0) {
-      alert("Please enter a valid valuation amount.");
+      showWarning("Warning", "Please enter a valid valuation amount.");
       return;
     }
     setCurrentVal(val);
     setShowValUpdateModal(false);
     setNewValueInput("");
-    alert("Valuation updated successfully!");
+    showSuccess("Success", "Valuation updated successfully!");
   };
 
   // Transactions ledger data
@@ -211,9 +213,11 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
           </Button>
           <Button
             onClick={() => {
-              if (confirm("Are you sure you want to delete this asset from your portfolio registry?")) {
-                onBack();
-              }
+              showDelete(
+                "Delete",
+                "Are you sure you want to delete this asset from your portfolio registry?",
+                onBack
+              );
             }}
             className="h-9 px-3 rounded-xl border border-red-100 bg-red-50/20 hover:bg-red-50 text-xs font-bold text-red-600 transition-colors outline-none shrink-0"
           >
@@ -510,9 +514,13 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
                     </button>
                     <button 
                       onClick={() => {
-                        if (confirm(`Delete "${doc.name}" permanently from vault?`)) {
-                          setDocuments(documents.filter((_, i) => i !== idx));
-                        }
+                        showDelete(
+                          "Delete",
+                          `Delete "${doc.name}" permanently from vault?`,
+                          () => {
+                            setDocuments(documents.filter((_, i) => i !== idx));
+                          }
+                        );
                       }}
                       className="p-1 text-zinc-400 hover:text-red-600 rounded" 
                       title="Delete"

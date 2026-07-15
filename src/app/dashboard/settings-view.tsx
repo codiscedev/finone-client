@@ -22,8 +22,10 @@ import { Button } from "@/components/ui/button";
 import { Select } from "../../components/ui/select";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 
 export default function SettingsView() {
+  const { showSuccess, showDelete } = useCustomAlert();
   // Profile settings state
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -267,7 +269,7 @@ export default function SettingsView() {
           <div className="flex justify-between items-center pt-4 border-t border-zinc-100 text-xs">
             <span className="text-zinc-400 font-medium">Auto-populated based on selected country settings</span>
             <Button
-              onClick={() => alert("Profile updates saved successfully!")}
+              onClick={() => showSuccess("Success", "Profile updates saved successfully!")}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold"
             >
               Save Changes
@@ -379,7 +381,7 @@ export default function SettingsView() {
 
           <div className="flex justify-end pt-4 border-t border-zinc-100">
             <Button
-              onClick={() => alert("Password modified successfully!")}
+              onClick={() => showSuccess("Success", "Password modified successfully!")}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
             >
               Update Password
@@ -550,7 +552,7 @@ export default function SettingsView() {
 
           <div className="flex justify-end pt-4 border-t border-zinc-100">
             <Button
-              onClick={() => alert("Notification rules saved successfully!")}
+              onClick={() => showSuccess("Success", "Notification rules saved successfully!")}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
             >
               Save Notification Preferences
@@ -663,7 +665,7 @@ export default function SettingsView() {
 
           <div className="flex justify-end pt-4 border-t border-zinc-100">
             <Button
-              onClick={() => alert(`Applied ${themeMode} theme with ${accentColor} accent!`)}
+              onClick={() => showSuccess("Success", `Applied ${themeMode} theme with ${accentColor} accent!`)}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
             >
               Apply Theme
@@ -744,10 +746,11 @@ export default function SettingsView() {
             </button>
             <button
               onClick={() => {
-                const conf = confirm("Sign out from all devices? You will be redirected back to the login page.");
-                if (conf) {
-                  handleSignOut();
-                }
+                showDelete(
+                  "Delete",
+                  "Sign out from all devices? You will be redirected back to the login page.",
+                  handleSignOut
+                );
               }}
               className="inline-flex h-9 items-center justify-center rounded-xl bg-red-600 hover:bg-red-700 px-4 text-xs font-bold text-white shadow-sm transition-colors"
             >

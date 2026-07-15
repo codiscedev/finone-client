@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { CustomAlertProvider } from "@/components/ui/custom-alert-dialog";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -31,7 +32,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <AuthProvider>
-          {children}
+          <CustomAlertProvider>
+            {children}
+          </CustomAlertProvider>
         </AuthProvider>
       </body>
     </html>
