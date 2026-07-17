@@ -16,19 +16,140 @@ import {
   EyeOff,
   Smartphone,
   Info,
-  Sparkles
+  Sparkles,
+  Folders,
+  Trash2,
+  Edit3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "../../components/ui/select";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
+import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api";
 
 export default function SettingsView() {
   const { showSuccess, showDelete } = useCustomAlert();
   // Profile settings state
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
+
+  // Category Manager states
+  const { dbUser } = useAuth();
+  const [categoryType, setCategoryType] = React.useState<"asset" | "debt">("asset");
+  const [assetCategories, setAssetCategories] = React.useState<any[]>([]);
+  const [debtCategoriesList, setDebtCategoriesList] = React.useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = React.useState(false);
+  const [editingCategory, setEditingCategory] = React.useState<any | null>(null);
+
+  // Form fields
+  const [catName, setCatName] = React.useState("");
+  const [catIsAppreciation, setCatIsAppreciation] = React.useState(true);
+  const [catRate, setCatRate] = React.useState("");
+
+  const resetForm = () => {
+    setCatName("");
+    setCatIsAppreciation(true);
+    setCatRate("");
+  };
+
+  const fetchCategories = async () => {
+    if (!dbUser?.userId) return;
+    setLoadingCategories(true);
+    try {
+      if (categoryType === "asset") {
+        const res = await apiClient.get(`/v1/assetcategory/${dbUser.userId}`);
+        if (res.data?.success) {
+          setAssetCategories(res.data.data);
+        }
+      } else {
+        const res = await apiClient.get(`/v1/debtcategory/${dbUser.userId}`);
+        if (res.data?.success) {
+          setDebtCategoriesList(res.data.data);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchCategories();
+  }, [dbUser, categoryType]);
+
+  const startEdit = (cat: any) => {
+    setEditingCategory(cat);
+    setCatName(cat.name);
+    if (categoryType === "asset") {
+      setCatIsAppreciation(cat.isAppreciation);
+      setCatRate(cat.rate.toString());
+    }
+  };
+
+  const saveCategory = async () => {
+    if (!catName.trim() || !dbUser?.userId) return;
+    try {
+      if (editingCategory) {
+        // Update
+        if (categoryType === "asset") {
+          await apiClient.put(`/v1/assetcategory/${editingCategory.id}`, {
+            name: catName,
+            isAppreciation: catIsAppreciation,
+            rate: Number(catRate) || 0
+          });
+        } else {
+          await apiClient.put(`/v1/debtcategory/${editingCategory.id}`, {
+            name: catName
+          });
+        }
+        showSuccess("Success", "Category updated successfully!");
+      } else {
+        // Create
+        if (categoryType === "asset") {
+          await apiClient.post("/v1/assetcategory", {
+            userId: dbUser.userId,
+            name: catName,
+            isAppreciation: catIsAppreciation,
+            rate: Number(catRate) || 0
+          });
+        } else {
+          await apiClient.post("/v1/debtcategory", {
+            userId: dbUser.userId,
+            name: catName
+          });
+        }
+        showSuccess("Success", "Category created successfully!");
+      }
+      setEditingCategory(null);
+      resetForm();
+      fetchCategories();
+    } catch (err) {
+      console.error("Error saving category:", err);
+    }
+  };
+
+  const confirmDelete = (catId: string) => {
+    showDelete(
+      "Delete Custom Category",
+      "Are you sure you want to delete this custom category? All related items will remain intact.",
+      async () => {
+        try {
+          if (categoryType === "asset") {
+            await apiClient.delete(`/v1/assetcategory/${catId}`);
+          } else {
+            await apiClient.delete(`/v1/debtcategory/${catId}`);
+          }
+          showSuccess("Success", "Category deleted successfully!");
+          fetchCategories();
+        } catch (err) {
+          console.error("Error deleting category:", err);
+        }
+      }
+    );
+  };
 
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -557,6 +678,160 @@ export default function SettingsView() {
             >
               Save Notification Preferences
             </Button>
+          </div>
+        </div>
+
+        {/* ==========================================
+            Category Manager Card
+            ========================================== */}
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6 lg:col-span-2">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Folders className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-zinc-900">Category Manager</h3>
+              <p className="text-xs text-zinc-500">View, create, and customize your custom Asset and Debt Category definitions</p>
+            </div>
+          </div>
+
+          <div className="flex border-b border-zinc-150 text-xs font-bold text-zinc-500 gap-6">
+            <button
+              onClick={() => { setCategoryType("asset"); setEditingCategory(null); resetForm(); }}
+              className={`pb-3 relative transition-colors outline-none ${categoryType === "asset" ? "text-blue-600 border-b-2 border-blue-600" : "hover:text-zinc-800"}`}
+            >
+              Asset Categories
+            </button>
+            <button
+              onClick={() => { setCategoryType("debt"); setEditingCategory(null); resetForm(); }}
+              className={`pb-3 relative transition-colors outline-none ${categoryType === "debt" ? "text-blue-600 border-b-2 border-blue-600" : "hover:text-zinc-800"}`}
+            >
+              Debt Categories
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-8 text-xs">
+            {/* Left Panel: Category List */}
+            <div className="md:col-span-3 space-y-3">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Existing Categories</p>
+              {loadingCategories ? (
+                <div className="py-8 flex justify-center items-center text-zinc-400">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-650 mr-2" />
+                  Loading Categories...
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-100 max-h-96 overflow-y-auto border border-zinc-150 rounded-xl bg-zinc-50/20 pr-1">
+                  {(categoryType === "asset" ? assetCategories : debtCategoriesList).map((cat) => {
+                    const isSystem = cat.userId === null;
+                    return (
+                      <div key={cat.id} className="p-3 flex justify-between items-center hover:bg-zinc-50/50 transition-colors">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-zinc-800">{cat.name}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                              isSystem ? "bg-zinc-100 text-zinc-500 border border-zinc-200" : "bg-blue-50 text-blue-600 border border-blue-100"
+                            }`}>
+                              {isSystem ? "System" : "Custom"}
+                            </span>
+                          </div>
+                          {categoryType === "asset" && (
+                            <p className="text-[10px] text-zinc-400">
+                              {cat.isAppreciation || cat.appreciation ? "Appreciation" : "Depreciation"} • Rate: {cat.rate}%
+                            </p>
+                          )}
+                        </div>
+                        
+                        {!isSystem && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => startEdit(cat)}
+                              className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit Category"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => confirmDelete(cat.id)}
+                              className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Category"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(categoryType === "asset" ? assetCategories : debtCategoriesList).length === 0 && (
+                    <p className="p-6 text-center text-zinc-400 italic">No categories found.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right Panel: Create/Edit Form */}
+            <div className="md:col-span-2 space-y-4 rounded-xl border border-zinc-150 p-4 bg-zinc-50/30">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+                {editingCategory ? "Edit Category" : "Create New Category"}
+              </p>
+
+              <div className="space-y-1.5">
+                <label className="font-semibold text-zinc-500">Category Name *</label>
+                <input
+                  type="text"
+                  placeholder="E.g. Commercial Building, Soft Debt"
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-white outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+              {categoryType === "asset" && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-zinc-500">Asset Type *</label>
+                    <select
+                      value={catIsAppreciation ? "true" : "false"}
+                      onChange={(e) => setCatIsAppreciation(e.target.value === "true")}
+                      className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-white outline-none text-zinc-900 focus:border-blue-500 focus:bg-white cursor-pointer"
+                    >
+                      <option value="true">APPRECIATION</option>
+                      <option value="false">DEPRECIATION</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-zinc-500">Default Rate (%) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="E.g. 8.00"
+                      value={catRate}
+                      onChange={(e) => setCatRate(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-white outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                {editingCategory && (
+                  <button
+                    onClick={() => { setEditingCategory(null); resetForm(); }}
+                    className="flex-1 h-8 rounded-lg border border-zinc-200 bg-white text-zinc-650 font-bold hover:bg-zinc-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <Button
+                  onClick={saveCategory}
+                  disabled={!catName.trim() || (categoryType === "asset" && !catRate)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
+                >
+                  {editingCategory ? "Save Changes" : "Create Category"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 

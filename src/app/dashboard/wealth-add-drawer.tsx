@@ -176,21 +176,22 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [loanName, setLoanName] = React.useState("");
   const [lendingBank, setLendingBank] = React.useState("");
   const [loanAccountNumber, setLoanAccountNumber] = React.useState("");
-  const [loanStatus, setLoanStatus] = React.useState<"Active" | "Closed" | "Foreclosed">("Active");
+  const [loanStatus, setLoanStatus] = React.useState<"Active" | "Closed">("Active");
 
   const [sanctionedAmount, setSanctionedAmount] = React.useState("");
   const [outstandingPrincipal, setOutstandingPrincipal] = React.useState("");
   const [loanInterestRate, setLoanInterestRate] = React.useState("");
   const [loanTenureValue, setLoanTenureValue] = React.useState("");
-  const [loanTenureUnit, setLoanTenureUnit] = React.useState<"Years" | "Months">("Years");
+  const [loanTenureUnit, setLoanTenureUnit] = React.useState<"Years" | "Months">("Months");
   const [loanStartDate, setLoanStartDate] = React.useState("");
+  const [loanEndDate, setLoanEndDate] = React.useState("");
   const [emiAmountInput, setEmiAmountInput] = React.useState("");
   const [emiDueDate, setEmiDueDate] = React.useState("");
 
   const [prepaymentAllowed, setPrepaymentAllowed] = React.useState<"Yes" | "No">("Yes");
   const [interestRateType, setInterestRateType] = React.useState<"Floating" | "Fixed">("Floating");
   const [coBorrower, setCoBorrower] = React.useState("");
-  const [linkedAsset, setLinkedAsset] = React.useState<"Property" | "Vehicle" | "Gold" | "Other" | "None">("None");
+  const [linkedAsset, setLinkedAsset] = React.useState<"Property" | "Vehicle" | "Gold" | "Other" | "Unsecure">("Unsecure");
   const [loanNotes, setLoanNotes] = React.useState("");
 
   // EMI & Loan calculations
@@ -473,11 +474,12 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       outstandingPrincipal: Number(outstandingPrincipal) || 0,
       loanInterestRate: Number(loanInterestRate) || 0,
       loanTenureValue: Number(loanTenureValue) || 0,
-      loanTenureUnit,
+      loanTenureUnit: "Months",
       loanStartDate,
+      loanEndDate,
       emiAmountInput: Number(emiAmountInput) || 0,
       emiDueDate,
-      prepaymentAllowed,
+      prepaymentAllowed: prepaymentAllowed === "Yes",
       interestRateType,
       coBorrower,
       linkedAsset,
@@ -564,23 +566,26 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
     if (recordType === "Debt") {
       if (!loanName.trim()) valErrors.loanName = "Loan name is required.";
-      if (!lendingBank.trim()) valErrors.lendingBank = "Lender/Bank is required.";
+      if (!lendingBank.trim()) valErrors.lendingBank = "Lender Name is required.";
 
       const sancAmt = Number(sanctionedAmount) || 0;
       const outAmt = Number(outstandingPrincipal) || 0;
       const rate = Number(loanInterestRate) || 0;
       const tenure = Number(loanTenureValue) || 0;
+      const emiVal = Number(emiAmountInput) || 0;
 
-      if (sancAmt <= 0) valErrors.sanctionedAmount = "Sanctioned amount must be greater than 0.";
+      if (sancAmt <= 0) valErrors.sanctionedAmount = "Principal is required.";
       if (outAmt <= 0) {
-        valErrors.outstandingPrincipal = "Outstanding principal must be greater than 0.";
+        valErrors.outstandingPrincipal = "Outstanding is required.";
       } else if (outAmt > sancAmt) {
-        valErrors.outstandingPrincipal = "Outstanding principal cannot exceed sanctioned amount.";
+        valErrors.outstandingPrincipal = "Outstanding cannot exceed Principal.";
       }
 
-      if (rate <= 0) valErrors.loanInterestRate = "Interest rate must be greater than 0%.";
-      if (tenure <= 0) valErrors.loanTenureValue = "Loan tenure must be greater than 0.";
-      if (!loanStartDate) valErrors.loanStartDate = "Loan start date is required.";
+      if (rate <= 0) valErrors.loanInterestRate = "Interest rate is required.";
+      if (tenure <= 0) valErrors.loanTenureValue = "Tenure is required.";
+      if (emiVal <= 0) valErrors.emiAmount = "EMI Amount is required.";
+      if (!loanStartDate) valErrors.loanStartDate = "Start date is required.";
+      if (!loanEndDate) valErrors.loanEndDate = "End date is required.";
     }
 
     if (Object.keys(valErrors).length > 0) {
@@ -597,7 +602,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
         await apiClient.post("/assets", payload);
       } else if (recordType === "Debt") {
         const payload = compileDebtPayload();
-        await apiClient.post("/debts", payload);
+        await apiClient.post("/v1/debt", payload);
       } else {
         await apiClient.post(`/wealth/${recordType?.toLowerCase()}`, {
           recordType,
@@ -633,6 +638,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     setLoanInterestRate("");
     setLoanTenureValue("");
     setLoanStartDate("");
+    setLoanEndDate("");
     setEmiAmountInput("");
     setEmiDueDate("");
     setCoBorrower("");
@@ -644,23 +650,26 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     const valErrors: Record<string, string> = {};
     if (recordType === "Debt") {
       if (!loanName.trim()) valErrors.loanName = "Loan name is required.";
-      if (!lendingBank.trim()) valErrors.lendingBank = "Lender/Bank is required.";
+      if (!lendingBank.trim()) valErrors.lendingBank = "Lender Name is required.";
 
       const sancAmt = Number(sanctionedAmount) || 0;
       const outAmt = Number(outstandingPrincipal) || 0;
       const rate = Number(loanInterestRate) || 0;
       const tenure = Number(loanTenureValue) || 0;
+      const emiVal = Number(emiAmountInput) || 0;
 
-      if (sancAmt <= 0) valErrors.sanctionedAmount = "Sanctioned amount must be greater than 0.";
+      if (sancAmt <= 0) valErrors.sanctionedAmount = "Principal is required.";
       if (outAmt <= 0) {
-        valErrors.outstandingPrincipal = "Outstanding principal must be greater than 0.";
+        valErrors.outstandingPrincipal = "Outstanding is required.";
       } else if (outAmt > sancAmt) {
-        valErrors.outstandingPrincipal = "Outstanding principal cannot exceed sanctioned amount.";
+        valErrors.outstandingPrincipal = "Outstanding cannot exceed Principal.";
       }
 
-      if (rate <= 0) valErrors.loanInterestRate = "Interest rate must be greater than 0%.";
-      if (tenure <= 0) valErrors.loanTenureValue = "Loan tenure must be greater than 0.";
-      if (!loanStartDate) valErrors.loanStartDate = "Loan start date is required.";
+      if (rate <= 0) valErrors.loanInterestRate = "Interest rate is required.";
+      if (tenure <= 0) valErrors.loanTenureValue = "Tenure is required.";
+      if (emiVal <= 0) valErrors.emiAmount = "EMI Amount is required.";
+      if (!loanStartDate) valErrors.loanStartDate = "Start date is required.";
+      if (!loanEndDate) valErrors.loanEndDate = "End date is required.";
     }
 
     if (Object.keys(valErrors).length > 0) {
@@ -674,7 +683,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     try {
       if (recordType === "Debt") {
         const payload = compileDebtPayload();
-        await apiClient.post("/debts", payload);
+        await apiClient.post("/v1/debt", payload);
       }
       showSuccess("Success", "Record created successfully! Enter details for the next record.");
       clearDebtFields();
@@ -734,12 +743,11 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     { code: "HOME_LOAN", label: "Home Loan", desc: "Mortgages or home construction financing", icon: Home, color: "text-emerald-600 bg-emerald-50" },
     { code: "GOLD_LOAN", label: "Gold Loan", desc: "Borrowings backed by gold assets", icon: Coins, color: "text-amber-500 bg-amber-50" },
     { code: "VEHICLE_LOAN", label: "Vehicle Loan", desc: "Loans for cars, bikes or transport", icon: Car, color: "text-blue-600 bg-blue-50" },
-    { code: "SOFT_LOAN", label: "Soft Loan (Family/Friends)", desc: "Zero or low interest borrowings from family", icon: HeartHandshake, color: "text-rose-500 bg-rose-50" },
+    { code: "SOFT_LOAN", label: "Soft Loan", desc: "Zero or low interest borrowings", icon: HeartHandshake, color: "text-rose-500 bg-rose-50" },
     { code: "MF_LOAN", label: "Mutual Fund Loan", desc: "Loans taken against mutual fund securities", icon: PieChart, color: "text-fuchsia-600 bg-fuchsia-50" },
     { code: "PERSONAL_LOAN", label: "Personal Loan", desc: "Unsecured personal credits or lines", icon: User, color: "text-indigo-600 bg-indigo-50" },
     { code: "EDUCATION_LOAN", label: "Education Loan", desc: "Student loans for higher studies", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50" },
-    { code: "CREDIT_CARD_LOAN", label: "Credit Card Loan", desc: "Credit card EMI conversion or loans", icon: CreditCard, color: "text-violet-600 bg-violet-50" },
-    { code: "OTHERS", label: "Other Loan", desc: "Any other active liability or loan", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50" }
+    { code: "CREDIT_CARD_LOAN", label: "Credit Card Loan", desc: "Credit card EMI conversion or loans", icon: CreditCard, color: "text-violet-600 bg-violet-50" }
   ];
 
   if (!isOpen) return null;
@@ -1832,22 +1840,21 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Loan Category</label>
+                        <label className="font-semibold text-zinc-500">Loan Category *</label>
                         <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] tracking-wide select-none">
                           {debtCategories.find((c) => c.code === debtCategory)?.label || debtCategory.replace("_", " ")}
                         </div>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Loan Status</label>
+                        <label className="font-semibold text-zinc-500">Loan Status *</label>
                         <Select
                           value={loanStatus}
-                          onChange={(e) => { setLoanStatus(e.target.value as "Active" | "Closed" | "Foreclosed"); triggerDraftSave(); }}
+                          onChange={(e) => { setLoanStatus(e.target.value as "Active" | "Closed"); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
                         >
                           <option value="Active">Active</option>
                           <option value="Closed">Closed</option>
-                          <option value="Foreclosed">Foreclosed</option>
                         </Select>
                       </div>
                     </div>
@@ -1866,7 +1873,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Lending Institution *</label>
+                        <label className="font-semibold text-zinc-500">Lender Name *</label>
                         <input
                           type="text"
                           placeholder="E.g. HDFC Bank, SBI"
@@ -1896,7 +1903,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Sanctioned Amount *</label>
+                        <label className="font-semibold text-zinc-500">Principal *</label>
                         <input
                           type="number"
                           placeholder="Amount in INR"
@@ -1908,7 +1915,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       </div>
 
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Outstanding Principal *</label>
+                        <label className="font-semibold text-zinc-500">Outstanding *</label>
                         <input
                           type="number"
                           placeholder="Outstanding Principal"
@@ -1934,45 +1941,34 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                         {errors.loanInterestRate && <span className="text-[10px] text-red-500">{errors.loanInterestRate}</span>}
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Tenure Value *</label>
+                      <div className="space-y-1 col-span-2">
+                        <label className="font-semibold text-zinc-500">Tenure (Months) *</label>
                         <input
                           type="number"
-                          placeholder="E.g. 20"
+                          placeholder="E.g. 240"
                           value={loanTenureValue}
                           onChange={(e) => { setLoanTenureValue(e.target.value); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
                         />
                         {errors.loanTenureValue && <span className="text-[10px] text-red-500">{errors.loanTenureValue}</span>}
                       </div>
-
-                      <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Tenure Unit *</label>
-                        <Select
-                          value={loanTenureUnit}
-                          onChange={(e) => { setLoanTenureUnit(e.target.value as "Years" | "Months"); triggerDraftSave(); }}
-                          className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
-                        >
-                          <option value="Years">Years</option>
-                          <option value="Months">Months</option>
-                        </Select>
-                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">EMI Amount (Calculated: {formatCurrency(emiCalc.emi)})</label>
+                        <label className="font-semibold text-zinc-500">EMI Amount *</label>
                         <input
                           type="number"
-                          placeholder="Override if different"
+                          placeholder="E.g. 15000"
                           value={emiAmountInput}
                           onChange={(e) => { setEmiAmountInput(e.target.value); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
                         />
+                        {errors.emiAmount && <span className="text-[10px] text-red-500">{errors.emiAmount}</span>}
                       </div>
 
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Loan Start Date *</label>
+                        <label className="font-semibold text-zinc-500">Start Date *</label>
                         <input
                           type="date"
                           value={loanStartDate}
@@ -1980,6 +1976,17 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                           className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-500 focus:border-blue-500 focus:bg-white"
                         />
                         {errors.loanStartDate && <span className="text-[10px] text-red-500">{errors.loanStartDate}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">End Date *</label>
+                        <input
+                          type="date"
+                          value={loanEndDate}
+                          onChange={(e) => { setLoanEndDate(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-500 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.loanEndDate && <span className="text-[10px] text-red-500">{errors.loanEndDate}</span>}
                       </div>
                     </div>
                   </div>
@@ -2116,14 +2123,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                         <label className="font-semibold text-zinc-500">Linked Asset</label>
                         <Select
                           value={linkedAsset}
-                          onChange={(e) => { setLinkedAsset(e.target.value as "Property" | "Vehicle" | "Gold" | "Other" | "None"); triggerDraftSave(); }}
+                          onChange={(e) => { setLinkedAsset(e.target.value as "Property" | "Vehicle" | "Gold" | "Other" | "Unsecure"); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
                         >
-                          <option value="None">None / Unsecured</option>
-                          <option value="Property">Linked Property Asset</option>
-                          <option value="Vehicle">Linked Vehicle Asset</option>
-                          <option value="Gold">Linked Gold Reserve</option>
-                          <option value="Other">Other Linked Asset</option>
+                          <option value="Unsecure">Unsecure</option>
+                          <option value="Property">Property</option>
+                          <option value="Vehicle">Vehicle</option>
+                          <option value="Gold">Gold</option>
+                          <option value="Other">Other</option>
                         </Select>
                       </div>
                     </div>
@@ -2151,15 +2158,6 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors disabled:opacity-50"
                     >
                       Cancel
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={handleSaveAndAddAnother}
-                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-all active:scale-[0.98] disabled:opacity-50"
-                    >
-                      {submitting ? "Saving..." : "Save & Add Another"}
                     </button>
 
                     <Button
