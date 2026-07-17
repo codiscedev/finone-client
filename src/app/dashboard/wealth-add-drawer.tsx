@@ -20,11 +20,7 @@ import {
   ShieldCheck,
   Car,
   Landmark,
-  Lock,
-  RefreshCw,
   PieChart,
-  PiggyBank,
-  Bitcoin,
   Banknote,
   HelpCircle,
   HeartHandshake,
@@ -94,7 +90,79 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   // Form states mapping
   // Generic / Property
   const [propertyName, setPropertyName] = React.useState("");
-  const [propertyType, setPropertyType] = React.useState("Commercial");
+  const [propertyType, setPropertyType] = React.useState("Apartment");
+
+  // Gold Form States
+  const [goldType, setGoldType] = React.useState("Physical");
+  const [goldCarat, setGoldCarat] = React.useState("");
+  const [goldCurrentPrice, setGoldCurrentPrice] = React.useState("");
+  const [goldWeight, setGoldWeight] = React.useState("");
+
+  const handlePurchaseValueChange = (val: string) => {
+    setPurchaseValue(val);
+    if (goldCurrentPrice && Number(goldCurrentPrice) > 0) {
+      const w = Number(val) / Number(goldCurrentPrice);
+      setGoldWeight(w.toFixed(2));
+      setCurrentMarketValue((w * Number(goldCurrentPrice)).toFixed(2));
+    }
+  };
+
+  const handleCurrentPriceChange = (val: string) => {
+    setGoldCurrentPrice(val);
+    if (val && Number(val) > 0) {
+      if (purchaseValue && Number(purchaseValue) > 0) {
+        const w = Number(purchaseValue) / Number(val);
+        setGoldWeight(w.toFixed(2));
+        setCurrentMarketValue((w * Number(val)).toFixed(2));
+      } else if (goldWeight && Number(goldWeight) > 0) {
+        setCurrentMarketValue((Number(goldWeight) * Number(val)).toFixed(2));
+      }
+    }
+  };
+
+  const handleWeightChange = (val: string) => {
+    setGoldWeight(val);
+    if (goldCurrentPrice && Number(goldCurrentPrice) > 0) {
+      setCurrentMarketValue((Number(val) * Number(goldCurrentPrice)).toFixed(2));
+    }
+  };
+
+  // Silver Form States
+  const [silverType, setSilverType] = React.useState("Physical");
+  const [silverCurrentPrice, setSilverCurrentPrice] = React.useState("");
+  const [silverWeight, setSilverWeight] = React.useState("");
+
+  const handleSilverPurchaseValueChange = (val: string) => {
+    setPurchaseValue(val);
+    if (silverCurrentPrice && Number(silverCurrentPrice) > 0) {
+      const w = Number(val) / Number(silverCurrentPrice);
+      setSilverWeight(w.toFixed(2));
+      setCurrentMarketValue((w * Number(silverCurrentPrice)).toFixed(2));
+    }
+  };
+
+  const handleSilverCurrentPriceChange = (val: string) => {
+    setSilverCurrentPrice(val);
+    if (val && Number(val) > 0) {
+      if (purchaseValue && Number(purchaseValue) > 0) {
+        const w = Number(purchaseValue) / Number(val);
+        setSilverWeight(w.toFixed(2));
+        setCurrentMarketValue((w * Number(val)).toFixed(2));
+      } else if (silverWeight && Number(silverWeight) > 0) {
+        setCurrentMarketValue((Number(silverWeight) * Number(val)).toFixed(2));
+      }
+    }
+  };
+
+  const handleSilverWeightChange = (val: string) => {
+    setSilverWeight(val);
+    if (silverCurrentPrice && Number(silverCurrentPrice) > 0) {
+      setCurrentMarketValue((Number(val) * Number(silverCurrentPrice)).toFixed(2));
+    }
+  };
+  // Vehicle Form States
+  const [vehicleName, setVehicleName] = React.useState("");
+
   const [purchaseValue, setPurchaseValue] = React.useState("");
   const [purchaseDate, setPurchaseDate] = React.useState("");
   const [currentMarketValue, setCurrentMarketValue] = React.useState("");
@@ -304,11 +372,19 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     if (assetCategory === "PROPERTY") {
       base.name = propertyName;
       base.propertyType = propertyType;
-      base.purchaseValue = Number(purchaseValue) || 0;
-      base.purchaseDate = purchaseDate;
-      base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
+      base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchaseDate = purchaseDate || null;
+      base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
       base.ownershipPercent = Number(ownershipPercent) || 100;
       base.rentalIncome = Number(rentalIncome) || 0;
+    } else if (assetCategory === "GOLD") {
+      base.name = `${goldType} Gold`;
+      base.goldType = goldType;
+      base.carat = goldCarat ? Number(goldCarat.replace("k", "")) : null;
+      base.weightInGrams = goldWeight ? Number(goldWeight) : null;
+      base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchaseDate = purchaseDate || null;
+      base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
     } else if (assetCategory === "STOCK") {
       base.name = stockQuery;
       base.stockQty = Number(stockQty) || 0;
@@ -317,31 +393,38 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       base.purchaseDate = stockDate;
       base.currentMarketValue = stockTotalValue;
       base.stockRegion = stockRegion;
-    } else if (assetCategory === "GOLD" || assetCategory === "SILVER") {
-      base.name = metalName;
-      base.metalQty = Number(metalQty) || 0;
-      base.metalStorage = metalStorage;
-      base.purchaseValue = Number(purchaseValue) || 0;
-      base.purchaseDate = purchaseDate;
-      base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
-      base.ownershipPercent = Number(ownershipPercent) || 100;
+    } else if (assetCategory === "SILVER") {
+      base.name = `${silverType} Silver`;
+      base.silverType = silverType;
+      base.weightInGrams = silverWeight ? Number(silverWeight) : null;
+      base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchaseDate = purchaseDate || null;
+      base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
     } else if (assetCategory === "VEHICLE") {
-      base.name = `${vehicleBrand} ${vehicleModel}`.trim() || vehicleType;
+      base.name = vehicleName;
+      base.vehicleName = vehicleName;
       base.vehicleType = vehicleType;
-      base.vehicleBrand = vehicleBrand;
-      base.vehicleModel = vehicleModel;
-      base.vehicleRegNo = vehicleRegNo;
-      base.vehicleInsurance = vehicleInsurance;
-      base.purchaseValue = Number(purchaseValue) || 0;
-      base.purchaseDate = purchaseDate;
-      base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
-      base.ownershipPercent = Number(ownershipPercent) || 100;
+      base.vehicleBrand = vehicleBrand || null;
+      base.vehicleModelName = vehicleModel || null;
+      base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchaseDate = purchaseDate || null;
+      base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+    } else if (assetCategory === "CASH") {
+      base.name = "Liquid Cash";
+      base.purchaseValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.purchaseDate = purchaseDate || null;
+    } else if (assetCategory === "OTHER") {
+      base.name = metalName;
+      base.purchaseValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.purchaseDate = purchaseDate || null;
     } else if (assetCategory === "BANK_ACCOUNT") {
-      base.name = bankName || "Savings Account";
+      base.name = bankName;
       base.bankAccType = bankAccType;
-      base.bankBalance = Number(bankBalance) || 0;
-      base.bankInterest = Number(bankInterest) || 0;
-      base.currentMarketValue = Number(bankBalance) || 0;
+      base.bankBalance = currentMarketValue ? Number(currentMarketValue) : null;
+      base.bankInterest = assetRate ? Number(assetRate) : null;
+      base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : null;
     } else if (assetCategory === "FIXED_DEPOSIT" || assetCategory === "RD") {
       base.name = `${assetCategory === "FIXED_DEPOSIT" ? "FD" : "RD"} - ${fdBank}`;
       base.fdBank = fdBank;
@@ -414,8 +497,60 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
       if (assetCategory === "PROPERTY") {
         if (!propertyName.trim()) valErrors.propertyName = "Property name is required.";
-        if (!purchaseValue) valErrors.purchaseValue = "Purchase value is required.";
-        if (!purchaseDate) valErrors.purchaseDate = "Purchase date is required.";
+        if (!assetRate) {
+          valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
+        }
+        if (!propertyType) {
+          valErrors.propertyType = "Property type is required.";
+        }
+      } else if (assetCategory === "GOLD") {
+        if (!assetRate) {
+          valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
+        }
+      } else if (assetCategory === "SILVER") {
+        if (!assetRate) {
+          valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
+        }
+        if (!silverWeight) {
+          valErrors.silverWeight = "Weight is required.";
+        }
+      } else if (assetCategory === "VEHICLE") {
+        if (!assetRate) {
+          valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
+        }
+        if (!vehicleType) {
+          valErrors.vehicleType = "Vehicle type is required.";
+        }
+        if (!vehicleName.trim()) {
+          valErrors.vehicleName = "Vehicle name is required.";
+        }
+      } else if (assetCategory === "CASH") {
+        if (!assetRate) {
+          valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
+        }
+        if (!currentMarketValue) {
+          valErrors.currentMarketValue = "Current Market Value is required.";
+        }
+      } else if (assetCategory === "OTHER") {
+        if (!assetRate) {
+          valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
+        }
+        if (!metalName.trim()) {
+          valErrors.assetName = "Asset name is required.";
+        }
+      } else if (assetCategory === "BANK_ACCOUNT") {
+        if (!assetRate) {
+          valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
+        }
+        if (!bankName.trim()) {
+          valErrors.bankName = "Bank name is required.";
+        }
+        if (!bankAccType) {
+          valErrors.bankAccType = "Account type is required.";
+        }
+        if (!currentMarketValue) {
+          valErrors.currentMarketValue = "Current Market Value is required.";
+        }
       } else if (assetCategory === "STOCK") {
         if (!stockQuery.trim()) valErrors.stockName = "Stock name is required.";
         if (!stockQty) valErrors.stockQty = "Quantity is required.";
@@ -590,17 +725,9 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     { code: "GOLD", label: "Gold", desc: "Physical gold bars, coins or jewelry", icon: Coins, color: "text-amber-500 bg-amber-50", defaultRate: "7" },
     { code: "SILVER", label: "Silver", desc: "Physical silver bars or commodities", icon: Sparkles, color: "text-slate-400 bg-slate-50", defaultRate: "6" },
     { code: "VEHICLE", label: "Vehicle", desc: "Cars, bikes or commercial transport assets", icon: Car, color: "text-blue-600 bg-blue-50", defaultRate: "15" },
-    { code: "BANK_ACCOUNT", label: "Bank Account", desc: "Savings or checking cash balances", icon: Landmark, color: "text-indigo-600 bg-indigo-50", defaultRate: "3" },
-    { code: "FIXED_DEPOSIT", label: "Fixed Deposit", desc: "Term deposits inside bank locks", icon: Lock, color: "text-teal-600 bg-teal-50", defaultRate: "6.5" },
-    { code: "RD", label: "Recurring Deposit", desc: "Monthly compounding deposits", icon: RefreshCw, color: "text-cyan-600 bg-cyan-50", defaultRate: "6.5" },
-    { code: "STOCK", label: "Stock Investment", desc: "Publicly listed company equities", icon: TrendingUp, color: "text-violet-600 bg-violet-50", defaultRate: "12" },
-    { code: "MUTUAL_FUND", label: "Mutual Fund", desc: "Equity index or debt mutual funds", icon: PieChart, color: "text-fuchsia-600 bg-fuchsia-50", defaultRate: "10" },
-    { code: "EPF", label: "Employee Prov Fund", desc: "Retirement EPF account indexes", icon: PiggyBank, color: "text-pink-600 bg-pink-50", defaultRate: "8.1" },
-    { code: "PPF", label: "Public Prov Fund", desc: "Post Office or bank PPF reserves", icon: Percent, color: "text-rose-600 bg-rose-50", defaultRate: "7.1" },
-    { code: "NPS", label: "National Pension", desc: "NPS pension fund manager portfolios", icon: Landmark, color: "text-sky-600 bg-sky-50", defaultRate: "9" },
-    { code: "CRYPTO", label: "Cryptocurrency", desc: "DeFi coin wallets and tokens", icon: Bitcoin, color: "text-orange-500 bg-orange-50", defaultRate: "15" },
     { code: "CASH", label: "Liquid Cash", desc: "Physical currency cash reserves", icon: Banknote, color: "text-lime-600 bg-lime-50", defaultRate: "0" },
-    { code: "OTHER", label: "Other Asset", desc: "Collectible art, variables, or items", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50", defaultRate: "5" }
+    { code: "BANK_ACCOUNT", label: "Savings Bank Account", desc: "Savings or checking cash balances", icon: Landmark, color: "text-indigo-600 bg-indigo-50", defaultRate: "3" },
+    { code: "OTHER", label: "Others", desc: "Other custom assets, variables, or items", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50", defaultRate: "5" }
   ];
 
   const debtCategories = [
@@ -809,7 +936,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   {/* Selected Category, Type, and Rate row */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b border-zinc-100 pb-4">
                     <div className="space-y-1">
-                      <label className="font-semibold text-zinc-500">Selected Category</label>
+                      <label className="font-semibold text-zinc-500">Selected Category *</label>
                       <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] tracking-wide select-none">
                         {assetCategories.find((c) => c.code === assetCategory)?.label || assetCategory.replace("_", " ")}
                       </div>
@@ -833,7 +960,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
                     <div className="space-y-1">
                       <label className="font-semibold text-zinc-500">
-                        {assetType === "APPRECIATION" ? "Appreciation Rate (%)" : "Depreciation Rate (%)"}
+                        {assetType === "APPRECIATION" ? "Appreciation Rate (%) *" : "Depreciation Rate (%) *"}
                       </label>
                       <input
                         type="number"
@@ -842,6 +969,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                         onChange={(e) => { setAssetRate(e.target.value); triggerDraftSave(); }}
                         className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white font-semibold"
                       />
+                      {errors.assetRate && <span className="text-[10px] text-red-500">{errors.assetRate}</span>}
                     </div>
                   </div>
 
@@ -861,21 +989,29 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       </div>
 
                       <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Property Type</label>
+                        <label className="font-semibold text-zinc-500">Property Type *</label>
                         <Select
                           value={propertyType}
                           onChange={(e) => { setPropertyType(e.target.value); triggerDraftSave(); }}
                           className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
                         >
-                          <option value="Residential">Residential</option>
-                          <option value="Commercial">Commercial</option>
-                          <option value="Plot / Land">Plot / Land</option>
+                          <option value="Apartment">Apartment</option>
+                          <option value="Independent House">Independent House</option>
+                          <option value="Villa">Villa</option>
+                          <option value="Residential Plot">Residential Plot</option>
+                          <option value="Commercial Office">Commercial Office</option>
+                          <option value="Commercial Shop">Commercial Shop</option>
+                          <option value="Warehouse">Warehouse</option>
+                          <option value="Industrial Land">Industrial Land</option>
+                          <option value="Agricultural Land">Agricultural Land</option>
+                          <option value="Other">Other</option>
                         </Select>
+                        {errors.propertyType && <span className="text-[10px] text-red-500">{errors.propertyType}</span>}
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Purchase Value *</label>
+                          <label className="font-semibold text-zinc-500">Purchase Value</label>
                           <input
                             type="number"
                             placeholder="Amount in INR"
@@ -883,18 +1019,16 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             onChange={(e) => { setPurchaseValue(e.target.value); triggerDraftSave(); }}
                             className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
                           />
-                          {errors.purchaseValue && <span className="text-[10px] text-red-500">{errors.purchaseValue}</span>}
                         </div>
 
                         <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Purchase Date *</label>
+                          <label className="font-semibold text-zinc-500">Purchase Date</label>
                           <input
                             type="date"
                             value={purchaseDate}
                             onChange={(e) => { setPurchaseDate(e.target.value); triggerDraftSave(); }}
                             className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 text-zinc-500"
                           />
-                          {errors.purchaseDate && <span className="text-[10px] text-red-500">{errors.purchaseDate}</span>}
                         </div>
                       </div>
 
@@ -1051,7 +1185,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Vehicle Type</label>
+                          <label className="font-semibold text-zinc-500">Vehicle Type *</label>
                           <Select
                             value={vehicleType}
                             onChange={(e) => { setVehicleType(e.target.value); triggerDraftSave(); }}
@@ -1061,8 +1195,23 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             <option value="Bike">Bike / Two-Wheeler</option>
                             <option value="Commercial">Commercial Vehicle</option>
                           </Select>
+                          {errors.vehicleType && <span className="text-[10px] text-red-500">{errors.vehicleType}</span>}
                         </div>
 
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Vehicle Name *</label>
+                          <input
+                            type="text"
+                            placeholder="E.g. Red SUV"
+                            value={vehicleName}
+                            onChange={(e) => { setVehicleName(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                          />
+                          {errors.vehicleName && <span className="text-[10px] text-red-500">{errors.vehicleName}</span>}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="font-semibold text-zinc-500">Brand</label>
                           <input
@@ -1073,9 +1222,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
                           />
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="font-semibold text-zinc-500">Model Name</label>
                           <input
@@ -1086,22 +1233,11 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
                           />
                         </div>
-
-                        <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Registration Number</label>
-                          <input
-                            type="text"
-                            placeholder="MH-12-XX-1234"
-                            value={vehicleRegNo}
-                            onChange={(e) => { setVehicleRegNo(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
-                          />
-                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Purchase Price</label>
+                          <label className="font-semibold text-zinc-500">Purchase Value</label>
                           <input
                             type="number"
                             placeholder="Purchase value"
@@ -1112,15 +1248,70 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                         </div>
 
                         <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Current Valuation</label>
+                          <label className="font-semibold text-zinc-500">Purchase Date</label>
                           <input
-                            type="number"
-                            placeholder="Estimated market price"
-                            value={currentMarketValue}
-                            onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                            type="date"
+                            value={purchaseDate}
+                            onChange={(e) => { setPurchaseDate(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 text-zinc-500"
                           />
                         </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Market Value</label>
+                        <input
+                          type="number"
+                          placeholder="Estimated market price"
+                          value={currentMarketValue}
+                          onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category = CASH */}
+                  {assetCategory === "CASH" && (
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Market Value *</label>
+                        <input
+                          type="number"
+                          placeholder="Current cash value in INR"
+                          value={currentMarketValue}
+                          onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
+                        {errors.currentMarketValue && <span className="text-[10px] text-red-500">{errors.currentMarketValue}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category = OTHER */}
+                  {assetCategory === "OTHER" && (
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Asset Name *</label>
+                        <input
+                          type="text"
+                          placeholder="Asset details description..."
+                          value={metalName}
+                          onChange={(e) => { setMetalName(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.assetName && <span className="text-[10px] text-red-500">{errors.assetName}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Market Value</label>
+                        <input
+                          type="number"
+                          placeholder="Expected valuation"
+                          value={currentMarketValue}
+                          onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
                       </div>
                     </div>
                   )}
@@ -1130,7 +1321,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Bank Name</label>
+                          <label className="font-semibold text-zinc-500">Bank Name *</label>
                           <input
                             type="text"
                             placeholder="E.g. HDFC, ICICI"
@@ -1138,10 +1329,11 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             onChange={(e) => { setBankName(e.target.value); triggerDraftSave(); }}
                             className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
                           />
+                          {errors.bankName && <span className="text-[10px] text-red-500">{errors.bankName}</span>}
                         </div>
 
                         <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Account Type</label>
+                          <label className="font-semibold text-zinc-500">Account Type *</label>
                           <Select
                             value={bankAccType}
                             onChange={(e) => { setBankAccType(e.target.value); triggerDraftSave(); }}
@@ -1150,32 +1342,20 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                             <option value="Savings">Savings</option>
                             <option value="Checking">Checking / Current</option>
                           </Select>
+                          {errors.bankAccType && <span className="text-[10px] text-red-500">{errors.bankAccType}</span>}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Current Balance</label>
-                          <input
-                            type="number"
-                            placeholder="Outstanding Balance"
-                            value={bankBalance}
-                            onChange={(e) => { setBankBalance(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="font-semibold text-zinc-500">Interest Rate (% p.a.)</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            placeholder="E.g. 3.5"
-                            value={bankInterest}
-                            onChange={(e) => { setBankInterest(e.target.value); triggerDraftSave(); }}
-                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
-                          />
-                        </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Market Value *</label>
+                        <input
+                          type="number"
+                          placeholder="Outstanding Balance"
+                          value={currentMarketValue}
+                          onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
+                        {errors.currentMarketValue && <span className="text-[10px] text-red-500">{errors.currentMarketValue}</span>}
                       </div>
                     </div>
                   )}
@@ -1367,8 +1547,177 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     </div>
                   )}
 
-                  {/* Fallback / GOLD / SILVER / OTHER / CASH */}
-                  {assetCategory !== "PROPERTY" && assetCategory !== "STOCK" && assetCategory !== "VEHICLE" && assetCategory !== "BANK_ACCOUNT" && assetCategory !== "FIXED_DEPOSIT" && assetCategory !== "RD" && assetCategory !== "EPF" && assetCategory !== "PPF" && assetCategory !== "NPS" && assetCategory !== "CRYPTO" && (
+                  {/* Category = GOLD */}
+                  {assetCategory === "GOLD" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Gold Type *</label>
+                          <Select
+                            value={goldType}
+                            onChange={(e) => { setGoldType(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
+                          >
+                            <option value="Physical">Physical</option>
+                            <option value="Digital">Digital</option>
+                            <option value="ETF">ETF</option>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Carat</label>
+                          <Select
+                            value={goldCarat}
+                            onChange={(e) => { setGoldCarat(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
+                          >
+                            <option value="">Select Carat</option>
+                            <option value="24k">24k</option>
+                            <option value="22k">22k</option>
+                            <option value="18k">18k</option>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Purchase Value</label>
+                          <input
+                            type="number"
+                            placeholder="Amount in INR"
+                            value={purchaseValue}
+                            onChange={(e) => { handlePurchaseValueChange(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Purchase Date</label>
+                          <input
+                            type="date"
+                            value={purchaseDate}
+                            onChange={(e) => { setPurchaseDate(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 text-zinc-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Current Gold Price (per gram)</label>
+                          <input
+                            type="number"
+                            placeholder="E.g. 7000"
+                            value={goldCurrentPrice}
+                            onChange={(e) => { handleCurrentPriceChange(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Weight (grams)</label>
+                          <input
+                            type="number"
+                            placeholder="Calculated or manual input"
+                            value={goldWeight}
+                            onChange={(e) => { handleWeightChange(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Market Value</label>
+                        <input
+                          type="number"
+                          placeholder="Calculated or manual input"
+                          value={currentMarketValue}
+                          onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category = SILVER */}
+                  {assetCategory === "SILVER" && (
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Silver Type *</label>
+                        <Select
+                          value={silverType}
+                          onChange={(e) => { setSilverType(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
+                        >
+                          <option value="Physical">Physical</option>
+                          <option value="Digital">Digital</option>
+                          <option value="ETF">ETF</option>
+                        </Select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Purchase Value</label>
+                          <input
+                            type="number"
+                            placeholder="Amount in INR"
+                            value={purchaseValue}
+                            onChange={(e) => { handleSilverPurchaseValueChange(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Purchase Date</label>
+                          <input
+                            type="date"
+                            value={purchaseDate}
+                            onChange={(e) => { setPurchaseDate(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 text-zinc-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Current Silver Price (per gram)</label>
+                          <input
+                            type="number"
+                            placeholder="E.g. 90"
+                            value={silverCurrentPrice}
+                            onChange={(e) => { handleSilverCurrentPriceChange(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">Weight (grams) *</label>
+                          <input
+                            type="number"
+                            placeholder="Calculated or manual input"
+                            value={silverWeight}
+                            onChange={(e) => { handleSilverWeightChange(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                          />
+                          {errors.silverWeight && <span className="text-[10px] text-red-500">{errors.silverWeight}</span>}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Market Value</label>
+                        <input
+                          type="number"
+                          placeholder="Calculated or manual input"
+                          value={currentMarketValue}
+                          onChange={(e) => { setCurrentMarketValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback / SILVER / OTHER / CASH */}
+                  {assetCategory !== "PROPERTY" && assetCategory !== "GOLD" && assetCategory !== "SILVER" && assetCategory !== "STOCK" && assetCategory !== "VEHICLE" && assetCategory !== "BANK_ACCOUNT" && assetCategory !== "FIXED_DEPOSIT" && assetCategory !== "RD" && assetCategory !== "EPF" && assetCategory !== "PPF" && assetCategory !== "NPS" && assetCategory !== "CRYPTO" && assetCategory !== "OTHER" && assetCategory !== "CASH" && (
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Asset Name *</label>
