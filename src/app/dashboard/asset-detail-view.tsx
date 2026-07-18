@@ -28,23 +28,55 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
+import { apiClient } from "@/lib/api";
 
 interface AssetDetailViewProps {
-  assetName: string;
+  assetId: string;
   onBack: () => void;
 }
 
-export default function AssetDetailView({ assetName, onBack }: AssetDetailViewProps) {
+export default function AssetDetailView({ assetId, onBack }: AssetDetailViewProps) {
   const { showSuccess, showWarning, showDelete } = useCustomAlert();
-  // Check which mock asset is selected to customize values
-  const isProperty = assetName.toLowerCase().includes("apartment") || assetName.toLowerCase().includes("flat") || assetName.toLowerCase().includes("property");
-  
-  // Custom mock data based on selection
-  const [currentVal, setCurrentVal] = React.useState(isProperty ? 45000000 : 1248000);
-  const purchasePrice = isProperty ? 32000000 : 800000;
-  const purchaseDate = isProperty ? "2022-06-15" : "2023-11-10";
-  const categoryLabel = isProperty ? "Property" : "Stock Investment";
-  
+  const [asset, setAsset] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [currentVal, setCurrentVal] = React.useState(0);
+
+  const fetchAssetDetails = async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get(`/v1/asset/${assetId}`);
+      if (res.data?.success) {
+        setAsset(res.data.data);
+        setCurrentVal(Number(res.data.data.current_market_value) || 0);
+      }
+    } catch (err) {
+      console.error("Error fetching asset detail:", err);
+      showWarning("Error", "Failed to fetch asset details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchAssetDetails();
+  }, [assetId]);
+
+  const handleDelete = async () => {
+    try {
+      await apiClient.delete(`/v1/asset/${assetId}`);
+      showSuccess("Deleted", "Asset has been deleted successfully from your portfolio.");
+      onBack();
+    } catch (err: any) {
+      console.error("Failed to delete asset:", err);
+      showWarning("Error", "Failed to delete asset: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const purchasePrice = Number(asset?.purchase_value) || 0;
+  const purchaseDate = asset?.purchase_date || "";
+  const categoryLabel = asset?.category_name || asset?.type || "";
+  const isProperty = asset?.category_name === "Property" || asset?.propertyName != null;
+
   // Update Modal State
   const [showValUpdateModal, setShowValUpdateModal] = React.useState(false);
   const [newValueInput, setNewValueInput] = React.useState("");
@@ -75,16 +107,16 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
 
   // Calculations
   const absoluteGain = currentVal - purchasePrice;
-  const gainPercent = Math.round((absoluteGain / purchasePrice) * 100);
+  const gainPercent = purchasePrice > 0 ? Math.round((absoluteGain / purchasePrice) * 100) : 0;
   
   // Holding Period calculation in years
-  const start = new Date(purchaseDate);
+  const start = purchaseDate ? new Date(purchaseDate) : null;
   const end = new Date();
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  const holdingYears = Number((diffTime / (1000 * 60 * 60 * 24 * 365.25)).toFixed(1));
+  const diffTime = start && !isNaN(start.getTime()) ? Math.abs(end.getTime() - start.getTime()) : 0;
+  const holdingYears = diffTime > 0 ? Number((diffTime / (1000 * 60 * 60 * 24 * 365.25)).toFixed(1)) : 0;
   
   // CAGR Calculation
-  const cagr = holdingYears > 0 
+  const cagr = holdingYears > 0 && purchasePrice > 0
     ? Math.round((Math.pow((currentVal / purchasePrice), 1 / holdingYears) - 1) * 100)
     : 0;
 
@@ -104,7 +136,7 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
     "1Y": [85, 88, 91, 93, 97, 100],
     "3Y": [70, 78, 83, 89, 94, 100],
     "5Y": [55, 68, 79, 86, 92, 100],
-    "ALL": [ purchasePrice / currentVal * 100, 65, 75, 88, 94, 100 ]
+    "ALL": [ purchasePrice > 0 && currentVal > 0 ? (purchasePrice / currentVal) * 100 : 100, 65, 75, 88, 94, 100 ]
   };
   const activePoints = chartPoints[timeFilter];
 
@@ -117,17 +149,50 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
     return `${x},${y}`;
   }).join(" ");
 
-  const handleValUpdate = (e: React.FormEvent) => {
+  const handleValUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     const val = Number(newValueInput);
     if (!val || val <= 0) {
       showWarning("Warning", "Please enter a valid valuation amount.");
       return;
     }
-    setCurrentVal(val);
-    setShowValUpdateModal(false);
-    setNewValueInput("");
-    showSuccess("Success", "Valuation updated successfully!");
+    try {
+      const payload = {
+        categoryId: asset.category_id || asset.categoryId,
+        name: asset.name,
+        type: asset.type,
+        purchaseValue: asset.purchase_value || asset.purchaseValue,
+        currentMarketValue: val,
+        purchaseDate: asset.purchase_date || asset.purchaseDate,
+        isAppreciation: asset.is_appreciation || asset.isAppreciation,
+        appreciationRate: asset.appreciation_rate || asset.appreciationRate,
+        note: asset.note,
+        propertyName: asset.property_name || asset.propertyName,
+        propertyType: asset.property_type || asset.propertyType,
+        goldType: asset.gold_type || asset.goldType,
+        carat: asset.carat,
+        weightInGrams: asset.weight_in_grams || asset.weightInGrams,
+        silverType: asset.silver_type || asset.silverType,
+        vehicleType: asset.vehicle_type || asset.vehicleType,
+        vehicleName: asset.vehicle_name || asset.vehicleName,
+        vehicleBrand: asset.vehicle_brand || asset.vehicleBrand,
+        vehicleModelName: asset.vehicle_model_name || asset.vehicleModelName,
+        bankName: asset.bank_name || asset.bankName,
+        bankAccountType: asset.bank_account_type || asset.bankAccountType,
+        bankInterestRate: asset.bank_interest_rate || asset.bankInterestRate,
+      };
+      const res = await apiClient.put(`/v1/asset/${assetId}`, payload);
+      if (res.data?.success) {
+        setCurrentVal(val);
+        setAsset(res.data.data);
+        setShowValUpdateModal(false);
+        setNewValueInput("");
+        showSuccess("Success", "Valuation updated successfully!");
+      }
+    } catch (err: any) {
+      console.error("Failed to update asset value:", err);
+      showWarning("Error", "Failed to update asset valuation: " + (err.response?.data?.message || err.message));
+    }
   };
 
   // Transactions ledger data
@@ -147,7 +212,7 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
   const aiInsights = [
     {
       text: isProperty 
-        ? `${assetName} represents 32% of your overall Net Worth, creating real estate portfolio concentration risks.` 
+        ? `${asset?.name || "Asset"} represents 32% of your overall Net Worth, creating real estate portfolio concentration risks.` 
         : `This equity portfolio CAGR (${cagr}%) exceeds typical benchmark yields. Maintain automated SIP buyings.`,
       impact: isProperty ? "Risk Reduction Alert" : "SIP Goal target aligned",
       confidence: "92% Confidence",
@@ -165,6 +230,15 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
     }
   ];
 
+  if (loading) {
+    return (
+      <div className="flex h-[400px] w-full flex-col items-center justify-center text-zinc-500">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mb-2" />
+        <p className="text-xs font-bold">Loading asset details...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
       
@@ -176,7 +250,7 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
         <span>/</span>
         <span>Assets</span>
         <span>/</span>
-        <span className="text-zinc-700">{assetName}</span>
+        <span className="text-zinc-700">{asset?.name}</span>
       </div>
 
       {/* Header Actions row */}
@@ -187,9 +261,13 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black text-zinc-950">{assetName}</h2>
-              <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded uppercase border border-blue-100/50">
-                APPRECIATION
+              <h2 className="text-xl font-black text-zinc-950">{asset?.name}</h2>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase border ${
+                asset?.is_appreciation || asset?.isAppreciation
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-100/50"
+                  : "bg-amber-50 text-amber-600 border-amber-100/50"
+              }`}>
+                {asset?.is_appreciation || asset?.isAppreciation ? "APPRECIATION" : "DEPRECIATION"}
               </span>
             </div>
             <p className="text-[11px] text-zinc-400 font-semibold mt-1">
@@ -216,7 +294,7 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
               showDelete(
                 "Delete",
                 "Are you sure you want to delete this asset from your portfolio registry?",
-                onBack
+                handleDelete
               );
             }}
             className="h-9 px-3 rounded-xl border border-red-100 bg-red-50/20 hover:bg-red-50 text-xs font-bold text-red-600 transition-colors outline-none shrink-0"
@@ -344,7 +422,7 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-xs">
               <div className="flex justify-between items-center py-1 border-b border-zinc-50">
                 <span className="text-zinc-500 font-medium">Asset Name</span>
-                <span className="font-semibold text-zinc-900">{assetName}</span>
+                <span className="font-semibold text-zinc-900">{asset?.name}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-zinc-50">
                 <span className="text-zinc-500 font-medium">Category</span>
@@ -352,7 +430,9 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
               </div>
               <div className="flex justify-between items-center py-1 border-b border-zinc-50">
                 <span className="text-zinc-500 font-medium">Asset Type</span>
-                <span className="font-semibold text-zinc-900">APPRECIATION</span>
+                <span className="font-semibold text-zinc-900">
+                  {asset?.is_appreciation || asset?.isAppreciation ? "Appreciation" : "Depreciation"}
+                </span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-zinc-50">
                 <span className="text-zinc-500 font-medium">Purchase Date</span>
@@ -376,7 +456,7 @@ export default function AssetDetailView({ assetName, onBack }: AssetDetailViewPr
               </div>
               <div className="sm:col-span-2 pt-2 text-zinc-500 leading-relaxed font-semibold">
                 <span className="text-zinc-400 block mb-1 uppercase text-[10px] font-black tracking-wide">Internal Notes</span>
-                Registered joint co-managed portfolio asset. Valuations are benchmarked annually against bank locks or market indexes.
+                {asset?.note || "No internal notes registered for this asset record."}
               </div>
             </div>
           </div>

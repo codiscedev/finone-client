@@ -21,9 +21,15 @@ import {
   AlertCircle,
   HelpCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Trash,
+  CheckCircle,
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api";
+import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 
 interface DebtDetailViewProps {
   onBack: () => void;
@@ -31,98 +37,217 @@ interface DebtDetailViewProps {
 }
 
 export default function DebtDetailView({ onBack, onAddClick }: DebtDetailViewProps) {
-  // Value states
-  const totalOutstanding = 1260000; // ₹12,60,000
-  const monthlyEMI = 18500; // ₹18,500
-  const activeLoansCount = 3;
-  const debtToAssetRatio = 19; // 19%
+  const { dbUser } = useAuth();
+  const { showSuccess, showWarning } = useCustomAlert();
+  const [debts, setDebts] = React.useState<any[]>([]);
+  const [assets, setAssets] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
 
-  // Formatting utilities
+  const fetchDebtsAndAssets = async () => {
+    if (!dbUser?.userId) return;
+    setLoading(true);
+    try {
+      const debtRes = await apiClient.get(`/v1/debt/users/${dbUser.userId}`);
+      if (debtRes.data?.success) {
+        setDebts(debtRes.data.data);
+      }
+      const assetRes = await apiClient.get(`/v1/asset/users/${dbUser.userId}`);
+      if (assetRes.data?.success) {
+        setAssets(assetRes.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching data in DebtDetailView:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchDebtsAndAssets();
+  }, [dbUser]);
+
+  const handleDeleteDebt = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this loan?")) return;
+    try {
+      const res = await apiClient.delete(`/v1/debt/${id}`);
+      if (res.data?.success) {
+        showSuccess("Loan deleted successfully");
+        fetchDebtsAndAssets();
+      }
+    } catch (err) {
+      console.error("Error deleting debt:", err);
+      showWarning("Failed to delete loan");
+    }
+  };
+
+  // Helper formatting
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "INR",
+      currency: "USD",
       maximumFractionDigits: 0
     }).format(val);
   };
 
-  // Trend dataset (Jan - Dec values in Lakhs, representing paying off outstanding principal over time)
+  // Derived totals
+  const totalOutstanding = React.useMemo(() => {
+    return debts.reduce((sum, d) => sum + (Number(d.outstandingPrincipal) || Number(d.outstanding_principal) || Number(d.sanctionedAmount) || Number(d.principal) || 0), 0);
+  }, [debts]);
+
+  const monthlyEMI = React.useMemo(() => {
+    return debts.reduce((sum, d) => sum + (Number(d.emiAmountInput) || Number(d.emiAmount) || Number(d.emi_amount) || 0), 0);
+  }, [debts]);
+
+  const activeLoansCount = debts.length;
+
+  const debtToAssetRatio = React.useMemo(() => {
+    const totalAssetsValuation = assets.reduce((sum, a) => sum + (Number(a.current_market_value) || Number(a.purchase_value) || 0), 0);
+    return totalAssetsValuation > 0 ? Math.round((totalOutstanding / totalAssetsValuation) * 100) : 0;
+  }, [totalOutstanding, assets]);
+
+  // Trend dataset representing paying off outstanding principal over time month-by-month
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const trendValues = [15.0, 14.8, 14.5, 14.2, 14.0, 13.8, 13.5, 13.2, 13.0, 12.8, 12.7, 12.6]; // in Lakhs
+  const trendValues = React.useMemo(() => {
+    let current = totalOutstanding;
+    const values = [];
+    for (let i = 0; i < 12; i++) {
+      values.push(current);
+      current = Math.max(0, current - monthlyEMI);
+    }
+    return values;
+  }, [totalOutstanding, monthlyEMI]);
 
   const svgWidth = 500;
   const svgHeight = 160;
-  const maxVal = 16.0;
-  const minVal = 10.0;
+  const maxVal = Math.max(...trendValues, 1000);
+  const minVal = Math.min(...trendValues, 0);
   
   const chartCoordinates = trendValues.map((val, idx) => {
     const x = (idx / (trendValues.length - 1)) * svgWidth;
-    const y = svgHeight - ((val - minVal) / (maxVal - minVal)) * (svgHeight - 20) - 10;
+    const y = svgHeight - ((val - minVal) / (maxVal - minVal || 1)) * (svgHeight - 20) - 10;
     return `${x},${y}`;
   }).join(" ");
 
-  // Debt distributions
-  const debtSplits = [
-    { name: "Home Loan", pct: 67, val: 850000, color: "bg-blue-600", stroke: "stroke-blue-600" },
-    { name: "Car Loan", pct: 20, val: 250000, color: "bg-purple-500", stroke: "stroke-purple-500" },
-    { name: "Personal Loan", pct: 13, val: 160000, color: "bg-red-500", stroke: "stroke-red-500" }
-  ];
+  // Dynamic Debt distributions
+  const debtSplits = React.useMemo(() => {
+    const categoryTotals: Record<string, number> = {};
+    debts.forEach((d) => {
+      const outstanding = Number(d.outstandingPrincipal) || Number(d.outstanding_principal) || Number(d.sanctionedAmount) || Number(d.principal) || 0;
+      const categoryName = d.categoryName || (d.category ? d.category.name : "Other Loan");
+      categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + outstanding;
+    });
 
-  // Active Loan Rows
-  const loanRows = [
-    {
-      category: "Home Loan",
-      icon: <Home className="h-4 w-4 text-blue-600 shrink-0" />,
-      bank: "SBI",
-      outstanding: 850000,
-      emi: 12000,
-      rate: "8.40%",
-      remaining: "18 Years",
-      nextEMI: "05 Jul"
-    },
-    {
-      category: "Car Loan",
-      icon: <Car className="h-4 w-4 text-purple-600 shrink-0" />,
-      bank: "HDFC",
-      outstanding: 250000,
-      emi: 4500,
-      rate: "9.20%",
-      remaining: "3 Years",
-      nextEMI: "10 Jul"
-    },
-    {
-      category: "Personal Loan",
-      icon: <CreditCard className="h-4 w-4 text-red-550 shrink-0" />,
-      bank: "ICICI",
-      outstanding: 160000,
-      emi: 2000,
-      rate: "13.50%",
-      remaining: "1 Year",
-      nextEMI: "15 Jul"
-    }
-  ];
+    const colors = ["bg-blue-600", "bg-purple-500", "bg-red-500", "bg-amber-500", "bg-emerald-500", "bg-indigo-500"];
+    const strokes = ["stroke-blue-600", "stroke-purple-500", "stroke-red-500", "stroke-amber-500", "stroke-emerald-500", "stroke-indigo-500"];
 
-  // Upcoming Schedule list
-  const upcomingSchedule = [
-    { name: "SBI Home Loan", date: "05 Jul", val: 12000 },
-    { name: "HDFC Car Loan", date: "10 Jul", val: 4500 },
-    { name: "ICICI Personal Loan", date: "15 Jul", val: 2000 }
-  ];
+    return Object.entries(categoryTotals).map(([name, val], idx) => {
+      const pct = totalOutstanding > 0 ? Math.round((val / totalOutstanding) * 100) : 0;
+      return {
+        name,
+        pct,
+        val,
+        color: colors[idx % colors.length],
+        stroke: strokes[idx % strokes.length]
+      };
+    });
+  }, [debts, totalOutstanding]);
+
+  // Dynamic Loan Rows
+  const loanRows = React.useMemo(() => {
+    const defaultIcons: Record<string, any> = {
+      "Home Loan": Home,
+      "Vehicle Loan": Car,
+      "Credit Card Loan": CreditCard,
+      "Gold Loan": Coins,
+      "Personal Loan": CreditCard,
+      "Education Loan": HelpCircle
+    };
+
+    return debts.map((d) => {
+      const categoryName = d.categoryName || (d.category ? d.category.name : "Other Loan");
+      const IconComp = defaultIcons[categoryName] || HelpCircle;
+      const outstanding = Number(d.outstandingPrincipal) || Number(d.outstanding_principal) || Number(d.sanctionedAmount) || Number(d.principal) || 0;
+      const emi = Number(d.emiAmountInput) || Number(d.emiAmount) || Number(d.emi_amount) || 0;
+      const rate = Number(d.loanInterestRate) || Number(d.interestRate) || Number(d.interest_rate) || 0;
+      
+      const tenureVal = Number(d.loanTenureValue) || 0;
+      const remainingTenure = tenureVal > 12 ? `${Math.floor(tenureVal / 12)} Y, ${tenureVal % 12} M` : `${tenureVal} M`;
+
+      let nextEMIDate = "05 Jul";
+      if (d.emiDueDate) {
+        const parts = d.emiDueDate.split("-");
+        if (parts.length === 3) {
+          const day = parts[2];
+          const monthsNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const monthIndex = Number(parts[1]) - 1;
+          const month = monthsNames[monthIndex >= 0 && monthIndex < 12 ? monthIndex : 6];
+          nextEMIDate = `${day} ${month}`;
+        }
+      }
+
+      return {
+        id: d.id,
+        category: categoryName,
+        icon: <IconComp className="h-4 w-4 text-blue-600 shrink-0" />,
+        bank: d.lender || d.lenderName || "Bank",
+        outstanding,
+        emi,
+        rate: `${rate.toFixed(2)}%`,
+        remaining: remainingTenure,
+        nextEMI: nextEMIDate
+      };
+    });
+  }, [debts]);
+
+  // Dynamic Upcoming Schedule list
+  const upcomingSchedule = React.useMemo(() => {
+    return loanRows.map((r) => ({
+      name: `${r.bank} ${r.category}`,
+      date: r.nextEMI,
+      val: r.emi
+    })).slice(0, 3);
+  }, [loanRows]);
 
   // Loan Closure highlights
-  const closureStats = [
-    { label: "Extra Payment", val: "₹5,000 / month", highlightColor: "text-zinc-950" },
-    { label: "Interest Saved", val: "₹2,80,000", highlightColor: "text-emerald-600" },
-    { label: "Loan Closed", val: "3 Years Earlier", highlightColor: "text-blue-600 font-bold" }
-  ];
+  const closureStats = React.useMemo(() => {
+    const extraPmt = Math.round(monthlyEMI * 0.1) || 500;
+    const interestSaved = Math.round(totalOutstanding * 0.05) || 5000;
+    const monthsSaved = activeLoansCount > 0 ? Math.round(totalOutstanding / (monthlyEMI || 1) * 0.1) : 0;
+    return [
+      { label: "Recommended Extra Payment", val: `${formatCurrency(extraPmt)} / month`, highlightColor: "text-zinc-950" },
+      { label: "Estimated Interest Saved", val: formatCurrency(interestSaved), highlightColor: "text-emerald-600" },
+      { label: "Accelerated Loan Closure", val: `${monthsSaved} Months Earlier`, highlightColor: "text-blue-600 font-bold" }
+    ];
+  }, [monthlyEMI, totalOutstanding, activeLoansCount]);
 
   // AI Insights checklines
-  const aiInsights = [
-    { text: "Debt-to-Asset Ratio is within a healthy range.", type: "check" },
-    { text: "Home loan interest rate is competitive.", type: "check" },
-    { text: "Personal loan has the highest interest rate—consider paying it off first.", type: "warning" },
-    { text: "Paying ₹5,000 extra monthly could save approximately ₹2.8L in interest.", type: "check" }
-  ];
+  const aiInsights = React.useMemo(() => {
+    const insights = [];
+    if (debtToAssetRatio < 30) {
+      insights.push({ text: "Your Debt-to-Asset Ratio is within a healthy range (< 30%).", type: "check" });
+    } else {
+      insights.push({ text: "Warning: High Debt-to-Asset Ratio. Prioritize paying off high interest loans.", type: "warning" });
+    }
+    
+    let maxRate = 0;
+    let maxRateName = "";
+    debts.forEach((d) => {
+      const rate = Number(d.loanInterestRate) || Number(d.interestRate) || Number(d.interest_rate) || 0;
+      if (rate > maxRate) {
+        maxRate = rate;
+        maxRateName = d.loanName || d.categoryName || "Loan";
+      }
+    });
+
+    if (maxRate > 12) {
+      insights.push({ text: `Your ${maxRateName} has a high interest rate of ${maxRate.toFixed(2)}%. Prioritize paying it off first.`, type: "warning" });
+    } else if (maxRate > 0) {
+      insights.push({ text: `Your highest rate loan is ${maxRateName} at ${maxRate.toFixed(2)}%, which is within normal limits.`, type: "check" });
+    }
+
+    insights.push({ text: "Making a 10% extra payment monthly can drastically reduce your repayment tenure.", type: "check" });
+    return insights;
+  }, [debtToAssetRatio, debts]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
@@ -269,29 +394,55 @@ export default function DebtDetailView({ onBack, onAddClick }: DebtDetailViewPro
 
           <div className="flex justify-center items-center py-4 relative my-3">
             <svg className="w-32 h-32 transform -rotate-90">
-              {/* Home Loan 67% */}
-              <circle cx="64" cy="64" r="48" className="stroke-blue-600" strokeWidth="15" fill="transparent" strokeDasharray="301.6" strokeDashoffset="0" />
-              {/* Car Loan 20% */}
-              <circle cx="64" cy="64" r="48" className="stroke-purple-500" strokeWidth="15" fill="transparent" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * 33) / 100} />
-              {/* Personal Loan 13% */}
-              <circle cx="64" cy="64" r="48" className="stroke-red-500" strokeWidth="15" fill="transparent" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * 13) / 100} />
+              {debtSplits.length === 0 ? (
+                <circle cx="64" cy="64" r="48" className="stroke-zinc-100" strokeWidth="15" fill="transparent" />
+              ) : (
+                (() => {
+                  let accumulatedPercent = 0;
+                  return debtSplits.map((split, index) => {
+                    const circumference = 2 * Math.PI * 48; // 301.59
+                    const strokeDashoffset = circumference - (circumference * split.pct) / 100;
+                    const rotation = (accumulatedPercent / 100) * 360;
+                    accumulatedPercent += split.pct;
+
+                    return (
+                      <circle
+                        key={index}
+                        cx="64"
+                        cy="64"
+                        r="48"
+                        className={split.stroke}
+                        strokeWidth="15"
+                        fill="transparent"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={strokeDashoffset}
+                        transform={`rotate(${rotation} 64 64)`}
+                      />
+                    );
+                  });
+                })()
+              )}
             </svg>
             <div className="absolute flex flex-col items-center">
               <span className="text-[9px] font-bold text-zinc-400 uppercase">Debts</span>
-              <span className="text-xs font-black text-zinc-950 mt-0.5">₹12.6L</span>
+              <span className="text-xs font-black text-zinc-950 mt-0.5">{formatCurrency(totalOutstanding)}</span>
             </div>
           </div>
 
           <div className="space-y-1.5 border-t border-zinc-100 pt-3 text-[10px] font-bold text-zinc-500">
-            {debtSplits.map((split, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className={`h-2 w-2 rounded ${split.color} shrink-0`} />
-                  <span className="truncate">{split.name}</span>
+            {debtSplits.length === 0 ? (
+              <div className="text-center text-zinc-400 py-1">No splits available</div>
+            ) : (
+              debtSplits.map((split, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`h-2 w-2 rounded ${split.color} shrink-0`} />
+                    <span className="truncate">{split.name}</span>
+                  </div>
+                  <span>{split.pct}% ({formatCurrency(split.val)})</span>
                 </div>
-                <span>{split.pct}% ({formatCurrency(split.val)})</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -303,45 +454,54 @@ export default function DebtDetailView({ onBack, onAddClick }: DebtDetailViewPro
           <h3 className="text-xs font-black uppercase text-zinc-900 tracking-wide block">
             ACTIVE LOANS REGISTRY
           </h3>
-          <span className="text-xs font-semibold text-zinc-550">{activeLoansCount} Active Liabilities</span>
+          <span className="text-xs font-semibold text-zinc-555">{activeLoansCount} Active Liabilities</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-50/20">
-                <th className="p-4 pl-5">Loan Type</th>
-                <th className="p-4">Bank</th>
-                <th className="p-4">Outstanding</th>
-                <th className="p-4">EMI</th>
-                <th className="p-4">Interest</th>
-                <th className="p-4">Remaining</th>
-                <th className="p-4">Next EMI</th>
-                <th className="p-4 text-center pr-5">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50 font-medium">
-              {loanRows.map((row, idx) => (
-                <tr key={idx} className="hover:bg-zinc-50/40 transition-colors">
-                  <td className="p-4 pl-5 flex items-center gap-2.5 text-zinc-800 font-bold">
-                    {row.icon}
-                    <span>{row.category}</span>
-                  </td>
-                  <td className="p-4 text-zinc-600 font-semibold">{row.bank}</td>
-                  <td className="p-4 text-zinc-900 font-bold">{formatCurrency(row.outstanding)}</td>
-                  <td className="p-4 text-zinc-700 font-bold">{formatCurrency(row.emi)}</td>
-                  <td className="p-4 text-zinc-900 font-bold">{row.rate}</td>
-                  <td className="p-4 text-zinc-650">{row.remaining}</td>
-                  <td className="p-4 text-zinc-500 font-bold">{row.nextEMI}</td>
-                  <td className="p-4 text-center pr-5">
-                    <button className="h-6 w-6 rounded-md hover:bg-zinc-100 flex items-center justify-center mx-auto text-zinc-400 hover:text-zinc-700 cursor-pointer transition-colors outline-none">
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </td>
+          {loanRows.length === 0 ? (
+            <div className="p-8 text-center text-zinc-400 font-semibold bg-white">
+              No active loans found. Click "Add Loan" to get started.
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-50/20">
+                  <th className="p-4 pl-5">Loan Type</th>
+                  <th className="p-4">Bank</th>
+                  <th className="p-4">Outstanding</th>
+                  <th className="p-4">EMI</th>
+                  <th className="p-4">Interest</th>
+                  <th className="p-4">Remaining</th>
+                  <th className="p-4">Next EMI</th>
+                  <th className="p-4 text-center pr-5">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-50 font-medium">
+                {loanRows.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-zinc-50/40 transition-colors">
+                    <td className="p-4 pl-5 flex items-center gap-2.5 text-zinc-800 font-bold">
+                      {row.icon}
+                      <span>{row.category}</span>
+                    </td>
+                    <td className="p-4 text-zinc-600 font-semibold">{row.bank}</td>
+                    <td className="p-4 text-zinc-900 font-bold">{formatCurrency(row.outstanding)}</td>
+                    <td className="p-4 text-zinc-700 font-bold">{formatCurrency(row.emi)}</td>
+                    <td className="p-4 text-zinc-900 font-bold">{row.rate}</td>
+                    <td className="p-4 text-zinc-650">{row.remaining}</td>
+                    <td className="p-4 text-zinc-500 font-bold">{row.nextEMI}</td>
+                    <td className="p-4 text-center pr-5">
+                      <button
+                        onClick={() => handleDeleteDebt(row.id)}
+                        className="h-6 w-6 rounded-md hover:bg-red-50 flex items-center justify-center mx-auto text-zinc-400 hover:text-red-650 cursor-pointer transition-colors outline-none"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -419,16 +579,6 @@ export default function DebtDetailView({ onBack, onAddClick }: DebtDetailViewPro
         </div>
       </div>
 
-      {/* Bottom add loan action trigger */}
-      <div className="flex justify-center pt-4">
-        <Button
-          onClick={onAddClick}
-          className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md text-xs font-bold transition-all active:scale-[0.98] outline-none cursor-pointer flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Loan
-        </Button>
-      </div>
 
     </div>
   );

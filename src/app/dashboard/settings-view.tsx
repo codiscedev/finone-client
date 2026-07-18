@@ -37,9 +37,10 @@ export default function SettingsView() {
 
   // Category Manager states
   const { dbUser } = useAuth();
-  const [categoryType, setCategoryType] = React.useState<"asset" | "debt">("asset");
+  const [categoryType, setCategoryType] = React.useState<"asset" | "debt" | "investment">("asset");
   const [assetCategories, setAssetCategories] = React.useState<any[]>([]);
   const [debtCategoriesList, setDebtCategoriesList] = React.useState<any[]>([]);
+  const [investmentCategories, setInvestmentCategories] = React.useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = React.useState(false);
   const [editingCategory, setEditingCategory] = React.useState<any | null>(null);
 
@@ -63,10 +64,15 @@ export default function SettingsView() {
         if (res.data?.success) {
           setAssetCategories(res.data.data);
         }
-      } else {
+      } else if (categoryType === "debt") {
         const res = await apiClient.get(`/v1/debtcategory/${dbUser.userId}`);
         if (res.data?.success) {
           setDebtCategoriesList(res.data.data);
+        }
+      } else if (categoryType === "investment") {
+        const res = await apiClient.get(`/v1/investmentcategory/${dbUser.userId}`);
+        if (res.data?.success) {
+          setInvestmentCategories(res.data.data);
         }
       }
     } catch (err) {
@@ -83,9 +89,9 @@ export default function SettingsView() {
   const startEdit = (cat: any) => {
     setEditingCategory(cat);
     setCatName(cat.name);
-    if (categoryType === "asset") {
-      setCatIsAppreciation(cat.isAppreciation);
-      setCatRate(cat.rate.toString());
+    if (categoryType === "asset" || categoryType === "investment") {
+      setCatIsAppreciation(cat.isAppreciation ?? cat.is_appreciation ?? true);
+      setCatRate(cat.rate != null ? cat.rate.toString() : "");
     }
   };
 
@@ -100,9 +106,15 @@ export default function SettingsView() {
             isAppreciation: catIsAppreciation,
             rate: Number(catRate) || 0
           });
-        } else {
+        } else if (categoryType === "debt") {
           await apiClient.put(`/v1/debtcategory/${editingCategory.id}`, {
             name: catName
+          });
+        } else if (categoryType === "investment") {
+          await apiClient.put(`/v1/investmentcategory/${editingCategory.id}`, {
+            name: catName,
+            isAppreciation: catIsAppreciation,
+            rate: Number(catRate) || 0
           });
         }
         showSuccess("Success", "Category updated successfully!");
@@ -115,10 +127,17 @@ export default function SettingsView() {
             isAppreciation: catIsAppreciation,
             rate: Number(catRate) || 0
           });
-        } else {
+        } else if (categoryType === "debt") {
           await apiClient.post("/v1/debtcategory", {
             userId: dbUser.userId,
             name: catName
+          });
+        } else if (categoryType === "investment") {
+          await apiClient.post("/v1/investmentcategory", {
+            userId: dbUser.userId,
+            name: catName,
+            isAppreciation: catIsAppreciation,
+            rate: Number(catRate) || 0
           });
         }
         showSuccess("Success", "Category created successfully!");
@@ -139,8 +158,10 @@ export default function SettingsView() {
         try {
           if (categoryType === "asset") {
             await apiClient.delete(`/v1/assetcategory/${catId}`);
-          } else {
+          } else if (categoryType === "debt") {
             await apiClient.delete(`/v1/debtcategory/${catId}`);
+          } else if (categoryType === "investment") {
+            await apiClient.delete(`/v1/investmentcategory/${catId}`);
           }
           showSuccess("Success", "Category deleted successfully!");
           fetchCategories();
@@ -708,6 +729,12 @@ export default function SettingsView() {
             >
               Debt Categories
             </button>
+            <button
+              onClick={() => { setCategoryType("investment"); setEditingCategory(null); resetForm(); }}
+              className={`pb-3 relative transition-colors outline-none ${categoryType === "investment" ? "text-blue-600 border-b-2 border-blue-600" : "hover:text-zinc-800"}`}
+            >
+              Investment Categories
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-8 text-xs">
@@ -721,7 +748,7 @@ export default function SettingsView() {
                 </div>
               ) : (
                 <div className="divide-y divide-zinc-100 max-h-96 overflow-y-auto border border-zinc-150 rounded-xl bg-zinc-50/20 pr-1">
-                  {(categoryType === "asset" ? assetCategories : debtCategoriesList).map((cat) => {
+                  {(categoryType === "asset" ? assetCategories : categoryType === "debt" ? debtCategoriesList : investmentCategories).map((cat) => {
                     const isSystem = cat.userId === null;
                     return (
                       <div key={cat.id} className="p-3 flex justify-between items-center hover:bg-zinc-50/50 transition-colors">
@@ -734,9 +761,9 @@ export default function SettingsView() {
                               {isSystem ? "System" : "Custom"}
                             </span>
                           </div>
-                          {categoryType === "asset" && (
+                          {(categoryType === "asset" || categoryType === "investment") && (
                             <p className="text-[10px] text-zinc-400">
-                              {cat.isAppreciation || cat.appreciation ? "Appreciation" : "Depreciation"} • Rate: {cat.rate}%
+                              {cat.isAppreciation || cat.is_appreciation || cat.appreciation ? "Appreciation" : "Depreciation"} • Rate: {cat.rate}%
                             </p>
                           )}
                         </div>
@@ -762,7 +789,7 @@ export default function SettingsView() {
                       </div>
                     );
                   })}
-                  {(categoryType === "asset" ? assetCategories : debtCategoriesList).length === 0 && (
+                  {(categoryType === "asset" ? assetCategories : categoryType === "debt" ? debtCategoriesList : investmentCategories).length === 0 && (
                     <p className="p-6 text-center text-zinc-400 italic">No categories found.</p>
                   )}
                 </div>
@@ -786,10 +813,10 @@ export default function SettingsView() {
                 />
               </div>
 
-              {categoryType === "asset" && (
+              {(categoryType === "asset" || categoryType === "investment") && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="font-semibold text-zinc-500">Asset Type *</label>
+                    <label className="font-semibold text-zinc-500">{categoryType === "asset" ? "Asset Type *" : "Investment Type *"}</label>
                     <select
                       value={catIsAppreciation ? "true" : "false"}
                       onChange={(e) => setCatIsAppreciation(e.target.value === "true")}
@@ -825,7 +852,7 @@ export default function SettingsView() {
                 )}
                 <Button
                   onClick={saveCategory}
-                  disabled={!catName.trim() || (categoryType === "asset" && !catRate)}
+                  disabled={!catName.trim() || ((categoryType === "asset" || categoryType === "investment") && !catRate)}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
                 >
                   {editingCategory ? "Save Changes" : "Create Category"}

@@ -25,9 +25,15 @@ import {
   HelpCircle,
   HeartHandshake,
   User,
-  GraduationCap
+  GraduationCap,
+  LineChart,
+  BarChart2,
+  Briefcase,
+  Lock,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 import { Select } from "../../components/ui/select";
 import { apiClient } from "@/lib/api";
 import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
@@ -39,6 +45,122 @@ interface WealthAddDrawerProps {
 
 export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProps) {
   const { showSuccess, showWarning } = useCustomAlert();
+  const { dbUser } = useAuth();
+  const [assetCategoriesList, setAssetCategoriesList] = React.useState<any[]>([]);
+  const [debtCategoriesList, setDebtCategoriesList] = React.useState<any[]>([]);
+  const [investmentCategoriesList, setInvestmentCategoriesList] = React.useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = React.useState(false);
+
+  const fetchCategories = async () => {
+    if (!dbUser?.userId) return;
+    setLoadingCategories(true);
+    try {
+      const assetRes = await apiClient.get(`/v1/assetcategory/${dbUser.userId}`);
+      if (assetRes.data?.success) {
+        setAssetCategoriesList(assetRes.data.data);
+      }
+      const debtRes = await apiClient.get(`/v1/debtcategory/${dbUser.userId}`);
+      if (debtRes.data?.success) {
+        setDebtCategoriesList(debtRes.data.data);
+      }
+      const investRes = await apiClient.get(`/v1/investmentcategory/${dbUser.userId}`);
+      if (investRes.data?.success) {
+        setInvestmentCategoriesList(investRes.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching categories in drawer:", err);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchCategories();
+    }
+  }, [isOpen, dbUser]);
+
+  const assetCategories = React.useMemo(() => {
+    const defaultMeta: Record<string, { desc: string; icon: any; color: string }> = {
+      PROPERTY: { desc: "Residential, commercial or plot properties", icon: Home, color: "text-emerald-600 bg-emerald-50" },
+      GOLD: { desc: "Physical gold bars, coins or jewelry", icon: Coins, color: "text-amber-500 bg-amber-50" },
+      SILVER: { desc: "Physical silver bars or commodities", icon: Sparkles, color: "text-slate-400 bg-slate-50" },
+      VEHICLE: { desc: "Cars, bikes or commercial transport assets", icon: Car, color: "text-blue-600 bg-blue-50" },
+      LIQUID_CASH: { desc: "Physical currency cash reserves", icon: Banknote, color: "text-lime-600 bg-lime-50" },
+      SAVINGS_BANK_ACCOUNT: { desc: "Savings or checking cash balances", icon: Landmark, color: "text-indigo-650 bg-indigo-50" },
+      OTHERS: { desc: "Other custom assets, variables, or items", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50" }
+    };
+    
+    return assetCategoriesList.map((cat: any) => {
+      const code = cat.name.toUpperCase().replace(/\s+/g, "_");
+      const meta = defaultMeta[code] || defaultMeta[cat.name.toUpperCase()] || defaultMeta["OTHERS"];
+      return {
+        id: cat.id,
+        code: code,
+        label: cat.name,
+        desc: meta.desc,
+        icon: meta.icon,
+        color: meta.color,
+        defaultRate: cat.rate != null ? cat.rate.toString() : "5",
+        isAppreciation: cat.isAppreciation ?? cat.is_appreciation ?? true
+      };
+    });
+  }, [assetCategoriesList]);
+
+  const debtCategories = React.useMemo(() => {
+    const defaultMeta: Record<string, { desc: string; icon: any; color: string }> = {
+      HOME_LOAN: { desc: "Mortgages or home construction financing", icon: Home, color: "text-emerald-600 bg-emerald-50" },
+      GOLD_LOAN: { desc: "Borrowings backed by gold assets", icon: Coins, color: "text-amber-500 bg-amber-50" },
+      VEHICLE_LOAN: { desc: "Loans for cars, bikes or transport", icon: Car, color: "text-blue-600 bg-blue-50" },
+      SOFT_LOAN: { desc: "Zero or low interest borrowings", icon: HeartHandshake, color: "text-rose-500 bg-rose-50" },
+      MF_LOAN: { desc: "Loans taken against mutual fund securities", icon: PieChart, color: "text-fuchsia-600 bg-fuchsia-50" },
+      PERSONAL_LOAN: { desc: "Unsecured personal credits or lines", icon: User, color: "text-indigo-650 bg-indigo-50" },
+      EDUCATION_LOAN: { desc: "Student loans for higher studies", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50" },
+      CREDIT_CARD_LOAN: { desc: "Credit card EMI conversion or loans", icon: CreditCard, color: "text-violet-600 bg-violet-50" },
+      OTHER: { desc: "Other custom debts or borrowings", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50" }
+    };
+
+    return debtCategoriesList.map((cat: any) => {
+      const code = cat.name.toUpperCase().replace(/\s+/g, "_");
+      const meta = defaultMeta[code] || defaultMeta[cat.name.toUpperCase()] || defaultMeta["OTHER"];
+      return {
+        id: cat.id,
+        code: code,
+        label: cat.name,
+        desc: meta.desc,
+        icon: meta.icon,
+        color: meta.color
+      };
+    });
+  }, [debtCategoriesList]);
+
+  const investmentCategories = React.useMemo(() => {
+    const defaultMeta: Record<string, { desc: string; icon: any; color: string }> = {
+      STOCK: { desc: "Equity shares of publicly listed companies", icon: LineChart, color: "text-emerald-600 bg-emerald-50" },
+      MUTUAL_FUND: { desc: "Diversified mutual funds or index funds", icon: BarChart2, color: "text-blue-600 bg-blue-50" },
+      CRYPTO: { desc: "Digital currencies or crypto assets", icon: Coins, color: "text-rose-500 bg-rose-50" },
+      EPF: { desc: "Government EPF savings contributions", icon: Briefcase, color: "text-amber-500 bg-amber-50" },
+      PPF: { desc: "Government PPF tax-saving scheme", icon: Home, color: "text-indigo-650 bg-indigo-50" },
+      NPS: { desc: "National Pension System retirement contributions", icon: Landmark, color: "text-purple-500 bg-purple-50" },
+      FD: { desc: "Guaranteed return bank fixed deposit accounts", icon: Lock, color: "text-teal-600 bg-teal-50" },
+      RD: { desc: "Monthly savings recurring deposit accounts", icon: RefreshCw, color: "text-cyan-600 bg-cyan-50" },
+      OTHER: { desc: "Other custom or variable investment options", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50" }
+    };
+
+    return investmentCategoriesList.map((cat: any) => {
+      const code = cat.name.toUpperCase().replace(/\s+/g, "_");
+      const meta = defaultMeta[code] || defaultMeta[cat.name.toUpperCase()] || defaultMeta["OTHER"];
+      return {
+        id: cat.id,
+        code: code,
+        label: cat.name,
+        desc: meta.desc,
+        icon: meta.icon,
+        color: meta.color,
+        defaultRate: cat.rate != null ? cat.rate.toString() : "10"
+      };
+    });
+  }, [investmentCategoriesList]);
   // Steps: 1 = Choose Record Type, 2 = Select Category (for Assets), 3 = Input Form
   const [step, setStep] = React.useState(1);
   const [recordType, setRecordType] = React.useState<"Asset" | "Debt" | "Investment" | "Goal" | "Emergency" | null>(null);
@@ -172,6 +294,23 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [rentalIncome, setRentalIncome] = React.useState("");
 
   // Debt Form States
+  // Investment Form States
+  const [investmentCategory, setInvestmentCategory] = React.useState<string>("");
+  const [investmentName, setInvestmentName] = React.useState("");
+  const [investmentNotes, setInvestmentNotes] = React.useState("");
+  const [investmentSymbol, setInvestmentSymbol] = React.useState("");
+  const [investmentUnits, setInvestmentUnits] = React.useState("");
+  const [investmentBuyPrice, setInvestmentBuyPrice] = React.useState("");
+  const [investmentCurrentPrice, setInvestmentCurrentPrice] = React.useState("");
+  const [investmentInvestedAmount, setInvestmentInvestedAmount] = React.useState("");
+  const [investmentCurrentValue, setInvestmentCurrentValue] = React.useState("");
+  const [investmentExpectedReturn, setInvestmentExpectedReturn] = React.useState("");
+  const [investmentStartDate, setInvestmentStartDate] = React.useState("");
+  const [investmentIsSip, setInvestmentIsSip] = React.useState<"Yes" | "No">("No");
+  const [investmentSipAmount, setInvestmentSipAmount] = React.useState("");
+  const [investmentSipFrequency, setInvestmentSipFrequency] = React.useState("Monthly");
+  const [investmentMaturityDate, setInvestmentMaturityDate] = React.useState("");
+
   const [debtCategory, setDebtCategory] = React.useState<string>("");
   const [loanName, setLoanName] = React.useState("");
   const [lendingBank, setLendingBank] = React.useState("");
@@ -363,69 +502,123 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
   const compileAssetPayload = () => {
+    const selectedCategory = assetCategories.find((c) => c.code === assetCategory);
+
     const base: Record<string, any> = {
-      assetCategory,
+      categoryId: selectedCategory?.id || null,
+      category_id: selectedCategory?.id || null,
+      type: assetCategory,
       assetType,
+      asset_type: assetType,
       appreciationRate: Number(assetRate) || 0,
+      appreciation_rate: Number(assetRate) || 0,
       notes: assetNotes,
+      note: assetNotes,
     };
 
     if (assetCategory === "PROPERTY") {
       base.name = propertyName;
       base.propertyType = propertyType;
+      base.property_type = propertyType;
       base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchase_value = purchaseValue ? Number(purchaseValue) : null;
       base.purchaseDate = purchaseDate || null;
+      base.purchase_date = purchaseDate || null;
       base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+      base.currentValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+      base.current_value = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
       base.ownershipPercent = Number(ownershipPercent) || 100;
+      base.ownership_percent = Number(ownershipPercent) || 100;
       base.rentalIncome = Number(rentalIncome) || 0;
+      base.rental_income = Number(rentalIncome) || 0;
     } else if (assetCategory === "GOLD") {
       base.name = `${goldType} Gold`;
       base.goldType = goldType;
+      base.gold_type = goldType;
       base.carat = goldCarat ? Number(goldCarat.replace("k", "")) : null;
       base.weightInGrams = goldWeight ? Number(goldWeight) : null;
+      base.weight_in_grams = goldWeight ? Number(goldWeight) : null;
       base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchase_value = purchaseValue ? Number(purchaseValue) : null;
       base.purchaseDate = purchaseDate || null;
+      base.purchase_date = purchaseDate || null;
       base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+      base.currentValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+      base.current_value = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
     } else if (assetCategory === "STOCK") {
       base.name = stockQuery;
       base.stockQty = Number(stockQty) || 0;
       base.stockAvgPrice = Number(stockAvgPrice) || 0;
       base.purchaseValue = Number(stockInvestedAmount) || (Number(stockQty) * Number(stockAvgPrice)) || 0;
+      base.purchase_value = Number(stockInvestedAmount) || (Number(stockQty) * Number(stockAvgPrice)) || 0;
       base.purchaseDate = stockDate;
+      base.purchase_date = stockDate;
       base.currentMarketValue = stockTotalValue;
+      base.currentValue = stockTotalValue;
+      base.current_value = stockTotalValue;
       base.stockRegion = stockRegion;
     } else if (assetCategory === "SILVER") {
       base.name = `${silverType} Silver`;
       base.silverType = silverType;
+      base.silver_type = silverType;
       base.weightInGrams = silverWeight ? Number(silverWeight) : null;
+      base.weight_in_grams = silverWeight ? Number(silverWeight) : null;
       base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchase_value = purchaseValue ? Number(purchaseValue) : null;
       base.purchaseDate = purchaseDate || null;
+      base.purchase_date = purchaseDate || null;
       base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+      base.currentValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+      base.current_value = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
     } else if (assetCategory === "VEHICLE") {
       base.name = vehicleName;
       base.vehicleName = vehicleName;
+      base.vehicle_name = vehicleName;
       base.vehicleType = vehicleType;
+      base.vehicle_type = vehicleType;
       base.vehicleBrand = vehicleBrand || null;
+      base.vehicle_brand = vehicleBrand || null;
       base.vehicleModelName = vehicleModel || null;
+      base.vehicle_model_name = vehicleModel || null;
       base.purchaseValue = purchaseValue ? Number(purchaseValue) : null;
+      base.purchase_value = purchaseValue ? Number(purchaseValue) : null;
       base.purchaseDate = purchaseDate || null;
+      base.purchase_date = purchaseDate || null;
       base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
-    } else if (assetCategory === "CASH") {
+      base.currentValue = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+      base.current_value = currentMarketValue ? Number(currentMarketValue) : (purchaseValue ? Number(purchaseValue) : null);
+    } else if (assetCategory === "LIQUID_CASH") {
       base.name = "Liquid Cash";
       base.purchaseValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.purchase_value = currentMarketValue ? Number(currentMarketValue) : null;
       base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.currentValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.current_value = currentMarketValue ? Number(currentMarketValue) : null;
       base.purchaseDate = purchaseDate || null;
-    } else if (assetCategory === "OTHER") {
+      base.purchase_date = purchaseDate || null;
+    } else if (assetCategory === "OTHERS") {
       base.name = metalName;
       base.purchaseValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.purchase_value = currentMarketValue ? Number(currentMarketValue) : null;
       base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.currentValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.current_value = currentMarketValue ? Number(currentMarketValue) : null;
       base.purchaseDate = purchaseDate || null;
-    } else if (assetCategory === "BANK_ACCOUNT") {
+      base.purchase_date = purchaseDate || null;
+    } else if (assetCategory === "SAVINGS_BANK_ACCOUNT") {
       base.name = bankName;
+      base.bankName = bankName;
+      base.bank_name = bankName;
       base.bankAccType = bankAccType;
+      base.bankAccountType = bankAccType;
+      base.bank_account_type = bankAccType;
       base.bankBalance = currentMarketValue ? Number(currentMarketValue) : null;
       base.bankInterest = assetRate ? Number(assetRate) : null;
+      base.bankInterestRate = assetRate ? Number(assetRate) : null;
+      base.bank_interest_rate = assetRate ? Number(assetRate) : null;
       base.currentMarketValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.currentValue = currentMarketValue ? Number(currentMarketValue) : null;
+      base.current_value = currentMarketValue ? Number(currentMarketValue) : null;
     } else if (assetCategory === "FIXED_DEPOSIT" || assetCategory === "RD") {
       base.name = `${assetCategory === "FIXED_DEPOSIT" ? "FD" : "RD"} - ${fdBank}`;
       base.fdBank = fdBank;
@@ -434,17 +627,23 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       base.fdMaturityAmount = Number(fdMaturityAmount) || 0;
       base.fdMaturityDate = fdMaturityDate;
       base.currentMarketValue = Number(fdAmount) || 0;
+      base.currentValue = Number(fdAmount) || 0;
+      base.current_value = Number(fdAmount) || 0;
     } else if (assetCategory === "EPF" || assetCategory === "PPF") {
       base.name = `${assetCategory} Account`;
       base.epfEmployer = epfEmployer;
       base.epfUan = epfUan;
       base.epfBalance = Number(epfBalance) || 0;
       base.currentMarketValue = Number(epfBalance) || 0;
+      base.currentValue = Number(epfBalance) || 0;
+      base.current_value = Number(epfBalance) || 0;
     } else if (assetCategory === "NPS") {
       base.name = "NPS Pension Fund";
       base.npsPran = npsPran;
       base.npsManager = npsManager;
       base.currentMarketValue = Number(purchaseValue) || 0;
+      base.currentValue = Number(purchaseValue) || 0;
+      base.current_value = Number(purchaseValue) || 0;
     } else if (assetCategory === "CRYPTO") {
       base.name = `${cryptoCoin} Wallet`;
       base.cryptoCoin = cryptoCoin;
@@ -453,18 +652,28 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       base.cryptoPrice = Number(cryptoPrice) || 0;
       base.cryptoExchange = cryptoExchange;
       base.currentMarketValue = (Number(cryptoQty) || 0) * (Number(cryptoPrice) || 0);
+      base.currentValue = (Number(cryptoQty) || 0) * (Number(cryptoPrice) || 0);
+      base.current_value = (Number(cryptoQty) || 0) * (Number(cryptoPrice) || 0);
     } else {
       base.name = metalName || "Generic Asset";
       base.purchaseValue = Number(purchaseValue) || 0;
+      base.purchase_value = Number(purchaseValue) || 0;
       base.purchaseDate = purchaseDate;
+      base.purchase_date = purchaseDate;
       base.currentMarketValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
+      base.currentValue = Number(currentMarketValue) || (Number(purchaseValue) || 0);
+      base.current_value = Number(currentMarketValue) || (Number(purchaseValue) || 0);
       base.ownershipPercent = Number(ownershipPercent) || 100;
+      base.ownership_percent = Number(ownershipPercent) || 100;
     }
     return base;
   };
 
   const compileDebtPayload = () => {
+    const selectedCategory = debtCategories.find((c) => c.code === debtCategory);
     return {
+      categoryId: selectedCategory?.id || null,
+      category_id: selectedCategory?.id || null,
       debtCategory,
       loanName,
       lendingBank,
@@ -526,21 +735,21 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
         if (!vehicleName.trim()) {
           valErrors.vehicleName = "Vehicle name is required.";
         }
-      } else if (assetCategory === "CASH") {
+      } else if (assetCategory === "LIQUID_CASH") {
         if (!assetRate) {
           valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
         }
         if (!currentMarketValue) {
           valErrors.currentMarketValue = "Current Market Value is required.";
         }
-      } else if (assetCategory === "OTHER") {
+      } else if (assetCategory === "OTHERS") {
         if (!assetRate) {
           valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
         }
         if (!metalName.trim()) {
           valErrors.assetName = "Asset name is required.";
         }
-      } else if (assetCategory === "BANK_ACCOUNT") {
+      } else if (assetCategory === "SAVINGS_BANK_ACCOUNT") {
         if (!assetRate) {
           valErrors.assetRate = `${assetType === "APPRECIATION" ? "Appreciation" : "Depreciation"} rate is required.`;
         }
@@ -588,6 +797,25 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       if (!loanEndDate) valErrors.loanEndDate = "End date is required.";
     }
 
+    if (recordType === "Investment") {
+      if (!investmentCategory) valErrors.investmentCategory = "Category is required.";
+      if (!investmentName.trim()) valErrors.investmentName = "Investment name is required.";
+      if (!investmentSymbol.trim()) valErrors.investmentSymbol = "Symbol is required.";
+      if (!investmentUnits || Number(investmentUnits) <= 0) valErrors.investmentUnits = "Units must be positive.";
+      if (!investmentBuyPrice || Number(investmentBuyPrice) <= 0) valErrors.investmentBuyPrice = "Buy Price must be positive.";
+      if (!investmentCurrentPrice || Number(investmentCurrentPrice) <= 0) valErrors.investmentCurrentPrice = "Current Price must be positive.";
+      if (!investmentInvestedAmount || Number(investmentInvestedAmount) <= 0) valErrors.investmentInvestedAmount = "Invested Amount must be positive.";
+      if (!investmentCurrentValue || Number(investmentCurrentValue) <= 0) valErrors.investmentCurrentValue = "Current Value must be positive.";
+      if (!investmentExpectedReturn || Number(investmentExpectedReturn) <= 0) valErrors.investmentExpectedReturn = "Expected Return must be positive.";
+      if (!investmentStartDate) valErrors.investmentStartDate = "Start date is required.";
+      if (!investmentMaturityDate) valErrors.investmentMaturityDate = "Maturity date is required.";
+
+      if (investmentIsSip === "Yes") {
+        if (!investmentSipAmount || Number(investmentSipAmount) <= 0) valErrors.investmentSipAmount = "SIP Amount is required.";
+        if (!investmentSipFrequency) valErrors.investmentSipFrequency = "SIP Frequency is required.";
+      }
+    }
+
     if (Object.keys(valErrors).length > 0) {
       setErrors(valErrors);
       return;
@@ -599,10 +827,29 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     try {
       if (recordType === "Asset") {
         const payload = compileAssetPayload();
-        await apiClient.post("/assets", payload);
+        await apiClient.post("/v1/asset", payload);
       } else if (recordType === "Debt") {
         const payload = compileDebtPayload();
         await apiClient.post("/v1/debt", payload);
+      } else if (recordType === "Investment") {
+        const payload = {
+          name: investmentName,
+          type: investmentCategory,
+          symbol: investmentSymbol,
+          units: Number(investmentUnits) || 0,
+          buyPrice: Number(investmentBuyPrice) || 0,
+          currentPrice: Number(investmentCurrentPrice) || 0,
+          investedAmount: Number(investmentInvestedAmount) || 0,
+          currentValue: Number(investmentCurrentValue) || 0,
+          expectedReturnPct: Number(investmentExpectedReturn) || 0,
+          startDate: investmentStartDate,
+          isSip: investmentIsSip === "Yes",
+          sipAmount: investmentIsSip === "Yes" ? (Number(investmentSipAmount) || 0) : null,
+          sipFrequency: investmentIsSip === "Yes" ? investmentSipFrequency : null,
+          maturityDate: investmentMaturityDate,
+          notes: investmentNotes
+        };
+        await apiClient.post("/v1/investment", payload);
       } else {
         await apiClient.post(`/wealth/${recordType?.toLowerCase()}`, {
           recordType,
@@ -620,6 +867,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       setAssetRate("");
       setAssetNotes("");
       clearDebtFields();
+      clearInvestmentFields();
       onClose();
     } catch (err: any) {
       console.error("Error saving record:", err);
@@ -643,6 +891,24 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     setEmiDueDate("");
     setCoBorrower("");
     setLoanNotes("");
+  };
+
+  const clearInvestmentFields = () => {
+    setInvestmentCategory("");
+    setInvestmentName("");
+    setInvestmentNotes("");
+    setInvestmentSymbol("");
+    setInvestmentUnits("");
+    setInvestmentBuyPrice("");
+    setInvestmentCurrentPrice("");
+    setInvestmentInvestedAmount("");
+    setInvestmentCurrentValue("");
+    setInvestmentExpectedReturn("");
+    setInvestmentStartDate("");
+    setInvestmentIsSip("No");
+    setInvestmentSipAmount("");
+    setInvestmentSipFrequency("Monthly");
+    setInvestmentMaturityDate("");
   };
 
   const handleSaveAndAddAnother = async (e: React.FormEvent) => {
@@ -698,11 +964,47 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
   const handleRecordTypeSelect = (type: "Asset" | "Debt" | "Investment" | "Goal" | "Emergency") => {
     setRecordType(type);
-    if (type === "Asset" || type === "Debt") {
+    if (type === "Asset" || type === "Debt" || type === "Investment") {
       setStep(2);
     } else {
       // Direct placeholders for non-assets
       setStep(3);
+    }
+  };
+
+  const handleInvestmentCategorySelect = (category: string) => {
+    setInvestmentCategory(category);
+    const found = investmentCategories.find((c) => c.code === category);
+    setInvestmentExpectedReturn(found?.defaultRate || "10");
+    setStep(3);
+  };
+
+  const handleInvestmentUnitsChange = (val: string) => {
+    setInvestmentUnits(val);
+    calculateInvestedAndCurrentValue(val, investmentBuyPrice, investmentCurrentPrice);
+  };
+
+  const handleInvestmentBuyPriceChange = (val: string) => {
+    setInvestmentBuyPrice(val);
+    calculateInvestedAndCurrentValue(investmentUnits, val, investmentCurrentPrice);
+  };
+
+  const handleInvestmentCurrentPriceChange = (val: string) => {
+    setInvestmentCurrentPrice(val);
+    calculateInvestedAndCurrentValue(investmentUnits, investmentBuyPrice, val);
+  };
+
+  const calculateInvestedAndCurrentValue = (u: string, bp: string, cp: string) => {
+    const unitsVal = Number(u);
+    const buyPriceVal = Number(bp);
+    const currentPriceVal = Number(cp);
+    if (!isNaN(unitsVal) && unitsVal > 0) {
+      if (!isNaN(buyPriceVal) && buyPriceVal > 0) {
+        setInvestmentInvestedAmount((unitsVal * buyPriceVal).toFixed(2));
+      }
+      if (!isNaN(currentPriceVal) && currentPriceVal > 0) {
+        setInvestmentCurrentValue((unitsVal * currentPriceVal).toFixed(2));
+      }
     }
   };
 
@@ -727,28 +1029,6 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
     setStep(3);
   };
-
-  // Categories list
-  const assetCategories = [
-    { code: "PROPERTY", label: "Property", desc: "Residential, commercial or plot properties", icon: Home, color: "text-emerald-600 bg-emerald-50", defaultRate: "8" },
-    { code: "GOLD", label: "Gold", desc: "Physical gold bars, coins or jewelry", icon: Coins, color: "text-amber-500 bg-amber-50", defaultRate: "7" },
-    { code: "SILVER", label: "Silver", desc: "Physical silver bars or commodities", icon: Sparkles, color: "text-slate-400 bg-slate-50", defaultRate: "6" },
-    { code: "VEHICLE", label: "Vehicle", desc: "Cars, bikes or commercial transport assets", icon: Car, color: "text-blue-600 bg-blue-50", defaultRate: "15" },
-    { code: "CASH", label: "Liquid Cash", desc: "Physical currency cash reserves", icon: Banknote, color: "text-lime-600 bg-lime-50", defaultRate: "0" },
-    { code: "BANK_ACCOUNT", label: "Savings Bank Account", desc: "Savings or checking cash balances", icon: Landmark, color: "text-indigo-600 bg-indigo-50", defaultRate: "3" },
-    { code: "OTHER", label: "Others", desc: "Other custom assets, variables, or items", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50", defaultRate: "5" }
-  ];
-
-  const debtCategories = [
-    { code: "HOME_LOAN", label: "Home Loan", desc: "Mortgages or home construction financing", icon: Home, color: "text-emerald-600 bg-emerald-50" },
-    { code: "GOLD_LOAN", label: "Gold Loan", desc: "Borrowings backed by gold assets", icon: Coins, color: "text-amber-500 bg-amber-50" },
-    { code: "VEHICLE_LOAN", label: "Vehicle Loan", desc: "Loans for cars, bikes or transport", icon: Car, color: "text-blue-600 bg-blue-50" },
-    { code: "SOFT_LOAN", label: "Soft Loan", desc: "Zero or low interest borrowings", icon: HeartHandshake, color: "text-rose-500 bg-rose-50" },
-    { code: "MF_LOAN", label: "Mutual Fund Loan", desc: "Loans taken against mutual fund securities", icon: PieChart, color: "text-fuchsia-600 bg-fuchsia-50" },
-    { code: "PERSONAL_LOAN", label: "Personal Loan", desc: "Unsecured personal credits or lines", icon: User, color: "text-indigo-600 bg-indigo-50" },
-    { code: "EDUCATION_LOAN", label: "Education Loan", desc: "Student loans for higher studies", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50" },
-    { code: "CREDIT_CARD_LOAN", label: "Credit Card Loan", desc: "Credit card EMI conversion or loans", icon: CreditCard, color: "text-violet-600 bg-violet-50" }
-  ];
 
   if (!isOpen) return null;
 
@@ -857,10 +1137,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
             </div>
           )}
 
-          {/* ==========================================
-              Step 2: Select Category (Asset / Debt)
-              ========================================== */}
-          {step === 2 && (recordType === "Asset" || recordType === "Debt") && (
+          {step === 2 && (recordType === "Asset" || recordType === "Debt" || recordType === "Investment") && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <button
@@ -892,13 +1169,29 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       </button>
                     );
                   })
-                ) : (
+                ) : recordType === "Debt" ? (
                   debtCategories.map((c) => {
                     const Icon = c.icon;
                     return (
                       <button
                         key={c.code}
                         onClick={() => handleDebtCategorySelect(c.code)}
+                        className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
+                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
+                        </div>
+                        <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  investmentCategories.map((c) => {
+                    const Icon = c.icon;
+                    return (
+                      <button
+                        key={c.code}
+                        onClick={() => handleInvestmentCategorySelect(c.code)}
                         className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
                       >
                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
@@ -1279,8 +1572,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     </div>
                   )}
 
-                  {/* Category = CASH */}
-                  {assetCategory === "CASH" && (
+                  {/* Category = LIQUID_CASH */}
+                  {assetCategory === "LIQUID_CASH" && (
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Current Market Value *</label>
@@ -1296,8 +1589,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     </div>
                   )}
 
-                  {/* Category = OTHER */}
-                  {assetCategory === "OTHER" && (
+                  {/* Category = OTHERS */}
+                  {assetCategory === "OTHERS" && (
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Asset Name *</label>
@@ -1324,8 +1617,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     </div>
                   )}
 
-                  {/* Category = BANK_ACCOUNT */}
-                  {assetCategory === "BANK_ACCOUNT" && (
+                  {/* Category = SAVINGS_BANK_ACCOUNT */}
+                  {assetCategory === "SAVINGS_BANK_ACCOUNT" && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -1724,8 +2017,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                     </div>
                   )}
 
-                  {/* Fallback / SILVER / OTHER / CASH */}
-                  {assetCategory !== "PROPERTY" && assetCategory !== "GOLD" && assetCategory !== "SILVER" && assetCategory !== "STOCK" && assetCategory !== "VEHICLE" && assetCategory !== "BANK_ACCOUNT" && assetCategory !== "FIXED_DEPOSIT" && assetCategory !== "RD" && assetCategory !== "EPF" && assetCategory !== "PPF" && assetCategory !== "NPS" && assetCategory !== "CRYPTO" && assetCategory !== "OTHER" && assetCategory !== "CASH" && (
+                   {/* Fallback / SILVER / OTHERS / LIQUID_CASH */}
+                  {assetCategory !== "PROPERTY" && assetCategory !== "GOLD" && assetCategory !== "SILVER" && assetCategory !== "STOCK" && assetCategory !== "VEHICLE" && assetCategory !== "SAVINGS_BANK_ACCOUNT" && assetCategory !== "FIXED_DEPOSIT" && assetCategory !== "RD" && assetCategory !== "EPF" && assetCategory !== "PPF" && assetCategory !== "NPS" && assetCategory !== "CRYPTO" && assetCategory !== "OTHERS" && assetCategory !== "LIQUID_CASH" && (
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <label className="font-semibold text-zinc-500">Asset Name *</label>
@@ -1871,29 +2164,16 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       {errors.loanName && <span className="text-[10px] text-red-500">{errors.loanName}</span>}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Lender Name *</label>
-                        <input
-                          type="text"
-                          placeholder="E.g. HDFC Bank, SBI"
-                          value={lendingBank}
-                          onChange={(e) => { setLendingBank(e.target.value); triggerDraftSave(); }}
-                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
-                        />
-                        {errors.lendingBank && <span className="text-[10px] text-red-500">{errors.lendingBank}</span>}
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="font-semibold text-zinc-500">Account Number (Optional)</label>
-                        <input
-                          type="text"
-                          placeholder="Masked or full account index"
-                          value={loanAccountNumber}
-                          onChange={(e) => { setLoanAccountNumber(e.target.value); triggerDraftSave(); }}
-                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-zinc-500">Lender Name *</label>
+                      <input
+                        type="text"
+                        placeholder="E.g. HDFC Bank, SBI"
+                        value={lendingBank}
+                        onChange={(e) => { setLendingBank(e.target.value); triggerDraftSave(); }}
+                        className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                      />
+                      {errors.lendingBank && <span className="text-[10px] text-red-500">{errors.lendingBank}</span>}
                     </div>
                   </div>
 
@@ -2177,8 +2457,252 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   </div>
 
                 </form>
+              ) : recordType === "Investment" ? (
+                <form onSubmit={handleSave} className="space-y-6 text-xs">
+
+                  {/* Basic Information Section */}
+                  <div className="space-y-4">
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Basic Information</span>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Investment Category *</label>
+                        <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] tracking-wide select-none">
+                          {investmentCategories.find((c) => c.code === investmentCategory)?.label || investmentCategory}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Investment Name *</label>
+                        <input
+                          type="text"
+                          placeholder="E.g. HDFC Mid-Cap Growth Fund, TCS Shares"
+                          value={investmentName}
+                          onChange={(e) => { setInvestmentName(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentName && <span className="text-[10px] text-red-500">{errors.investmentName}</span>}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Symbol / Ticker *</label>
+                        <input
+                          type="text"
+                          placeholder="E.g. TCS, BTC, INFOSYS"
+                          value={investmentSymbol}
+                          onChange={(e) => { setInvestmentSymbol(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentSymbol && <span className="text-[10px] text-red-500">{errors.investmentSymbol}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Start Date *</label>
+                        <input
+                          type="date"
+                          value={investmentStartDate}
+                          onChange={(e) => { setInvestmentStartDate(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentStartDate && <span className="text-[10px] text-red-500">{errors.investmentStartDate}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transaction Details Section */}
+                  <div className="space-y-4 border-t border-zinc-100 pt-4">
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Transaction & Valuation Details</span>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Units *</label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="E.g. 10.50"
+                          value={investmentUnits}
+                          onChange={(e) => { handleInvestmentUnitsChange(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentUnits && <span className="text-[10px] text-red-500">{errors.investmentUnits}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Buy Price *</label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="₹ E.g. 3200"
+                          value={investmentBuyPrice}
+                          onChange={(e) => { handleInvestmentBuyPriceChange(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentBuyPrice && <span className="text-[10px] text-red-500">{errors.investmentBuyPrice}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Price *</label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="₹ E.g. 3500"
+                          value={investmentCurrentPrice}
+                          onChange={(e) => { handleInvestmentCurrentPriceChange(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentCurrentPrice && <span className="text-[10px] text-red-500">{errors.investmentCurrentPrice}</span>}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Invested Amount *</label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="₹ E.g. 33600"
+                          value={investmentInvestedAmount}
+                          onChange={(e) => { setInvestmentInvestedAmount(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentInvestedAmount && <span className="text-[10px] text-red-500">{errors.investmentInvestedAmount}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Current Value *</label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="₹ E.g. 36750"
+                          value={investmentCurrentValue}
+                          onChange={(e) => { setInvestmentCurrentValue(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentCurrentValue && <span className="text-[10px] text-red-500">{errors.investmentCurrentValue}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Expected Return (%) *</label>
+                        <input
+                          type="number"
+                          placeholder="E.g. 12"
+                          value={investmentExpectedReturn}
+                          onChange={(e) => { setInvestmentExpectedReturn(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentExpectedReturn && <span className="text-[10px] text-red-500">{errors.investmentExpectedReturn}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Plan / SIP Section */}
+                  <div className="space-y-4 border-t border-zinc-100 pt-4">
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">SIP & Maturity Details</span>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Is SIP? *</label>
+                        <Select
+                          value={investmentIsSip}
+                          onChange={(e) => { setInvestmentIsSip(e.target.value as "Yes" | "No"); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Maturity Date *</label>
+                        <input
+                          type="date"
+                          value={investmentMaturityDate}
+                          onChange={(e) => { setInvestmentMaturityDate(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.investmentMaturityDate && <span className="text-[10px] text-red-500">{errors.investmentMaturityDate}</span>}
+                      </div>
+                    </div>
+
+                    {investmentIsSip === "Yes" && (
+                      <div className="grid grid-cols-2 gap-4 p-3 bg-zinc-50 rounded-xl border border-zinc-150 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">SIP Amount *</label>
+                          <input
+                            type="number"
+                            placeholder="₹ E.g. 5000"
+                            value={investmentSipAmount}
+                            onChange={(e) => { setInvestmentSipAmount(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-white outline-none text-zinc-900 focus:border-blue-500"
+                          />
+                          {errors.investmentSipAmount && <span className="text-[10px] text-red-500">{errors.investmentSipAmount}</span>}
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-semibold text-zinc-500">SIP Frequency *</label>
+                          <Select
+                            value={investmentSipFrequency}
+                            onChange={(e) => { setInvestmentSipFrequency(e.target.value); triggerDraftSave(); }}
+                            className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-white outline-none text-zinc-900 cursor-pointer focus:border-blue-500"
+                          >
+                            <option value="Monthly">Monthly</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Halferly">Halferly</option>
+                            <option value="Anually">Anually</option>
+                          </Select>
+                          {errors.investmentSipFrequency && <span className="text-[10px] text-red-500">{errors.investmentSipFrequency}</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Notes Section */}
+                  <div className="space-y-1 border-t border-zinc-100 pt-4">
+                    <label className="font-semibold text-zinc-500">Notes / Remarks</label>
+                    <textarea
+                      placeholder="E.g. depository details, nominee..."
+                      value={investmentNotes}
+                      onChange={(e) => { setInvestmentNotes(e.target.value); triggerDraftSave(); }}
+                      className="w-full rounded-lg border border-zinc-200 p-3 bg-zinc-50/50 outline-none text-zinc-900 h-16 resize-none focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+
+                  {/* Sticky Actions Footer */}
+                  <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => {
+                        setStep(2);
+                        setErrors({});
+                      }}
+                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Investment"
+                      )}
+                    </Button>
+                  </div>
+
+                </form>
               ) : (
-                // Investment / Goal Placeholder Form (Future extensible layout)
+                // Goal / Emergency Placeholder Form (Future extensible layout)
                 <div className="space-y-6 text-xs text-center py-10 bg-zinc-50 rounded-2xl border border-zinc-150">
                   <Info className="h-8 w-8 text-zinc-400 mx-auto" />
                   <div className="max-w-xs mx-auto space-y-2">
@@ -2190,7 +2714,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   <div className="pt-4 flex justify-center">
                     <button
                       onClick={() => setStep(1)}
-                      className="px-4 h-8 rounded-lg border border-zinc-250 bg-white text-[11px] font-bold text-zinc-600 shadow-sm"
+                      className="px-4 h-8 rounded-lg border border-zinc-250 bg-white text-[11px] font-bold text-zinc-650 shadow-sm"
                     >
                       Back to Type Selection
                     </button>

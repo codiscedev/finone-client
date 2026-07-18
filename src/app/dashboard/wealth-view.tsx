@@ -19,6 +19,8 @@ import {
   ArrowDownRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api";
 import FinancialHealthView from "./financial-health-view";
 import AssetDetailView from "./asset-detail-view";
 import AssetsOverviewView from "./assets-overview-view";
@@ -34,6 +36,154 @@ interface WealthViewProps {
 }
 
 export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewProps) {
+  const { dbUser } = useAuth();
+  const [assets, setAssets] = React.useState<any[]>([]);
+  const [loadingAssets, setLoadingAssets] = React.useState(false);
+  const [debts, setDebts] = React.useState<any[]>([]);
+  const [loadingDebts, setLoadingDebts] = React.useState(false);
+
+  const fetchAssets = async () => {
+    if (!dbUser?.userId) return;
+    setLoadingAssets(true);
+    try {
+      const res = await apiClient.get(`/v1/asset/users/${dbUser.userId}`);
+      if (res.data?.success) {
+        setAssets(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching assets in dashboard:", err);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  const fetchDebts = async () => {
+    if (!dbUser?.userId) return;
+    setLoadingDebts(true);
+    try {
+      const res = await apiClient.get(`/v1/debt/users/${dbUser.userId}`);
+      if (res.data?.success) {
+        setDebts(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching debts in dashboard:", err);
+    } finally {
+      setLoadingDebts(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (dbUser) {
+      fetchAssets();
+      fetchDebts();
+    }
+  }, [dbUser]);
+
+  // Asset Card derived variables
+  const { totalValuation, appreciatingTotal, depreciatingTotal, gainPercent, assetAllocationShares } = React.useMemo(() => {
+    let totalVal = 0;
+    let purchaseValSum = 0;
+    let appreciatingSum = 0;
+    let depreciatingSum = 0;
+    
+    const categoryTotals: Record<string, number> = {};
+
+    assets.forEach((a) => {
+      const currentVal = Number(a.current_market_value) || Number(a.purchase_value) || 0;
+      const purchaseVal = Number(a.purchase_value) || 0;
+      totalVal += currentVal;
+      purchaseValSum += purchaseVal;
+      
+      if (a.is_appreciation || a.isAppreciation) {
+        appreciatingSum += currentVal;
+      } else {
+        depreciatingSum += currentVal;
+      }
+      
+      const categoryName = a.categoryName || (a.category ? a.category.name : "Others");
+      categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + currentVal;
+    });
+
+    const gainPercentVal = purchaseValSum > 0 ? Math.round(((totalVal - purchaseValSum) / purchaseValSum) * 100) : 0;
+    
+    const colors: Record<string, string> = {
+      "Property": "bg-blue-600",
+      "Gold": "bg-amber-500",
+      "Silver": "bg-zinc-400",
+      "Vehicle": "bg-indigo-500",
+      "Liquid Cash": "bg-cyan-500",
+      "Savings Bank Account": "bg-teal-500",
+      "Others": "bg-zinc-300"
+    };
+
+    const defaultColors = ["bg-blue-600", "bg-amber-500", "bg-zinc-400", "bg-indigo-500", "bg-cyan-500", "bg-teal-500", "bg-zinc-300", "bg-purple-500", "bg-rose-500"];
+
+    let idx = 0;
+    const allocationShares = Object.entries(categoryTotals).map(([name, val]) => {
+      const pct = totalVal > 0 ? Math.round((val / totalVal) * 100) : 0;
+      const color = colors[name] || defaultColors[idx++ % defaultColors.length];
+      return {
+        name,
+        pct,
+        color
+      };
+    });
+
+    return {
+      totalValuation: totalVal,
+      appreciatingTotal: appreciatingSum,
+      depreciatingTotal: depreciatingSum,
+      gainPercent: gainPercentVal,
+      assetAllocationShares: allocationShares
+    };
+  }, [assets]);
+
+  // Debt Card derived variables
+  const { totalDebtOutstanding, activeLiabilitiesCount, averageInterestRate, totalMonthlyEmi, dtiRatio, liabilitiesSummary } = React.useMemo(() => {
+    let totalOutstanding = 0;
+    let totalEmi = 0;
+    let rateSum = 0;
+    let rateCount = 0;
+    
+    const categoryCounts: Record<string, number> = {};
+    
+    debts.forEach((d) => {
+      const outstanding = Number(d.outstandingPrincipal) || Number(d.outstanding_principal) || Number(d.sanctionedAmount) || Number(d.principal) || 0;
+      totalOutstanding += outstanding;
+      
+      const emi = Number(d.emiAmountInput) || Number(d.emiAmount) || Number(d.emi_amount) || 0;
+      totalEmi += emi;
+      
+      const rate = Number(d.loanInterestRate) || Number(d.interestRate) || Number(d.interest_rate) || 0;
+      if (rate > 0) {
+        rateSum += rate;
+        rateCount++;
+      }
+      
+      const categoryName = d.categoryName || (d.category ? d.category.name : "Other Loan");
+      categoryCounts[categoryName] = (categoryCounts[categoryName] || 0) + 1;
+    });
+
+    const avgRate = rateCount > 0 ? (rateSum / rateCount).toFixed(1) : "0.0";
+    
+    const monthlyIncome = 8000; // standard default monthly income base
+    const calculatedDti = monthlyIncome > 0 ? Math.round((totalEmi / monthlyIncome) * 100) : 0;
+    
+    const liabilityStrings = Object.entries(categoryCounts).map(([cat, count]) => {
+      return `${count} ${cat}${count > 1 ? "s" : ""}`;
+    });
+    const summaryText = liabilityStrings.length > 0 ? liabilityStrings.join(", ") : "No active liabilities";
+
+    return {
+      totalDebtOutstanding: totalOutstanding,
+      activeLiabilitiesCount: debts.length,
+      averageInterestRate: avgRate,
+      totalMonthlyEmi: totalEmi,
+      dtiRatio: calculatedDti,
+      liabilitiesSummary: summaryText
+    };
+  }, [debts]);
+
   // Scenario Simulator state (Net Worth Card)
   const [showHealthDetails, setShowHealthDetails] = React.useState(false);
   const [selectedAsset, setSelectedAsset] = React.useState<string | null>(null);
@@ -120,15 +270,17 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   if (selectedAsset === "overview") {
     return (
       <AssetsOverviewView 
-        onBack={() => setSelectedAsset(null)} 
-        onAssetClick={(name) => setSelectedAsset(name)} 
+        onBack={() => { setSelectedAsset(null); fetchAssets(); }} 
+        onAssetClick={(id) => setSelectedAsset(id)} 
         onAddClick={onAddClick}
+        assets={assets}
+        loading={loadingAssets}
       />
     );
   }
 
   if (selectedAsset) {
-    return <AssetDetailView assetName={selectedAsset} onBack={() => setSelectedAsset(null)} />;
+    return <AssetDetailView assetId={selectedAsset} onBack={() => { setSelectedAsset(null); fetchAssets(); }} />;
   }
 
   return (
@@ -243,9 +395,6 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
           </div>
         </div>
 
-        {/* ==========================================
-            2. Assets Card (4 Columns)
-            ========================================== */}
         <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
           <div className="flex justify-between items-start">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
@@ -269,10 +418,12 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
           </div>
 
           <div className="my-5">
-            <p className="text-2xl font-bold tracking-tight text-zinc-900">$1,480,000</p>
+            <p className="text-2xl font-bold tracking-tight text-zinc-900">{formatCurrency(totalValuation)}</p>
             <p className="text-xs mt-1 text-zinc-500 flex items-center gap-1">
-              <span className="font-bold text-emerald-600 bg-emerald-50 px-1 rounded">+6.2% YoY</span>
-              <span>across 8 connected assets</span>
+              <span className={`font-bold px-1 rounded ${gainPercent >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-650 bg-red-50"}`}>
+                {gainPercent >= 0 ? "+" : ""}{gainPercent}% Yield
+              </span>
+              <span>across {assets.length} connected assets</span>
             </p>
           </div>
 
@@ -281,12 +432,12 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Appreciating</p>
-                <p className="text-sm font-bold text-zinc-900 mt-0.5">$1,360,000</p>
-                <span className="text-[10px] text-emerald-600 font-semibold">Real estate & Stocks</span>
+                <p className="text-sm font-bold text-zinc-900 mt-0.5">{formatCurrency(appreciatingTotal)}</p>
+                <span className="text-[10px] text-emerald-650 font-semibold">Real estate & Stocks</span>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Depreciating</p>
-                <p className="text-sm font-bold text-zinc-900 mt-0.5">$120,000</p>
+                <p className="text-sm font-bold text-zinc-900 mt-0.5">{formatCurrency(depreciatingTotal)}</p>
                 <span className="text-[10px] text-zinc-400 font-semibold">Automobile assets</span>
               </div>
             </div>
@@ -294,18 +445,36 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
             {/* Asset Distribution Bar chart */}
             <div>
               <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 mb-1.5">Asset Allocation</p>
-              <div className="h-3.5 w-full bg-zinc-100 rounded-full overflow-hidden flex">
-                <div className="h-full bg-blue-600" style={{ width: "55%" }} title="Real Estate (55%)" />
-                <div className="h-full bg-emerald-500" style={{ width: "30%" }} title="Securities (30%)" />
-                <div className="h-full bg-yellow-500" style={{ width: "10%" }} title="Crypto (10%)" />
-                <div className="h-full bg-zinc-400" style={{ width: "5%" }} title="Cash (5%)" />
-              </div>
-              <div className="flex justify-between items-center text-[9px] text-zinc-400 font-bold mt-2">
-                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-600" /> RE</span>
-                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Stocks</span>
-                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-yellow-500" /> Crypto</span>
-                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-zinc-400" /> Cash</span>
-              </div>
+              {totalValuation > 0 ? (
+                <>
+                  <div className="h-3.5 w-full bg-zinc-100 rounded-full overflow-hidden flex">
+                    {assetAllocationShares.map((share, idx) => (
+                      share.pct > 0 && (
+                        <div
+                          key={idx}
+                          className={`h-full ${share.color}`}
+                          style={{ width: `${share.pct}%` }}
+                          title={`${share.name} (${share.pct}%)`}
+                        />
+                      )
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 items-center text-[9px] text-zinc-400 font-bold mt-2">
+                    {assetAllocationShares.map((share, idx) => (
+                      share.pct > 0 && (
+                        <span key={idx} className="flex items-center gap-1.5">
+                          <span className={`h-1.5 w-1.5 rounded-full ${share.color}`} />
+                          {share.name} ({share.pct}%)
+                        </span>
+                      )
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-zinc-400 text-[10px] font-bold py-2 bg-zinc-50 rounded-lg text-center border border-dashed border-zinc-200">
+                  No assets added yet
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -336,9 +505,11 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
           </div>
 
           <div className="my-5">
-            <p className="text-2xl font-bold tracking-tight text-zinc-900">$231,610</p>
+            <p className="text-2xl font-bold tracking-tight text-zinc-900">{formatCurrency(totalDebtOutstanding)}</p>
             <p className="text-xs mt-1 text-zinc-500 flex items-center gap-2">
-              <span className="font-bold text-red-600 bg-red-50 px-1 rounded">24% DTI</span>
+              <span className={`font-bold px-1 rounded ${dtiRatio > 35 ? "text-red-600 bg-red-50" : dtiRatio > 15 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50"}`}>
+                {dtiRatio}% DTI
+              </span>
               <span>Debt-to-Income ratio</span>
             </p>
           </div>
@@ -347,27 +518,39 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
           <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
             <div className="flex justify-between">
               <span className="text-zinc-500 font-semibold">Active Liabilities:</span>
-              <span className="font-bold text-zinc-900">1 Mortgage, 1 Auto Loan</span>
+              <span className="font-bold text-zinc-900">{liabilitiesSummary}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-500 font-semibold">Average Interest Rate:</span>
-              <span className="font-bold text-zinc-900">4.1% APR</span>
+              <span className="font-bold text-zinc-900">{averageInterestRate}% APR</span>
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-500 font-semibold">Total Monthly EMI:</span>
-              <span className="font-bold text-zinc-900">$1,850 / mo</span>
+              <span className="font-bold text-zinc-900">{formatCurrency(totalMonthlyEmi)} / mo</span>
             </div>
 
             {/* AI avalanche suggestion */}
-            <div className="rounded-xl bg-orange-50/50 p-3.5 border border-orange-100/50">
-              <div className="flex items-center gap-1.5 text-orange-600 mb-1">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-xs font-bold">AI Debt-Avalanche Strategy</span>
+            {debts.length > 0 ? (
+              <div className="rounded-xl bg-orange-50/50 p-3.5 border border-orange-100/50">
+                <div className="flex items-center gap-1.5 text-orange-600 mb-1">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-xs font-bold">AI Debt-Avalanche Strategy</span>
+                </div>
+                <p className="text-[11px] text-zinc-650 leading-normal">
+                  Prioritize extra prepayments on your highest-rate loan. Your average rate is <span className="font-bold text-red-650">{averageInterestRate}% APR</span> across {debts.length} active liabilities.
+                </p>
               </div>
-              <p className="text-[11px] text-zinc-600 leading-normal">
-                Prioritize additional payments of $400/mo to your Auto Loan ($12,000 @ 6.2%). Saving: <span className="font-bold text-emerald-600">$1,840 interest</span>.
-              </p>
-            </div>
+            ) : (
+              <div className="rounded-xl bg-emerald-50/50 p-3.5 border border-emerald-100/50">
+                <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span className="text-xs font-bold">AI Debt health Strategy</span>
+                </div>
+                <p className="text-[11px] text-zinc-650 leading-normal">
+                  You are completely debt free! Keep maintaining a robust savings rate and invest in appreciating assets.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
