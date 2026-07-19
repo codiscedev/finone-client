@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Info,
   ShieldCheck,
+  ShieldAlert,
   Car,
   Landmark,
   PieChart,
@@ -30,7 +31,9 @@ import {
   BarChart2,
   Briefcase,
   Lock,
-  RefreshCw
+  RefreshCw,
+  HeartPulse,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -49,6 +52,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const [assetCategoriesList, setAssetCategoriesList] = React.useState<any[]>([]);
   const [debtCategoriesList, setDebtCategoriesList] = React.useState<any[]>([]);
   const [investmentCategoriesList, setInvestmentCategoriesList] = React.useState<any[]>([]);
+  const [goalCategoriesList, setGoalCategoriesList] = React.useState<any[]>([]);
+  const [essentialCategoriesList, setEssentialCategoriesList] = React.useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = React.useState(false);
 
   const fetchCategories = async () => {
@@ -66,6 +71,14 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       const investRes = await apiClient.get(`/v1/investmentcategory/${dbUser.userId}`);
       if (investRes.data?.success) {
         setInvestmentCategoriesList(investRes.data.data);
+      }
+      const goalRes = await apiClient.get(`/v1/goalcategory/users/${dbUser.userId}`);
+      if (goalRes.data?.success) {
+        setGoalCategoriesList(goalRes.data.data);
+      }
+      const essentialRes = await apiClient.get(`/v1/essentialcategory/users/${dbUser.userId}`);
+      if (essentialRes.data?.success) {
+        setEssentialCategoriesList(essentialRes.data.data);
       }
     } catch (err) {
       console.error("Error fetching categories in drawer:", err);
@@ -161,6 +174,65 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       };
     });
   }, [investmentCategoriesList]);
+
+  const goalCategories = React.useMemo(() => {
+    const defaultMeta: Record<string, { desc: string; icon: any; color: string }> = {
+      CAREER: { desc: "Career goals or professional development", icon: Briefcase, color: "text-emerald-600 bg-emerald-50" },
+      HEALTH: { desc: "Health insurance, gym or fitness targets", icon: HeartPulse, color: "text-rose-500 bg-rose-50" },
+      FINANCE: { desc: "Savings reserves, investment allocations", icon: Coins, color: "text-amber-500 bg-amber-50" },
+      LEARNING: { desc: "Higher education or training skillsets", icon: GraduationCap, color: "text-blue-600 bg-blue-50" },
+      PERSONAL: { desc: "Personal lifestyle or miscellaneous goals", icon: User, color: "text-indigo-650 bg-indigo-50" },
+      RELATIONSHIPS: { desc: "Family travels, marriages or partnerships", icon: Users, color: "text-purple-500 bg-purple-50" },
+      RETIREMENT: { desc: "Pension funding or long term retirement matching", icon: Landmark, color: "text-teal-600 bg-teal-50" },
+      OTHER: { desc: "Other custom targets or milestones", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50" }
+    };
+
+    const acceptedCodes = ["CAREER", "HEALTH", "FINANCE", "LEARNING", "PERSONAL", "RELATIONSHIPS"];
+    return goalCategoriesList
+      .map((cat: any) => {
+        const code = cat.name.toUpperCase().replace(/\s+/g, "_");
+        const meta = defaultMeta[code] || defaultMeta[cat.name.toUpperCase()] || defaultMeta["OTHER"];
+        return {
+          id: cat.id,
+          code: code,
+          label: cat.name,
+          desc: meta.desc,
+          icon: meta.icon,
+          color: meta.color
+        };
+      })
+      .filter((c) => acceptedCodes.includes(c.code));
+  }, [goalCategoriesList]);
+
+  const essentialCategories = React.useMemo(() => {
+    const defaultMeta: Record<string, { desc: string; icon: any; color: string }> = {
+      FD: { desc: "Fixed Deposit accounts", icon: Lock, color: "text-emerald-600 bg-emerald-50" },
+      LIQUID_CASH: { desc: "Physical currency cash reserves", icon: Coins, color: "text-lime-600 bg-lime-50" },
+      SAVINGS_BANK_ACCOUNT: { desc: "Savings or checking cash balances", icon: Landmark, color: "text-indigo-650 bg-indigo-50" },
+      EMERGENCY_FUND: { desc: "Emergency savings reserve balances", icon: ShieldCheck, color: "text-blue-600 bg-blue-50" },
+      HEALTH_INSURANCE: { desc: "Medical and health policy coverage", icon: HeartPulse, color: "text-rose-500 bg-rose-50" },
+      LIFE_INSURANCE: { desc: "Life insurance premium index", icon: ShieldAlert, color: "text-purple-500 bg-purple-50" },
+      VEHICLE_INSURANCE: { desc: "Vehicle safety insurance plan", icon: Car, color: "text-cyan-600 bg-cyan-50" },
+      HOME_INSURANCE: { desc: "Property protection plans", icon: Home, color: "text-amber-500 bg-amber-50" },
+      TERM_INSURANCE: { desc: "Term life policy protection", icon: ShieldCheck, color: "text-violet-600 bg-violet-50" },
+      PERSONAL_ACCIDENT_COVER: { desc: "Accident protection benefits", icon: ShieldAlert, color: "text-red-500 bg-red-50" },
+      OTHER: { desc: "Other custom essential category", icon: HelpCircle, color: "text-zinc-500 bg-zinc-50" }
+    };
+
+    return essentialCategoriesList.map((cat: any) => {
+      const code = cat.name.toUpperCase().replace(/\s+/g, "_");
+      const meta = defaultMeta[code] || defaultMeta[cat.name.toUpperCase()] || defaultMeta["OTHER"];
+      return {
+        id: cat.id,
+        code: code,
+        label: cat.name,
+        desc: meta.desc,
+        icon: meta.icon,
+        color: meta.color
+      };
+    });
+  }, [essentialCategoriesList]);
+
   // Steps: 1 = Choose Record Type, 2 = Select Category (for Assets), 3 = Input Form
   const [step, setStep] = React.useState(1);
   const [recordType, setRecordType] = React.useState<"Asset" | "Debt" | "Investment" | "Goal" | "Emergency" | null>(null);
@@ -498,6 +570,63 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
   const stockPriceNum = Number(stockAvgPrice) || 0;
   const stockTotalValue = stockQuantityNum * stockPriceNum;
 
+  // Goal Form States
+  const [goalName, setGoalName] = React.useState("");
+  const [goalCategory, setGoalCategory] = React.useState("");
+  const [goalTargetAmount, setGoalTargetAmount] = React.useState("");
+  const [goalSavedAmount, setGoalSavedAmount] = React.useState("");
+  const [goalTargetDate, setGoalTargetDate] = React.useState("");
+  const [goalStatus, setGoalStatus] = React.useState("Active");
+  const [goalNotes, setGoalNotes] = React.useState("");
+
+  const clearGoalFields = () => {
+    setGoalName("");
+    setGoalCategory("");
+    setGoalTargetAmount("");
+    setGoalSavedAmount("");
+    setGoalTargetDate("");
+    setGoalStatus("Active");
+    setGoalNotes("");
+  };
+
+  // Essential / Emergency Form States
+  const [essentialCategory, setEssentialCategory] = React.useState("");
+  const [essentialCategoryId, setEssentialCategoryId] = React.useState("");
+  const [essentialNote, setEssentialNote] = React.useState("");
+  const [essentialInsurer, setEssentialInsurer] = React.useState("");
+  const [essentialSumAssured, setEssentialSumAssured] = React.useState("");
+  const [essentialPremium, setEssentialPremium] = React.useState("");
+  const [essentialFrequency, setEssentialFrequency] = React.useState("YEARLY");
+  const [essentialStartDate, setEssentialStartDate] = React.useState("");
+  const [essentialRenewalDate, setEssentialRenewalDate] = React.useState("");
+  const [essentialIsActive, setEssentialIsActive] = React.useState(true);
+
+  const clearEssentialFields = () => {
+    setEssentialCategory("");
+    setEssentialCategoryId("");
+    setEssentialNote("");
+    setEssentialInsurer("");
+    setEssentialSumAssured("");
+    setEssentialPremium("");
+    setEssentialFrequency("YEARLY");
+    setEssentialStartDate("");
+    setEssentialRenewalDate("");
+    setEssentialIsActive(true);
+  };
+
+  const handleEssentialCategorySelect = (category: string, id: string) => {
+    setEssentialCategory(category);
+    setEssentialCategoryId(id);
+    setStep(3);
+    triggerDraftSave();
+  };
+
+  const isInsuranceCategory = (categoryName: string) => {
+    if (!categoryName) return false;
+    const name = categoryName.toLowerCase();
+    return name.includes("insurance") || name.includes("cover") || name.includes("policy") || name.includes("life") || name.includes("accident");
+  };
+
   // Generic asset error validation states
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
@@ -816,6 +945,32 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       }
     }
 
+    if (recordType === "Goal") {
+      if (!goalName.trim()) valErrors.goalName = "Goal Name is required.";
+      if (!goalCategory) valErrors.goalCategory = "Goal Category is required.";
+      if (!goalTargetAmount || Number(goalTargetAmount) <= 0) {
+        valErrors.goalTargetAmount = "Target Amount is required and must be positive.";
+      }
+      if (goalSavedAmount === "") {
+        valErrors.goalSavedAmount = "Saved Amount is required.";
+      } else if (Number(goalSavedAmount) < 0) {
+        valErrors.goalSavedAmount = "Saved Amount cannot be negative.";
+      }
+      if (!goalTargetDate) valErrors.goalTargetDate = "Target Date is required.";
+    }
+
+    if (recordType === "Emergency") {
+      if (!essentialCategoryId) valErrors.essentialCategory = "Essential Category is required.";
+      const isPolicy = isInsuranceCategory(essentialCategory);
+      if (isPolicy) {
+        if (!essentialInsurer.trim()) valErrors.essentialInsurer = "Insurer name is required.";
+        if (!essentialSumAssured || Number(essentialSumAssured) <= 0) valErrors.essentialSumAssured = "Sum assured must be positive.";
+        if (!essentialPremium || Number(essentialPremium) <= 0) valErrors.essentialPremium = "Premium must be positive.";
+      } else {
+        if (!essentialSumAssured || Number(essentialSumAssured) <= 0) valErrors.essentialSumAssured = "Amount is required and must be positive.";
+      }
+    }
+
     if (Object.keys(valErrors).length > 0) {
       setErrors(valErrors);
       return;
@@ -850,8 +1005,38 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
           notes: investmentNotes
         };
         await apiClient.post("/v1/investment", payload);
+      } else if (recordType === "Goal") {
+        const selectedCat = goalCategories.find((c) => c.code === goalCategory);
+        const payload = {
+          name: goalName,
+          categoryId: selectedCat?.id || null,
+          targetAmount: Number(goalTargetAmount) || 0,
+          savedAmount: Number(goalSavedAmount) || 0,
+          targetDate: goalTargetDate || null,
+          status: goalStatus,
+          notes: goalNotes
+        };
+        await apiClient.post("/v1/goal", payload);
+      } else if (recordType === "Emergency") {
+        const isPolicy = isInsuranceCategory(essentialCategory);
+        const payload: any = {
+          categoryId: essentialCategoryId,
+          categoryName: essentialCategory.replace(/_/g, " "),
+          note: essentialNote
+        };
+        if (isPolicy) {
+          payload.insurer = essentialInsurer;
+          payload.sumAssured = Number(essentialSumAssured) || 0;
+          payload.premium = Number(essentialPremium) || 0;
+          payload.frequency = essentialFrequency;
+          payload.startDate = essentialStartDate || null;
+          payload.renewalDate = essentialRenewalDate || null;
+          payload.isActive = essentialIsActive;
+        }
+        await apiClient.post("/v1/essential", payload);
       } else {
-        await apiClient.post(`/wealth/${recordType?.toLowerCase()}`, {
+        const typeStr = ((recordType as any) || "").toLowerCase();
+        await apiClient.post(`/wealth/${typeStr}`, {
           recordType,
           notes: assetNotes,
         });
@@ -868,6 +1053,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       setAssetNotes("");
       clearDebtFields();
       clearInvestmentFields();
+      clearGoalFields();
+      clearEssentialFields();
       onClose();
     } catch (err: any) {
       console.error("Error saving record:", err);
@@ -964,7 +1151,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
 
   const handleRecordTypeSelect = (type: "Asset" | "Debt" | "Investment" | "Goal" | "Emergency") => {
     setRecordType(type);
-    if (type === "Asset" || type === "Debt" || type === "Investment") {
+    if (type === "Asset" || type === "Debt" || type === "Investment" || type === "Goal" || type === "Emergency") {
       setStep(2);
     } else {
       // Direct placeholders for non-assets
@@ -977,6 +1164,12 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
     const found = investmentCategories.find((c) => c.code === category);
     setInvestmentExpectedReturn(found?.defaultRate || "10");
     setStep(3);
+  };
+
+  const handleGoalCategorySelect = (category: string) => {
+    setGoalCategory(category);
+    setStep(3);
+    triggerDraftSave();
   };
 
   const handleInvestmentUnitsChange = (val: string) => {
@@ -1127,7 +1320,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   className="rounded-xl border border-zinc-200 p-4 text-left hover:border-blue-600 hover:bg-blue-50/5 transition-all outline-none group cursor-pointer"
                 >
                   <ShieldCheck className="h-6 w-6 text-zinc-400 group-hover:text-blue-600 transition-colors" />
-                  <h4 className="text-xs font-black text-zinc-900 mt-2.5">Emergency & Policy</h4>
+                  <h4 className="text-xs font-black text-zinc-900 mt-2.5">Essentials</h4>
                   <p className="text-[10px] text-zinc-500 mt-1 leading-normal">
                     Safety reserves buffer, term life insurance policies, or will nomination plans.
                   </p>
@@ -1137,7 +1330,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
             </div>
           )}
 
-          {step === 2 && (recordType === "Asset" || recordType === "Debt" || recordType === "Investment") && (
+          {step === 2 && (recordType === "Asset" || recordType === "Debt" || recordType === "Investment" || recordType === "Goal" || recordType === "Emergency") && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <button
@@ -1185,13 +1378,45 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                       </button>
                     );
                   })
-                ) : (
+                ) : recordType === "Investment" ? (
                   investmentCategories.map((c) => {
                     const Icon = c.icon;
                     return (
                       <button
                         key={c.code}
                         onClick={() => handleInvestmentCategorySelect(c.code)}
+                        className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
+                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
+                        </div>
+                        <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
+                      </button>
+                    );
+                  })
+                ) : recordType === "Goal" ? (
+                  goalCategories.map((c) => {
+                    const Icon = c.icon;
+                    return (
+                      <button
+                        key={c.code}
+                        onClick={() => handleGoalCategorySelect(c.code)}
+                        className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
+                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
+                        </div>
+                        <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  essentialCategories.map((c) => {
+                    const Icon = c.icon;
+                    return (
+                      <button
+                        key={c.code}
+                        onClick={() => handleEssentialCategorySelect(c.code, c.id)}
                         className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
                       >
                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
@@ -1216,7 +1441,7 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
               <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <button
                   onClick={() => {
-                    if (recordType === "Asset" || recordType === "Debt") {
+                    if (recordType === "Asset" || recordType === "Debt" || recordType === "Investment" || recordType === "Goal") {
                       setStep(2);
                     } else {
                       setStep(1);
@@ -2701,8 +2926,290 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
                   </div>
 
                 </form>
+              ) : recordType === "Goal" ? (
+                <form onSubmit={handleSave} className="space-y-6 text-xs">
+                  <div className="space-y-4">
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Goal Details</span>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Goal Category *</label>
+                        <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] tracking-wide select-none">
+                          {goalCategories.find((c) => c.code === goalCategory)?.label || goalCategory.replace("_", " ")}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Status *</label>
+                        <Select
+                          value={goalStatus}
+                          onChange={(e) => { setGoalStatus(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Achieved">Achieved</option>
+                          <option value="Paused">Paused</option>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-semibold text-zinc-500">Goal Name *</label>
+                      <input
+                        type="text"
+                        placeholder="E.g. Buy Retirement Home"
+                        value={goalName}
+                        onChange={(e) => { setGoalName(e.target.value); triggerDraftSave(); }}
+                        className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                      />
+                      {errors.goalName && <span className="text-[10px] text-red-500">{errors.goalName}</span>}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Target Amount *</label>
+                        <input
+                          type="number"
+                          placeholder="E.g. 5000000"
+                          value={goalTargetAmount}
+                          onChange={(e) => { setGoalTargetAmount(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
+                        {errors.goalTargetAmount && <span className="text-[10px] text-red-500">{errors.goalTargetAmount}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Saved Amount *</label>
+                        <input
+                          type="number"
+                          placeholder="E.g. 100000"
+                          value={goalSavedAmount}
+                          onChange={(e) => { setGoalSavedAmount(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                        />
+                        {errors.goalSavedAmount && <span className="text-[10px] text-red-500">{errors.goalSavedAmount}</span>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-semibold text-zinc-500">Target Date *</label>
+                      <input
+                        type="date"
+                        value={goalTargetDate}
+                        onChange={(e) => { setGoalTargetDate(e.target.value); triggerDraftSave(); }}
+                        className="w-full h-9 rounded-lg border border-zinc-250 bg-zinc-50/50 outline-none text-zinc-900 text-[11px] cursor-pointer focus:border-blue-500 focus:bg-white"
+                      />
+                      {errors.goalTargetDate && <span className="text-[10px] text-red-500">{errors.goalTargetDate}</span>}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-semibold text-zinc-500">Notes</label>
+                      <textarea
+                        placeholder="Goal details, milestones, priority..."
+                        value={goalNotes}
+                        onChange={(e) => { setGoalNotes(e.target.value); triggerDraftSave(); }}
+                        className="w-full h-16 rounded-lg border border-zinc-200 p-2 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white text-xs resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => {
+                        setStep(2);
+                        setErrors({});
+                      }}
+                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Goal"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              ) : recordType === "Emergency" ? (
+                <form onSubmit={handleSave} className="space-y-6 text-xs">
+                  <div className="space-y-4">
+                    <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Essential Details</span>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Category *</label>
+                        <div className="h-9 w-full rounded-lg border border-zinc-250 bg-zinc-100/60 px-3 flex items-center font-bold text-zinc-650 text-[11px] tracking-wide select-none">
+                          {essentialCategories.find((c) => c.code === essentialCategory)?.label || essentialCategory.replace(/_/g, " ")}
+                        </div>
+                        {errors.essentialCategory && <span className="text-[10px] text-red-500">{errors.essentialCategory}</span>}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Notes / Details</label>
+                        <input
+                          type="text"
+                          placeholder="E.g. Primary savings, term policy..."
+                          value={essentialNote}
+                          onChange={(e) => { setEssentialNote(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    {!isInsuranceCategory(essentialCategory) && (
+                      <div className="space-y-1">
+                        <label className="font-semibold text-zinc-500">Amount / Balance (INR) *</label>
+                        <input
+                          type="number"
+                          placeholder="E.g. 50000"
+                          value={essentialSumAssured}
+                          onChange={(e) => { setEssentialSumAssured(e.target.value); triggerDraftSave(); }}
+                          className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                        />
+                        {errors.essentialSumAssured && <span className="text-[10px] text-red-500">{errors.essentialSumAssured}</span>}
+                      </div>
+                    )}
+
+                    {isInsuranceCategory(essentialCategory) && (
+                      <div className="space-y-4 border-t border-zinc-100 pt-4">
+                        <span className="text-[10px] font-black text-zinc-400 tracking-wider block">Policy & Insurance Information</span>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="font-semibold text-zinc-500">Insurer Name *</label>
+                            <input
+                              type="text"
+                              placeholder="E.g. Star Health"
+                              value={essentialInsurer}
+                              onChange={(e) => { setEssentialInsurer(e.target.value); triggerDraftSave(); }}
+                              className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                            />
+                            {errors.essentialInsurer && <span className="text-[10px] text-red-500">{errors.essentialInsurer}</span>}
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-semibold text-zinc-500">Premium Amount (INR) *</label>
+                            <input
+                              type="number"
+                              placeholder="E.g. 15000"
+                              value={essentialPremium}
+                              onChange={(e) => { setEssentialPremium(e.target.value); triggerDraftSave(); }}
+                              className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                            />
+                            {errors.essentialPremium && <span className="text-[10px] text-red-500">{errors.essentialPremium}</span>}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="font-semibold text-zinc-500">Sum Assured (INR) *</label>
+                            <input
+                              type="number"
+                              placeholder="E.g. 1000000"
+                              value={essentialSumAssured}
+                              onChange={(e) => { setEssentialSumAssured(e.target.value); triggerDraftSave(); }}
+                              className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900"
+                            />
+                            {errors.essentialSumAssured && <span className="text-[10px] text-red-500">{errors.essentialSumAssured}</span>}
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-semibold text-zinc-500">Frequency *</label>
+                            <Select
+                              value={essentialFrequency}
+                              onChange={(e) => { setEssentialFrequency(e.target.value); triggerDraftSave(); }}
+                              className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer focus:border-blue-500 focus:bg-white"
+                            >
+                              <option value="YEARLY">Yearly</option>
+                              <option value="MONTHLY">Monthly</option>
+                              <option value="QUARTERLY">Quarterly</option>
+                              <option value="HALF_YEARLY">Half Yearly</option>
+                              <option value="ONCE">One-time</option>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="font-semibold text-zinc-500">Start Date</label>
+                            <input
+                              type="date"
+                              value={essentialStartDate}
+                              onChange={(e) => { setEssentialStartDate(e.target.value); triggerDraftSave(); }}
+                              className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 text-[11px] cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-semibold text-zinc-500">Renewal Date</label>
+                            <input
+                              type="date"
+                              value={essentialRenewalDate}
+                              onChange={(e) => { setEssentialRenewalDate(e.target.value); triggerDraftSave(); }}
+                              className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 text-[11px] cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2">
+                          <input
+                            type="checkbox"
+                            id="essentialIsActive"
+                            checked={essentialIsActive}
+                            onChange={(e) => { setEssentialIsActive(e.target.checked); triggerDraftSave(); }}
+                            className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <label htmlFor="essentialIsActive" className="font-semibold text-zinc-650 cursor-pointer select-none">
+                            Policy is active and in-force
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => {
+                        setStep(2);
+                        setErrors({});
+                      }}
+                      className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Essential"
+                      )}
+                    </Button>
+                  </div>
+                </form>
               ) : (
-                // Goal / Emergency Placeholder Form (Future extensible layout)
+                // Backup Placeholder Form (Future extensible layout)
                 <div className="space-y-6 text-xs text-center py-10 bg-zinc-50 rounded-2xl border border-zinc-150">
                   <Info className="h-8 w-8 text-zinc-400 mx-auto" />
                   <div className="max-w-xs mx-auto space-y-2">

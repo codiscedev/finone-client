@@ -382,7 +382,7 @@ function DashboardView({ userName }: DashboardViewProps) {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">$1,248,390.40</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">₹1,24,83,904.40</h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs">
               <span className="inline-flex items-center gap-0.5 font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
                 <TrendingUp className="h-3 w-3" />
@@ -402,7 +402,7 @@ function DashboardView({ userName }: DashboardViewProps) {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">+$12,480.00</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">+₹1,24,800.00</h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs">
               <span className="inline-flex items-center gap-0.5 font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
                 <TrendingUp className="h-3 w-3" />
@@ -422,7 +422,7 @@ function DashboardView({ userName }: DashboardViewProps) {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">$8,450.00</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">₹84,500.00</h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs">
               <span className="inline-flex items-center gap-0.5 font-bold text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded-md">
                 15 Jun
@@ -506,7 +506,7 @@ function DashboardView({ userName }: DashboardViewProps) {
               </svg>
               {/* Tooltip Overlay */}
               <div className="absolute top-16 left-[36%] rounded-lg bg-zinc-950 px-2.5 py-1.5 text-[10px] text-white font-medium shadow-md">
-                <span className="text-zinc-400">Oct:</span> $1,192,300
+                <span className="text-zinc-400">Oct:</span> ₹1,19,23,000
               </div>
             </div>
             
@@ -548,36 +548,36 @@ function DashboardView({ userName }: DashboardViewProps) {
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-xs">
                   <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Vanguard Growth ETF Deposit</td>
+                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Fixed Deposit Maturity Interest</td>
                     <td className="px-6 py-3.5 text-zinc-500">Security Investment</td>
-                    <td className="px-6 py-3.5 font-semibold text-emerald-600">+$4,200.00</td>
+                    <td className="px-6 py-3.5 font-semibold text-emerald-600">+₹42,000.00</td>
                     <td className="px-6 py-3.5 text-zinc-500">Jun 26, 2026</td>
                     <td className="px-6 py-3.5">
                       <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
                     </td>
                   </tr>
                   <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Sarah Jenkins (Advisory Fee)</td>
+                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Wealth Advisor Fee Settlement</td>
                     <td className="px-6 py-3.5 text-zinc-500">Professional Fees</td>
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">-$250.00</td>
+                    <td className="px-6 py-3.5 font-semibold text-zinc-900">-₹2,500.00</td>
                     <td className="px-6 py-3.5 text-zinc-500">Jun 25, 2026</td>
                     <td className="px-6 py-3.5">
                       <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
                     </td>
                   </tr>
                   <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">IRS Estimated Tax Q2</td>
+                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Self-Assessment Tax Est Q2</td>
                     <td className="px-6 py-3.5 text-zinc-500">Taxes</td>
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">-$2,100.00</td>
+                    <td className="px-6 py-3.5 font-semibold text-zinc-900">-₹21,000.00</td>
                     <td className="px-6 py-3.5 text-zinc-500">Jun 15, 2026</td>
                     <td className="px-6 py-3.5">
                       <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
                     </td>
                   </tr>
                   <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Coinbase USDC Transfer</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Crypto Liquidity</td>
-                    <td className="px-6 py-3.5 font-semibold text-emerald-600">+$1,500.00</td>
+                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Savings Bank Interest Transfer</td>
+                    <td className="px-6 py-3.5 text-zinc-500">Interest Accrued</td>
+                    <td className="px-6 py-3.5 font-semibold text-emerald-600">+₹15,000.00</td>
                     <td className="px-6 py-3.5 text-zinc-500">Jun 12, 2026</td>
                     <td className="px-6 py-3.5">
                       <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-0.5 text-[10px] font-semibold text-yellow-700">Pending</span>

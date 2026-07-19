@@ -18,9 +18,16 @@ import {
   Coins,
   History,
   Info,
-  CheckSquare
+  CheckSquare,
+  Activity,
+  Car,
+  Home,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api";
+import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 
 interface EmergencyDetailViewProps {
   onBack: () => void;
@@ -29,12 +36,108 @@ interface EmergencyDetailViewProps {
 }
 
 export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick }: EmergencyDetailViewProps) {
-  // Value constants
-  const emergencyReserve = 650000; // ₹6,50,000
-  const lifeCover = 20000000; // ₹2.0 Cr
-  const healthCover = 1000000; // ₹10,00,000
-  const coverageMonths = 8;
-  const yearlyPremiumTotal = 36500; // ₹36,500
+  const { dbUser } = useAuth();
+  const { showSuccess, showWarning, showDelete } = useCustomAlert();
+  const [essentials, setEssentials] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  const fetchEssentials = async () => {
+    if (!dbUser?.userId) return;
+    setLoading(true);
+    try {
+      const res = await apiClient.get(`/v1/essential/users/${dbUser.userId}`);
+      if (res.data?.success) {
+        setEssentials(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching essentials:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (dbUser) {
+      fetchEssentials();
+    }
+  }, [dbUser]);
+
+  const handleDeleteEssential = (id: string) => {
+    showDelete(
+      "Delete Essential / Policy",
+      "Are you sure you want to delete this essential tracking record? This action cannot be undone.",
+      async () => {
+        try {
+          await apiClient.delete(`/v1/essential/${id}`);
+          showSuccess("Success", "Essential record deleted successfully!");
+          fetchEssentials();
+        } catch (err) {
+          console.error("Error deleting essential:", err);
+          showWarning("Error", "Failed to delete essential record.");
+        }
+      }
+    );
+  };
+
+  // Helper to identify insurance categories
+  const isInsuranceCategory = (categoryName: string) => {
+    if (!categoryName) return false;
+    const name = categoryName.toLowerCase();
+    return name.includes("insurance") || name.includes("cover") || name.includes("policy") || name.includes("life") || name.includes("accident");
+  };
+
+  const hasData = essentials.length > 0;
+
+  // Safety reserves
+  const emergencyReserve = React.useMemo(() => {
+    if (!hasData) return 650000; // ₹6,50,000 mock
+    return essentials
+      .filter((e) => !isInsuranceCategory(e.category?.name || e.categoryName))
+      .reduce((sum, e) => sum + (Number(e.sumAssured) || 0), 0);
+  }, [essentials, hasData]);
+
+  // Life cover sum
+  const lifeCover = React.useMemo(() => {
+    if (!hasData) return 20000000; // ₹2.0 Cr mock
+    return essentials
+      .filter((e) => {
+        const name = (e.category?.name || e.categoryName || "").toLowerCase();
+        return name.includes("life") || name.includes("term");
+      })
+      .reduce((sum, e) => sum + (Number(e.sumAssured) || 0), 0);
+  }, [essentials, hasData]);
+
+  // Health cover sum
+  const healthCover = React.useMemo(() => {
+    if (!hasData) return 1000000; // ₹10,00,000 mock
+    return essentials
+      .filter((e) => {
+        const name = (e.category?.name || e.categoryName || "").toLowerCase();
+        return name.includes("health") || name.includes("medical");
+      })
+      .reduce((sum, e) => sum + (Number(e.sumAssured) || 0), 0);
+  }, [essentials, hasData]);
+
+  // Yearly premium
+  const yearlyPremiumTotal = React.useMemo(() => {
+    if (!hasData) return 36500; // ₹36,500 mock
+    return essentials.reduce((sum, e) => {
+      const prem = Number(e.premium) || 0;
+      const freq = (e.frequency || "YEARLY").toUpperCase();
+      let multiplier = 1;
+      if (freq === "MONTHLY") multiplier = 12;
+      else if (freq === "QUARTERLY") multiplier = 4;
+      else if (freq === "HALF_YEARLY") multiplier = 2;
+      else if (freq === "ONCE") multiplier = 0;
+      return sum + prem * multiplier;
+    }, 0);
+  }, [essentials, hasData]);
+
+  // Coverage months
+  const coverageMonths = React.useMemo(() => {
+    const monthlyExpense = 50000; // standard default monthly expense
+    return Math.round((emergencyReserve / monthlyExpense) * 10) / 10;
+  }, [emergencyReserve]);
 
   // Formatting utilities
   const formatCurrency = (val: number) => {
@@ -46,42 +149,121 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
   };
 
   // Premium breakdown splits
-  const premiumSplits = [
-    { name: "Term Life Insurance", pct: 49, val: 18000, color: "bg-blue-600", stroke: "stroke-blue-600" },
-    { name: "Family Health Insurance", pct: 34, val: 12500, color: "bg-emerald-500", stroke: "stroke-emerald-500" },
-    { name: "Critical Illness Cover", pct: 17, val: 6000, color: "bg-amber-500", stroke: "stroke-amber-500" }
-  ];
+  const premiumSplits = React.useMemo(() => {
+    if (!hasData) {
+      return [
+        { name: "Term Life Insurance", pct: 49, val: 18000, color: "bg-blue-600", stroke: "stroke-blue-600" },
+        { name: "Family Health Insurance", pct: 34, val: 12500, color: "bg-emerald-500", stroke: "stroke-emerald-500" },
+        { name: "Critical Illness Cover", pct: 17, val: 6000, color: "bg-amber-500", stroke: "stroke-amber-500" }
+      ];
+    }
+
+    const categoriesMap: Record<string, number> = {};
+    let totalPremium = 0;
+    essentials.forEach((e) => {
+      const prem = Number(e.premium) || 0;
+      const freq = (e.frequency || "YEARLY").toUpperCase();
+      let multiplier = 1;
+      if (freq === "MONTHLY") multiplier = 12;
+      else if (freq === "QUARTERLY") multiplier = 4;
+      else if (freq === "HALF_YEARLY") multiplier = 2;
+      else if (freq === "ONCE") multiplier = 0;
+      const annual = prem * multiplier;
+      if (annual > 0) {
+        const name = e.category?.name || e.categoryName || "Other Policy";
+        categoriesMap[name] = (categoriesMap[name] || 0) + annual;
+        totalPremium += annual;
+      }
+    });
+
+    if (totalPremium === 0) {
+      return [{ name: "No Active Premiums", pct: 100, val: 0, color: "bg-zinc-400", stroke: "stroke-zinc-400" }];
+    }
+
+    const colors = ["bg-blue-600", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500"];
+    const strokes = ["stroke-blue-600", "stroke-emerald-500", "stroke-amber-500", "stroke-purple-500", "stroke-rose-500", "stroke-cyan-500"];
+    
+    return Object.entries(categoriesMap).map(([name, val], idx) => {
+      const pct = Math.round((val / totalPremium) * 100);
+      return {
+        name,
+        pct,
+        val,
+        color: colors[idx % colors.length],
+        stroke: strokes[idx % strokes.length]
+      };
+    });
+  }, [essentials, hasData]);
 
   // Active policy list rows
-  const policyRows = [
-    {
-      type: "Term Life Insurance",
-      icon: <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0" />,
-      insurer: "HDFC Life",
-      coverage: 20000000,
-      premium: 18000,
-      nominee: "Spouse (Wife)",
-      status: "Active"
-    },
-    {
-      type: "Family Health Insurance",
-      icon: <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />,
-      insurer: "Niva Bupa",
-      coverage: 1000000,
-      premium: 12500,
-      nominee: "Spouse & Kid",
-      status: "Active"
-    },
-    {
-      type: "Critical Illness Cover",
-      icon: <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0" />,
-      insurer: "ICICI Lombard",
-      coverage: 1500000,
-      premium: 6000,
-      nominee: "Mother",
-      status: "Active"
+  const policyRows = React.useMemo(() => {
+    if (!hasData) {
+      return [
+        {
+          id: "mock-1",
+          type: "Term Life Insurance",
+          icon: <ShieldCheck className="h-4.5 w-4.5 text-blue-600 shrink-0" />,
+          insurer: "HDFC Life",
+          coverage: 20000000,
+          premium: 18000,
+          nominee: "Spouse (Wife)",
+          status: "Active"
+        },
+        {
+          id: "mock-2",
+          type: "Family Health Insurance",
+          icon: <HeartPulse className="h-4.5 w-4.5 text-emerald-600 shrink-0" />,
+          insurer: "Niva Bupa",
+          coverage: 1000000,
+          premium: 12500,
+          nominee: "Spouse & Kid",
+          status: "Active"
+        },
+        {
+          id: "mock-3",
+          type: "Critical Illness Cover",
+          icon: <Activity className="h-4.5 w-4.5 text-amber-500 shrink-0" />,
+          insurer: "ICICI Lombard",
+          coverage: 1500000,
+          premium: 6000,
+          nominee: "Mother",
+          status: "Active"
+        }
+      ];
     }
-  ];
+
+    const defaultIconMeta: Record<string, { icon: any; color: string }> = {
+      HEALTH_INSURANCE: { icon: HeartPulse, color: "text-emerald-600" },
+      LIFE_INSURANCE: { icon: ShieldCheck, color: "text-blue-600" },
+      VEHICLE_INSURANCE: { icon: Car, color: "text-amber-500" },
+      HOME_PROTECTION: { icon: Home, color: "text-purple-600" },
+      TERM_INSURANCE: { icon: ShieldCheck, color: "text-teal-600" },
+      PERSONAL_ACCIDENT_COVER: { icon: ShieldAlert, color: "text-red-500" }
+    };
+
+    return essentials.map((e) => {
+      const catName = e.category?.name || e.categoryName || "";
+      const catCode = (e.category?.code || e.categoryCode || "").toUpperCase().replace(/\s+/g, "_");
+      
+      const sum = Number(e.sumAssured) || 0;
+      const prem = Number(e.premium) || 0;
+      const isPolicy = isInsuranceCategory(catName) || prem > 0;
+      
+      const iconMeta = defaultIconMeta[catCode] || { icon: ShieldCheck, color: "text-blue-600" };
+      const IconComp = iconMeta.icon;
+
+      return {
+        id: e.id,
+        type: catName,
+        insurer: e.insurer || (isPolicy ? "Self" : "N/A"),
+        coverage: sum,
+        premium: prem,
+        nominee: isPolicy ? "Family Nominees Assigned" : "N/A",
+        status: e.isActive !== false ? "Active" : "Inactive",
+        icon: <IconComp className={`h-4.5 w-4.5 ${iconMeta.color} shrink-0`} />
+      };
+    });
+  }, [essentials, hasData]);
 
   // Will & Nominees updates checklist
   const NomineeChecklist = [
@@ -93,7 +275,7 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
 
   // AI insights checklines
   const aiInsights = [
-    { text: "Safety fund covers 8 months of base expenses.", type: "check" },
+    { text: "Safety fund covers optimal monthly base expenses.", type: "check" },
     { text: "Term life coverage is optimal based on outstanding liabilities.", type: "check" },
     { text: "Will and Nominee configuration complete—guarantees assets security.", type: "check" },
     { text: "Recommendation: Consider adding personal accident rider.", type: "warning" }
@@ -108,7 +290,7 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
           <ChevronLeft className="h-4 w-4 mr-0.5" /> Wealth
         </button>
         <span>/</span>
-        <span className="text-zinc-700">Emergency Funds & Policies</span>
+        <span className="text-zinc-700">Essentials</span>
       </div>
 
       {/* Pro Upgrade Banner */}
@@ -135,7 +317,7 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
       {/* Main Emergency Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-zinc-200/80 p-5 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
         <div>
-          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block">EMERGENCY & POLICIES</span>
+          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-wider block">ESSENTIALS</span>
           <div className="flex items-baseline gap-3 mt-1">
             <h2 className="text-2xl font-black text-zinc-950">{formatCurrency(emergencyReserve)}</h2>
             <span className="text-xs font-semibold text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-lg border border-zinc-100">
@@ -217,18 +399,24 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
                 strokeWidth="16"
                 strokeLinecap="round"
                 strokeDasharray="238.7"
-                strokeDashoffset="0" // 100% completion indicator
+                strokeDashoffset={238.7 - (238.7 * Math.min(100, emergencyReserve > 0 ? Math.round((emergencyReserve / 300000) * 100) : 0)) / 100}
               />
             </svg>
             <div className="absolute top-[65px] flex flex-col items-center">
-              <span className="text-xs font-black text-zinc-950">₹6,50,000 Saved</span>
-              <span className="text-[10px] font-bold text-emerald-600 mt-0.5">216% of 6-Month Buffer</span>
+              <span className="text-xs font-black text-zinc-950">{formatCurrency(emergencyReserve)} Saved</span>
+              <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
+                {emergencyReserve > 0 ? Math.round((emergencyReserve / 300000) * 100) : 0}% of 6-Month Buffer
+              </span>
             </div>
           </div>
 
           <div className="border-t border-zinc-100 pt-3 text-[10.5px] text-zinc-500 font-semibold flex justify-between items-center">
             <span>Minimum Buffer: ₹3,00,000</span>
-            <span className="text-emerald-600 font-bold">Optimal Safety Index reached</span>
+            {emergencyReserve >= 300000 ? (
+              <span className="text-emerald-600 font-bold">Optimal Safety Index reached</span>
+            ) : (
+              <span className="text-amber-600 font-bold">Accumulating Safety Capital...</span>
+            )}
           </div>
         </div>
 
@@ -243,16 +431,33 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
 
           <div className="flex justify-center items-center py-4 relative my-3">
             <svg className="w-32 h-32 transform -rotate-90">
-              {/* Term Life 49% */}
-              <circle cx="64" cy="64" r="48" className="stroke-blue-600" strokeWidth="15" fill="transparent" strokeDasharray="301.6" strokeDashoffset="0" />
-              {/* Health Insurance 34% */}
-              <circle cx="64" cy="64" r="48" className="stroke-emerald-500" strokeWidth="15" fill="transparent" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * 51) / 100} />
-              {/* Critical Illness 17% */}
-              <circle cx="64" cy="64" r="48" className="stroke-amber-500" strokeWidth="15" fill="transparent" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * 17) / 100} />
+              {premiumSplits.map((split, idx) => {
+                const r = 48;
+                const circumference = 2 * Math.PI * r;
+                const cumulativePct = premiumSplits.slice(0, idx).reduce((sum, item) => sum + item.pct, 0);
+                const rotation = (cumulativePct / 100) * 360 - 90;
+                return (
+                  <circle
+                    key={idx}
+                    cx="64"
+                    cy="64"
+                    r={r}
+                    className={split.stroke}
+                    strokeWidth="12"
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference - (circumference * Math.max(1, split.pct)) / 100}
+                    transform={`rotate(${rotation} 64 64)`}
+                    style={{ transition: "stroke-dashoffset 0.5s ease" }}
+                  />
+                );
+              })}
             </svg>
             <div className="absolute flex flex-col items-center">
               <span className="text-[9px] font-bold text-zinc-400 uppercase">Premium</span>
-              <span className="text-xs font-black text-zinc-950 mt-0.5">₹36.5K</span>
+              <span className="text-xs font-black text-zinc-950 mt-0.5">
+                {yearlyPremiumTotal >= 100000 ? `₹${(yearlyPremiumTotal/100000).toFixed(1)}L` : `₹${(yearlyPremiumTotal/1000).toFixed(1)}K`}
+              </span>
             </div>
           </div>
 
@@ -305,14 +510,24 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
                   <td className="p-4 text-zinc-700 font-bold">{formatCurrency(row.premium)}</td>
                   <td className="p-4 text-zinc-900 font-bold">{row.nominee}</td>
                   <td className="p-4">
-                    <span className="px-2 py-0.5 text-[10px] font-black text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-100/30">
+                    <span className={`px-2 py-0.5 text-[10px] font-black rounded-lg border ${
+                      row.status === "Active" ? "text-emerald-700 bg-emerald-50 border-emerald-100/30" : "text-zinc-500 bg-zinc-55/10 border-zinc-100/30"
+                    }`}>
                       {row.status}
                     </span>
                   </td>
                   <td className="p-4 text-center pr-5">
-                    <button className="h-6 w-6 rounded-md hover:bg-zinc-100 flex items-center justify-center mx-auto text-zinc-400 hover:text-zinc-700 cursor-pointer transition-colors outline-none">
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
+                    {!row.id.toString().startsWith("mock-") ? (
+                      <button
+                        onClick={() => handleDeleteEssential(row.id)}
+                        className="h-6 w-6 rounded-md hover:bg-red-50 flex items-center justify-center mx-auto text-zinc-400 hover:text-red-600 cursor-pointer transition-colors outline-none"
+                        title="Delete Essential / Policy"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-bold text-zinc-400 italic">Sandbox</span>
+                    )}
                   </td>
                 </tr>
               ))}

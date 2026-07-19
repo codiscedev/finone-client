@@ -107,7 +107,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="relative z-10 w-full py-8 text-center text-xs text-zinc-500 dark:text-zinc-500 border-t border-zinc-200/50 dark:border-zinc-900/50">
-        &copy; {new Date().getFullYear()} FinOne Technologies. Powered by Next.js and React.
+        &copy; {new Date().getFullYear()} FinOne. Powered by Codisce.
       </footer>
     </div>
   );

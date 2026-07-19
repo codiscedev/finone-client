@@ -669,7 +669,7 @@ export default function TransactionOnboardingDrawer({
 
                 {/* Amount */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-zinc-500">Amount ($) *</label>
+                  <label className="text-xs font-bold text-zinc-500">Amount (INR) *</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -681,7 +681,7 @@ export default function TransactionOnboardingDrawer({
                       onChange={e => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                       className="w-full h-9 rounded-lg border border-zinc-200 px-3 pl-7 text-sm font-bold focus:border-blue-500 focus:outline-none"
                     />
-                    <span className="absolute left-3 top-2.5 text-xs text-zinc-400 font-bold">$</span>
+                    <span className="absolute left-3 top-2.5 text-xs text-zinc-400 font-bold">₹</span>
                   </div>
                 </div>
 

@@ -41,6 +41,8 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   const [loadingAssets, setLoadingAssets] = React.useState(false);
   const [debts, setDebts] = React.useState<any[]>([]);
   const [loadingDebts, setLoadingDebts] = React.useState(false);
+  const [goals, setGoals] = React.useState<any[]>([]);
+  const [essentials, setEssentials] = React.useState<any[]>([]);
 
   const fetchAssets = async () => {
     if (!dbUser?.userId) return;
@@ -72,10 +74,36 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
     }
   };
 
+  const fetchGoals = async () => {
+    if (!dbUser?.userId) return;
+    try {
+      const res = await apiClient.get(`/v1/goal/users/${dbUser.userId}`);
+      if (res.data?.success) {
+        setGoals(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching goals in dashboard:", err);
+    }
+  };
+
+  const fetchEssentials = async () => {
+    if (!dbUser?.userId) return;
+    try {
+      const res = await apiClient.get(`/v1/essential/users/${dbUser.userId}`);
+      if (res.data?.success) {
+        setEssentials(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching essentials in dashboard:", err);
+    }
+  };
+
   React.useEffect(() => {
     if (dbUser) {
       fetchAssets();
       fetchDebts();
+      fetchGoals();
+      fetchEssentials();
     }
   }, [dbUser]);
 
@@ -184,6 +212,73 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
     };
   }, [debts]);
 
+  // Helper to identify insurance categories
+  const isInsuranceCategory = (categoryName: string) => {
+    if (!categoryName) return false;
+    const name = categoryName.toLowerCase();
+    return name.includes("insurance") || name.includes("cover") || name.includes("policy") || name.includes("life") || name.includes("accident");
+  };
+
+  // Goal totals
+  const { totalGoalTarget, totalGoalSaved, goalFundingPercentage, activeGoalsCount } = React.useMemo(() => {
+    let totalTarget = 0;
+    let totalSaved = 0;
+    let activeCount = 0;
+    goals.forEach((g) => {
+      totalTarget += Number(g.targetAmount) || 0;
+      totalSaved += Number(g.savedAmount) || 0;
+      if (g.status?.toLowerCase() === "active") {
+        activeCount++;
+      }
+    });
+    const pct = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
+    return {
+      totalGoalTarget: totalTarget,
+      totalGoalSaved: totalSaved,
+      goalFundingPercentage: pct,
+      activeGoalsCount: activeCount
+    };
+  }, [goals]);
+
+  // Essentials totals
+  const { totalSafetyReserve, totalInsurancePremium, totalInsuranceCover, monthsCoverage, lifeCoverAmount, healthCoverAmount } = React.useMemo(() => {
+    let reserves = 0;
+    let premium = 0;
+    let cover = 0;
+    let life = 0;
+    let health = 0;
+
+    essentials.forEach((e) => {
+      const catName = e.category?.name || e.categoryName || "";
+      const isPolicy = isInsuranceCategory(catName) || e.premium > 0;
+      
+      const sum = Number(e.sumAssured) || 0;
+      if (isPolicy) {
+        premium += Number(e.premium) || 0;
+        cover += sum;
+        if (catName.toLowerCase().includes("life") || catName.toLowerCase().includes("term")) {
+          life += sum;
+        } else if (catName.toLowerCase().includes("health") || catName.toLowerCase().includes("medical")) {
+          health += sum;
+        }
+      } else {
+        reserves += sum;
+      }
+    });
+
+    const monthlyExpense = 50000; // standard default monthly expense base (INR)
+    const months = monthlyExpense > 0 ? (reserves / monthlyExpense).toFixed(1) : "0.0";
+
+    return {
+      totalSafetyReserve: reserves,
+      totalInsurancePremium: premium,
+      totalInsuranceCover: cover,
+      monthsCoverage: months,
+      lifeCoverAmount: life,
+      healthCoverAmount: health
+    };
+  }, [essentials]);
+
   // Scenario Simulator state (Net Worth Card)
   const [showHealthDetails, setShowHealthDetails] = React.useState(false);
   const [selectedAsset, setSelectedAsset] = React.useState<string | null>(null);
@@ -198,13 +293,13 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   // Retirement Goal Calculator state (Goals Card)
   const [targetRetireAge, setTargetRetireAge] = React.useState(60);
   const [currentAge, setCurrentAge] = React.useState(30);
-  const [currentSavings, setCurrentSavings] = React.useState(150000);
+  const currentSavings = totalGoalSaved > 0 ? totalGoalSaved : 1500000;
 
   // Dynamic Net Worth Projection calculations
   const calculateProjection = (years: number) => {
     const r = returnRate / 100;
     const n = 12; // monthly compounded
-    const principal = 1248390; // Current Net Worth
+    const principal = Math.max(0, totalValuation - totalDebtOutstanding);
     const PMT = monthlySavings;
     
     // Future value of current principal
@@ -260,11 +355,11 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   }
 
   if (showGoalDetails) {
-    return <GoalsDetailView onBack={() => setShowGoalDetails(false)} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+    return <GoalsDetailView onBack={() => { setShowGoalDetails(false); fetchGoals(); }} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
   }
 
   if (showEmergencyDetails) {
-    return <EmergencyDetailView onBack={() => setShowEmergencyDetails(false)} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+    return <EmergencyDetailView onBack={() => { setShowEmergencyDetails(false); fetchEssentials(); }} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
   }
 
   if (selectedAsset === "overview") {
@@ -581,8 +676,12 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
 
           {/* Core Balance */}
           <div className="my-5">
-            <p className="text-3xl font-extrabold tracking-tight text-zinc-900">$1,248,390</p>
-            <p className="text-xs mt-1 text-zinc-500">Assets ($1,480,000) minus Liabilities ($231,610)</p>
+            <p className="text-3xl font-extrabold tracking-tight text-zinc-900">
+              {formatCurrency(totalValuation - totalDebtOutstanding)}
+            </p>
+            <p className="text-xs mt-1 text-zinc-500">
+              Assets ({formatCurrency(totalValuation)}) minus Liabilities ({formatCurrency(totalDebtOutstanding)})
+            </p>
           </div>
 
           {/* Simulator Sliders */}
@@ -672,12 +771,12 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
 
           <div className="my-5 flex justify-between items-end">
             <div>
-              <p className="text-3xl font-extrabold tracking-tight text-zinc-900">$458,000</p>
+              <p className="text-3xl font-extrabold tracking-tight text-zinc-900">₹45,80,000</p>
               <p className="text-xs mt-1 text-zinc-500">Portfolio allocations index</p>
             </div>
             <div className="text-right">
-              <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md inline-block">+$82,400 Total Profit</p>
-              <p className="text-[10px] text-zinc-400 mt-1">Overall CAGR: 10.4%</p>
+              <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md inline-block">+₹8,24,000 Total Profit</p>
+              <p className="text-[10px] text-zinc-400 mt-1">Overall CAGR: 12.4%</p>
             </div>
           </div>
 
@@ -687,23 +786,23 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
               <div className="space-y-2">
                 <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Equity Breakdown</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">US Equities:</span>
-                  <span className="font-semibold text-zinc-900">45% ($206,100)</span>
+                  <span className="text-zinc-500">Mutual Funds:</span>
+                  <span className="font-semibold text-zinc-900">45% (₹20.61L)</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Tech Stocks:</span>
-                  <span className="font-semibold text-zinc-900">30% ($137,400)</span>
+                  <span className="font-semibold text-zinc-900">30% (₹13.74L)</span>
                 </div>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Fixed Income</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">T-Bills & Bonds:</span>
-                  <span className="font-semibold text-zinc-900">20% ($91,600)</span>
+                  <span className="text-zinc-500">EPF & PPF:</span>
+                  <span className="font-semibold text-zinc-900">20% (₹9.16L)</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Cash Reserves:</span>
-                  <span className="font-semibold text-zinc-900">5% ($22,900)</span>
+                  <span className="text-zinc-500">Liquid Cash:</span>
+                  <span className="font-semibold text-zinc-900">5% (₹2.29L)</span>
                 </div>
               </div>
             </div>
@@ -713,7 +812,7 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-blue-500" />
                 <div>
-                  <p className="font-semibold text-zinc-900">Active Monthly SIP: $1,500/mo</p>
+                  <p className="font-semibold text-zinc-900">Active Monthly SIP: ₹15,000/mo</p>
                   <p className="text-[10px] text-zinc-500">Aligned with retirement goal targets</p>
                 </div>
               </div>
@@ -744,7 +843,25 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
 
           <div className="mt-5">
             <h3 className="text-lg font-bold text-zinc-900">Goals Planner</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Retirement calculator and savings target progress</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{goals.length} Goals Tracked | {activeGoalsCount} Active</p>
+          </div>
+
+          {/* Dynamic Goals progress */}
+          <div className="my-5 bg-zinc-50/50 p-4 rounded-xl border border-zinc-150 space-y-2">
+            <div className="flex justify-between items-end text-xs mb-1.5 font-semibold text-zinc-800">
+              <div>
+                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Overall Goals Progress</span>
+                <p className="text-lg font-black text-zinc-900 mt-0.5">{formatCurrency(totalGoalSaved)} / {formatCurrency(totalGoalTarget)}</p>
+              </div>
+              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
+                goalFundingPercentage >= 100 ? "text-emerald-600 bg-emerald-50 border-emerald-100" : "text-blue-600 bg-blue-50 border-blue-100"
+              }`}>
+                {goalFundingPercentage}% Funded
+              </span>
+            </div>
+            <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-pulse" style={{ width: `${Math.min(goalFundingPercentage, 100)}%` }} />
+            </div>
           </div>
 
           {/* Calculator Controls */}
@@ -770,7 +887,7 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
               </div>
               <div>
                 <span className="text-zinc-500">Required monthly SIP:</span>
-                <p className="font-bold text-zinc-900 mt-0.5">$1,500 / mo</p>
+                <p className="font-bold text-zinc-900 mt-0.5">₹15,000 / mo</p>
               </div>
             </div>
           </div>
@@ -779,7 +896,7 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
           <div className="space-y-4">
             <div>
               <div className="flex justify-between items-center text-xs font-semibold text-zinc-800 mb-1.5">
-                <span>Retirement Corpus Progress (Target $2.5M)</span>
+                <span>Retirement Corpus Progress (Target ₹2.5 Cr)</span>
                 <span>{corpusPercentage}% Probability</span>
               </div>
               <div className="h-2.5 w-full bg-zinc-100 rounded-full overflow-hidden">
@@ -792,17 +909,17 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
             <div className="grid grid-cols-3 gap-2 text-center text-xs pt-3 border-t border-zinc-100">
               <div>
                 <span className="text-[10px] text-zinc-400 font-semibold block">Child Education</span>
-                <p className="font-bold text-zinc-900 mt-0.5">$120k</p>
+                <p className="font-bold text-zinc-900 mt-0.5">₹12L</p>
                 <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded inline-block mt-1">94% probability</span>
               </div>
               <div>
                 <span className="text-[10px] text-zinc-400 font-semibold block">House Purchase</span>
-                <p className="font-bold text-zinc-900 mt-0.5">$650k</p>
+                <p className="font-bold text-zinc-900 mt-0.5">₹65L</p>
                 <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded inline-block mt-1">82% probability</span>
               </div>
               <div>
                 <span className="text-[10px] text-zinc-400 font-semibold block">Vacation</span>
-                <p className="font-bold text-zinc-900 mt-0.5">$15k</p>
+                <p className="font-bold text-zinc-900 mt-0.5">₹1.5L</p>
                 <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded inline-block mt-1">99% probability</span>
               </div>
             </div>
@@ -830,7 +947,7 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
           </div>
 
           <div className="mt-5">
-            <h3 className="text-lg font-bold text-zinc-900">Emergency & Essentials</h3>
+            <h3 className="text-lg font-bold text-zinc-900">Essentials</h3>
             <p className="text-xs text-zinc-500 mt-0.5">Insurance policies and safety capital protection</p>
           </div>
 
@@ -839,14 +956,20 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
             <div className="flex justify-between items-end text-xs mb-1.5">
               <div>
                 <span className="text-zinc-400 font-semibold">Safety Reserve Capital</span>
-                <p className="text-xl font-bold text-zinc-900 mt-0.5">$36,000 / $30,000 target</p>
+                <p className="text-xl font-bold text-zinc-900 mt-0.5">
+                  {formatCurrency(totalSafetyReserve)} / {formatCurrency(300000)} target
+                </p>
               </div>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">120% Funded</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                totalSafetyReserve >= 300000 ? "text-emerald-600 bg-emerald-50 border border-emerald-105" : "text-amber-600 bg-amber-50 border border-amber-105"
+              }`}>
+                {totalSafetyReserve > 0 ? Math.round((totalSafetyReserve / 300000) * 100) : 0}% Funded
+              </span>
             </div>
             <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500" style={{ width: "100%" }} />
+              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(totalSafetyReserve > 0 ? Math.round((totalSafetyReserve / 300000) * 100) : 0, 100)}%` }} />
             </div>
-            <p className="text-[10px] text-zinc-500 mt-1">Provides <span className="font-bold text-zinc-800">7.2 Months</span> of basic household expense coverage.</p>
+            <p className="text-[10px] text-zinc-500 mt-1">Provides <span className="font-bold text-zinc-800">{monthsCoverage} Months</span> of basic household expense coverage.</p>
           </div>
 
           {/* Insurance and nominee checklist */}
@@ -856,22 +979,26 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
                 <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Policies Status</p>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Health Insurance:</span>
-                  <span className="font-bold text-emerald-600">Active</span>
+                  <span className={`font-bold ${healthCoverAmount > 0 ? "text-emerald-600" : "text-amber-500"}`}>
+                    {healthCoverAmount > 0 ? formatCurrency(healthCoverAmount) : "Missing!"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Life Insurance:</span>
-                  <span className="font-bold text-emerald-600">Active</span>
+                  <span className={`font-bold ${lifeCoverAmount > 0 ? "text-emerald-600" : "text-amber-500"}`}>
+                    {lifeCoverAmount > 0 ? formatCurrency(lifeCoverAmount) : "Missing!"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Home Protection:</span>
-                  <span className="font-bold text-red-600">Missing!</span>
+                  <span className="text-zinc-500">Other Protection:</span>
+                  <span className="font-bold text-emerald-600">Active</span>
                 </div>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Estate Audits</p>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Will Documented:</span>
-                  <span className="font-bold text-red-600">Missing!</span>
+                  <span className="font-bold text-emerald-600">Active</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Nominees Assigned:</span>
@@ -884,7 +1011,11 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
             <div className="rounded-xl bg-blue-50/50 p-3.5 border border-blue-100/50 flex items-start gap-2.5">
               <Sparkles className="h-4.5 w-4.5 text-blue-600 shrink-0 mt-0.5 animate-pulse" />
               <p className="text-[11px] text-zinc-600 leading-normal">
-                AI recommends getting home protection quotes. Also consider utilizing our simple estate builder tool to generate your personal digital Will.
+                {healthCoverAmount === 0 || lifeCoverAmount === 0 ? (
+                  <span className="text-amber-700 font-bold">AI recommends adding health/life coverage limits to correctly construct protective cushions.</span>
+                ) : (
+                  "AI confirms coverage levels are healthy. Keep tracking premium renewal timelines."
+                )}
               </p>
             </div>
           </div>
