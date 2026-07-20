@@ -21,6 +21,7 @@ interface AuthContextType {
   authError: string | null;
   clearAuthError: () => void;
   logout: () => Promise<void>;
+  completeOnboarding: (updatedUser: DbUser) => void;
 }
 
 const AuthContext = React.createContext<AuthContextType>({
@@ -30,6 +31,7 @@ const AuthContext = React.createContext<AuthContextType>({
   authError: null,
   clearAuthError: () => { },
   logout: async () => { },
+  completeOnboarding: () => { },
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -97,14 +99,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (loading) return;
 
     const isAuthRoute = pathname === "/login" || pathname === "/signup";
-    const isProtectedRoute = pathname.startsWith("/dashboard");
+    const isProtectedRoute = pathname.startsWith("/dashboard") || pathname === "/onboarding";
 
     if (!firebaseUser && isProtectedRoute) {
       router.push("/login");
-    } else if (firebaseUser && isAuthRoute) {
-      router.push("/dashboard");
+    } else if (firebaseUser) {
+      if (dbUser?.newUser && pathname !== "/onboarding") {
+        router.push("/onboarding");
+      } else if (!dbUser?.newUser && pathname === "/onboarding") {
+        router.push("/dashboard");
+      } else if (isAuthRoute) {
+        if (dbUser?.newUser) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
+      }
     }
-  }, [firebaseUser, loading, pathname, router]);
+  }, [firebaseUser, dbUser, loading, pathname, router]);
 
   const logout = async () => {
     setLoading(true);
@@ -123,8 +135,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearAuthError = () => setAuthError(null);
 
+  const completeOnboarding = (updatedUser: DbUser) => {
+    setDbUser(updatedUser);
+    sessionStorage.setItem("finone_db_user", JSON.stringify(updatedUser));
+  };
+
   return (
-    <AuthContext.Provider value={{ firebaseUser, dbUser, loading, authError, clearAuthError, logout }}>
+    <AuthContext.Provider value={{ firebaseUser, dbUser, loading, authError, clearAuthError, logout, completeOnboarding }}>
       {children}
     </AuthContext.Provider>
   );

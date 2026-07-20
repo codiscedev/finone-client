@@ -7,7 +7,6 @@ import {
   Bell,
   Paintbrush,
   FileText,
-  ShieldCheck,
   LogOut,
   Globe,
   Percent,
@@ -28,6 +27,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
+import { useTheme } from "@/lib/theme-context";
 
 export default function SettingsView() {
   const { showSuccess, showDelete } = useCustomAlert();
@@ -36,7 +36,7 @@ export default function SettingsView() {
   const [email, setEmail] = React.useState("");
 
   // Category Manager states
-  const { dbUser } = useAuth();
+  const { dbUser, firebaseUser } = useAuth();
   const [categoryType, setCategoryType] = React.useState<"asset" | "debt" | "investment" | "goal" | "essential">("asset");
   const [assetCategories, setAssetCategories] = React.useState<any[]>([]);
   const [debtCategoriesList, setDebtCategoriesList] = React.useState<any[]>([]);
@@ -268,12 +268,13 @@ export default function SettingsView() {
     }
   };
 
+
+
   // Password state
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
-  const [twoFactor, setTwoFactor] = React.useState(true);
 
   // Password strength checker
   const hasMinLength = newPassword.length >= 8;
@@ -313,10 +314,17 @@ export default function SettingsView() {
   };
 
   // Theme personalization state
-  const [themeMode, setThemeMode] = React.useState("light");
-  const [accentColor, setAccentColor] = React.useState("blue");
-  const [fontSize, setFontSize] = React.useState("medium");
-  const [density, setDensity] = React.useState("comfortable");
+  const { theme, setTheme, accentColor, setAccentColor } = useTheme();
+  const [themeMode, setThemeMode] = React.useState<"light" | "dark" | "system">("light");
+  const [selectedAccent, setSelectedAccent] = React.useState<"blue" | "emerald" | "purple" | "indigo" | "gold" | "rose">("blue");
+
+  React.useEffect(() => {
+    setThemeMode(theme);
+  }, [theme]);
+
+  React.useEffect(() => {
+    setSelectedAccent(accentColor);
+  }, [accentColor]);
 
   // Sign out confirmation modal dialog trigger
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
@@ -457,117 +465,96 @@ export default function SettingsView() {
           </div>
         </div>
 
-        {/* ==========================================
-            2. Change Password Card
-            ========================================== */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Lock className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-zinc-900">Change Password</h3>
-              <p className="text-xs text-zinc-500">Configure secure credentials and multi-factor logins</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 text-xs">
-            <div className="space-y-1.5">
-              <label className="font-semibold text-zinc-500">Current Password</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
-              />
+        {firebaseUser?.providerData.some(p => p.providerId === "password") && (
+          /* ==========================================
+              2. Change Password Card
+              ========================================== */
+          <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <Lock className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-zinc-900">Change Password</h3>
+                <p className="text-xs text-zinc-500">Configure secure credentials and multi-factor logins</p>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="font-semibold text-zinc-500">New Password</label>
-              <div className="relative flex items-center">
+            <div className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-zinc-500">Current Password</label>
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type="password"
                   placeholder="••••••••"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-zinc-200 pl-3 pr-10 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-zinc-400 hover:text-zinc-600 outline-none"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
               </div>
 
-              {/* Password strength visual */}
-              {newPassword && (
-                <div className="mt-2.5 space-y-1.5 rounded-lg border border-zinc-150 bg-zinc-50 p-2">
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-zinc-500 font-semibold">Security Level:</span>
-                    <span className={`font-bold ${strength.text ? 'text-zinc-800' : 'text-zinc-400'}`}>{strength.text}</span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1">
-                    {[1, 2, 3, 4].map((index) => (
-                      <div
-                        key={index}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          index <= passwordStrengthCount ? strength.color : "bg-zinc-200"
-                        }`}
-                      />
-                    ))}
-                  </div>
+              <div className="space-y-1.5">
+                <label className="font-semibold text-zinc-500">New Password</label>
+                <div className="relative flex items-center">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-zinc-200 pl-3 pr-10 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 text-zinc-400 hover:text-zinc-600 outline-none"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="font-semibold text-zinc-500">Confirm New Password</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus-visible:border-blue-500 focus:bg-white"
-              />
-            </div>
-
-            {/* 2FA switch */}
-            <div className="flex items-center justify-between p-3 rounded-xl border border-zinc-100 bg-zinc-50">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                <div>
-                  <p className="font-bold text-zinc-900">Two-Factor Authentication (2FA)</p>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Use email or authenticator codes during sign-in</p>
-                </div>
+                {/* Password strength visual */}
+                {newPassword && (
+                  <div className="mt-2.5 space-y-1.5 rounded-lg border border-zinc-150 bg-zinc-50 p-2">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-zinc-500 font-semibold">Security Level:</span>
+                      <span className={`font-bold ${strength.text ? 'text-zinc-800' : 'text-zinc-400'}`}>{strength.text}</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[1, 2, 3, 4].map((index) => (
+                        <div
+                          key={index}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            index <= passwordStrengthCount ? strength.color : "bg-zinc-200"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => setTwoFactor(!twoFactor)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  twoFactor ? "bg-blue-600" : "bg-zinc-200"
-                }`}
+
+              <div className="space-y-1.5">
+                <label className="font-semibold text-zinc-500">Confirm New Password</label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus-visible:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-zinc-100">
+              <Button
+                onClick={() => showSuccess("Success", "Password modified successfully!")}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
               >
-                <span
-                  className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    twoFactor ? "translate-x-4" : "translate-x-0"
-                  }`}
-                />
-              </button>
+                Update Password
+              </Button>
             </div>
           </div>
-
-          <div className="flex justify-end pt-4 border-t border-zinc-100">
-            <Button
-              onClick={() => showSuccess("Success", "Password modified successfully!")}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
-            >
-              Update Password
-            </Button>
-          </div>
-        </div>
+        )}
 
         {/* ==========================================
             3. Notification Preferences Card
@@ -936,7 +923,7 @@ export default function SettingsView() {
             </div>
             <div>
               <h3 className="text-base font-bold text-zinc-900">Personalize Appearance</h3>
-              <p className="text-xs text-zinc-500">Pick desktop theme colors, font size and layout modes</p>
+              <p className="text-xs text-zinc-500">Pick desktop theme colors</p>
             </div>
           </div>
 
@@ -980,58 +967,39 @@ export default function SettingsView() {
             {/* Accent Color picker */}
             <div>
               <label className="font-semibold text-zinc-500 block mb-2">Primary Accent Color</label>
-              <div className="flex gap-3">
-                {["blue", "emerald", "purple", "indigo"].map((color) => {
+              <div className="flex flex-wrap gap-3">
+                {["blue", "emerald", "purple", "indigo", "gold", "rose"].map((color) => {
                   const colorBg =
                     color === "blue" ? "bg-blue-600" :
                     color === "emerald" ? "bg-emerald-500" :
-                    color === "purple" ? "bg-purple-600" : "bg-indigo-600";
+                    color === "purple" ? "bg-purple-600" :
+                    color === "indigo" ? "bg-indigo-600" :
+                    color === "gold" ? "bg-amber-500" : "bg-rose-500";
                   return (
                     <button
                       key={color}
-                      onClick={() => setAccentColor(color)}
+                      onClick={() => setSelectedAccent(color as any)}
                       className={`h-7 w-7 rounded-full flex items-center justify-center text-white transition-all scale-[0.98] outline-none ${colorBg} ${
-                        accentColor === color ? "ring-4 ring-zinc-100" : "opacity-80 hover:opacity-100"
+                        selectedAccent === color ? "ring-4 ring-zinc-200 dark:ring-zinc-700" : "opacity-80 hover:opacity-100"
                       }`}
+                      title={`${color.charAt(0).toUpperCase() + color.slice(1)} Accent`}
                     >
-                      {accentColor === color && <Check className="h-3.5 w-3.5" />}
+                      {selectedAccent === color && <Check className="h-3.5 w-3.5" />}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Font size and Density */}
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <div className="space-y-1.5">
-                <label className="font-semibold text-zinc-500">Font Size</label>
-                <Select
-                  value={fontSize}
-                  onChange={(e) => setFontSize(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
-                >
-                  <option value="small">Small (Inter 12px)</option>
-                  <option value="medium">Medium (Inter 14px)</option>
-                  <option value="large">Large (Inter 16px)</option>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="font-semibold text-zinc-500">Layout Density</label>
-                <Select
-                  value={density}
-                  onChange={(e) => setDensity(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-zinc-50/50 outline-none text-zinc-900 cursor-pointer"
-                >
-                  <option value="comfortable">Comfortable</option>
-                  <option value="compact">Compact (Dense)</option>
-                </Select>
-              </div>
-            </div>
           </div>
 
           <div className="flex justify-end pt-4 border-t border-zinc-100">
             <Button
-              onClick={() => showSuccess("Success", `Applied ${themeMode} theme with ${accentColor} accent!`)}
+              onClick={() => {
+                setTheme(themeMode);
+                setAccentColor(selectedAccent);
+                showSuccess("Success", `Applied ${themeMode} theme with ${selectedAccent} accent!`);
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
             >
               Apply Theme

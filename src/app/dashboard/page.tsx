@@ -10,7 +10,6 @@ import {
   BrainCircuit,
   Settings,
   Bell,
-  Search,
   ChevronDown,
   TrendingUp,
   TrendingDown,
@@ -23,7 +22,6 @@ import {
   DollarSign,
   FileText,
   MessageSquare,
-  User,
   Menu,
   Star,
   ChevronLeft,
@@ -47,9 +45,25 @@ export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = React.useState("Dashboard");
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState("");
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
   const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
+
+  const profileRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
+        setShowProfileMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const sidebarItems = [
     { name: "Dashboard", icon: LayoutDashboard },
@@ -220,25 +234,14 @@ export default function DashboardPage() {
             <span className="text-xs font-medium text-zinc-500">Overview</span>
           </div>
 
-          {/* Search, Notifications & Profile */}
+          {/* Notifications & Profile */}
           <div className="flex items-center gap-5">
-            {/* Minimal Search Bar */}
-            <div className="relative hidden sm:block w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search commands, reports..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 w-full rounded-lg border border-zinc-200 bg-zinc-50/50 pl-9 pr-4 text-xs font-medium text-zinc-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
 
-            {/* Notification Bell with Dropdown Menu */}
+            {/* Notification Bell */}
             <div className="relative">
               <button
                 onClick={() => {
-                  setShowNotifications(!showNotifications);
+                  setShowNotifications(true);
                   setShowProfileMenu(false);
                 }}
                 className="relative rounded-lg p-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 outline-none transition-colors border border-transparent hover:border-zinc-200/60"
@@ -249,23 +252,43 @@ export default function DashboardPage() {
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 mt-2.5 w-80 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg shadow-zinc-200/50 animate-in fade-in-50 slide-in-from-top-1">
-                  <div className="flex items-center justify-between border-b border-zinc-100 px-3.5 py-2">
-                    <span className="text-xs font-bold text-zinc-900">Notifications</span>
-                    <button className="text-[10px] font-bold text-blue-600 hover:underline">Mark all read</button>
-                  </div>
-                  <div className="divide-y divide-zinc-100 max-h-60 overflow-y-auto">
-                    {notifications.map((n) => (
-                      <div key={n.id} className="p-3 hover:bg-zinc-50/80 transition-colors flex items-start justify-between gap-2.5">
-                        <div>
-                          <p className={`text-xs ${n.read ? 'text-zinc-600' : 'text-zinc-900 font-semibold'}`}>{n.text}</p>
-                          <span className="text-[10px] text-zinc-400 mt-1 block">{n.time}</span>
-                        </div>
-                        {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500 mt-1.5" />}
+                <>
+                  {/* Backdrop overlay */}
+                  <div
+                    onClick={() => setShowNotifications(false)}
+                    className="fixed inset-0 z-40 bg-zinc-950/40 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
+                  />
+                  {/* Notification Drawer Side-bar */}
+                  <div className="fixed inset-y-0 right-0 z-50 w-80 sm:w-96 border-l border-zinc-200 bg-white p-6 shadow-2xl flex flex-col transition-all duration-300 transform translate-x-0 animate-in slide-in-from-right duration-300 ease-out">
+                    <div className="flex items-center justify-between border-b border-zinc-150 pb-4 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-4.5 w-4.5 text-blue-600" />
+                        <h2 className="text-sm font-bold text-zinc-900">Notifications</h2>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2.5">
+                        <button className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer">Mark all read</button>
+                        <button
+                          onClick={() => setShowNotifications(false)}
+                          className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors border border-transparent outline-none cursor-pointer flex items-center justify-center font-bold text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 divide-y divide-zinc-100 overflow-y-auto pr-1">
+                      {notifications.map((n) => (
+                        <div key={n.id} className="py-3.5 hover:bg-zinc-50/50 transition-colors flex items-start justify-between gap-3 first:pt-0">
+                          <div>
+                            <p className={`text-xs ${n.read ? 'text-zinc-600' : 'text-zinc-900 font-semibold'}`}>{n.text}</p>
+                            <span className="text-[10px] text-zinc-400 mt-1 block">{n.time}</span>
+                          </div>
+                          {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500 mt-1.5" />}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 
@@ -273,7 +296,7 @@ export default function DashboardPage() {
             <span className="h-5 w-[1px] bg-zinc-200" />
 
             {/* User Profile Section with Dropdown Menu */}
-            <div className="relative">
+            <div className="relative" ref={profileRef}>
               <button
                 onClick={() => {
                   setShowProfileMenu(!showProfileMenu);
@@ -303,19 +326,6 @@ export default function DashboardPage() {
                       {dbUser?.email || firebaseUser?.email || ""}
                     </p>
                   </div>
-                  <button className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-650 hover:bg-zinc-50 hover:text-zinc-900 flex items-center gap-2 outline-none">
-                    <User className="h-3.5 w-3.5 text-zinc-400" /> Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveMenu("Settings");
-                      setShowProfileMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-650 hover:bg-zinc-50 hover:text-zinc-900 flex items-center gap-2 outline-none"
-                  >
-                    <Settings className="h-3.5 w-3.5 text-zinc-400" /> Account Settings
-                  </button>
-                  <div className="h-px bg-zinc-100 my-1" />
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50/50 flex items-center gap-2 outline-none"

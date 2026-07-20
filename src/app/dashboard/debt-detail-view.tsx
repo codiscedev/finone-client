@@ -71,12 +71,12 @@ export default function DebtDetailView({ onBack, onAddClick }: DebtDetailViewPro
     try {
       const res = await apiClient.delete(`/v1/debt/${id}`);
       if (res.data?.success) {
-        showSuccess("Loan deleted successfully");
+        showSuccess("Success", "Loan deleted successfully");
         fetchDebtsAndAssets();
       }
     } catch (err) {
       console.error("Error deleting debt:", err);
-      showWarning("Failed to delete loan");
+      showWarning("Error", "Failed to delete loan");
     }
   };
 
