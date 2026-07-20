@@ -86,41 +86,35 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
     return name.includes("insurance") || name.includes("cover") || name.includes("policy") || name.includes("life") || name.includes("accident");
   };
 
-  const hasData = essentials.length > 0;
-
   // Safety reserves
   const emergencyReserve = React.useMemo(() => {
-    if (!hasData) return 650000; // ₹6,50,000 mock
     return essentials
       .filter((e) => !isInsuranceCategory(e.category?.name || e.categoryName))
       .reduce((sum, e) => sum + (Number(e.sumAssured) || 0), 0);
-  }, [essentials, hasData]);
+  }, [essentials]);
 
   // Life cover sum
   const lifeCover = React.useMemo(() => {
-    if (!hasData) return 20000000; // ₹2.0 Cr mock
     return essentials
       .filter((e) => {
         const name = (e.category?.name || e.categoryName || "").toLowerCase();
         return name.includes("life") || name.includes("term");
       })
       .reduce((sum, e) => sum + (Number(e.sumAssured) || 0), 0);
-  }, [essentials, hasData]);
+  }, [essentials]);
 
   // Health cover sum
   const healthCover = React.useMemo(() => {
-    if (!hasData) return 1000000; // ₹10,00,000 mock
     return essentials
       .filter((e) => {
         const name = (e.category?.name || e.categoryName || "").toLowerCase();
         return name.includes("health") || name.includes("medical");
       })
       .reduce((sum, e) => sum + (Number(e.sumAssured) || 0), 0);
-  }, [essentials, hasData]);
+  }, [essentials]);
 
   // Yearly premium
   const yearlyPremiumTotal = React.useMemo(() => {
-    if (!hasData) return 36500; // ₹36,500 mock
     return essentials.reduce((sum, e) => {
       const prem = Number(e.premium) || 0;
       const freq = (e.frequency || "YEARLY").toUpperCase();
@@ -131,7 +125,7 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
       else if (freq === "ONCE") multiplier = 0;
       return sum + prem * multiplier;
     }, 0);
-  }, [essentials, hasData]);
+  }, [essentials]);
 
   // Coverage months
   const coverageMonths = React.useMemo(() => {
@@ -150,14 +144,6 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
 
   // Premium breakdown splits
   const premiumSplits = React.useMemo(() => {
-    if (!hasData) {
-      return [
-        { name: "Term Life Insurance", pct: 49, val: 18000, color: "bg-blue-600", stroke: "stroke-blue-600" },
-        { name: "Family Health Insurance", pct: 34, val: 12500, color: "bg-emerald-500", stroke: "stroke-emerald-500" },
-        { name: "Critical Illness Cover", pct: 17, val: 6000, color: "bg-amber-500", stroke: "stroke-amber-500" }
-      ];
-    }
-
     const categoriesMap: Record<string, number> = {};
     let totalPremium = 0;
     essentials.forEach((e) => {
@@ -193,45 +179,10 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
         stroke: strokes[idx % strokes.length]
       };
     });
-  }, [essentials, hasData]);
+  }, [essentials]);
 
   // Active policy list rows
   const policyRows = React.useMemo(() => {
-    if (!hasData) {
-      return [
-        {
-          id: "mock-1",
-          type: "Term Life Insurance",
-          icon: <ShieldCheck className="h-4.5 w-4.5 text-blue-600 shrink-0" />,
-          insurer: "HDFC Life",
-          coverage: 20000000,
-          premium: 18000,
-          nominee: "Spouse (Wife)",
-          status: "Active"
-        },
-        {
-          id: "mock-2",
-          type: "Family Health Insurance",
-          icon: <HeartPulse className="h-4.5 w-4.5 text-emerald-600 shrink-0" />,
-          insurer: "Niva Bupa",
-          coverage: 1000000,
-          premium: 12500,
-          nominee: "Spouse & Kid",
-          status: "Active"
-        },
-        {
-          id: "mock-3",
-          type: "Critical Illness Cover",
-          icon: <Activity className="h-4.5 w-4.5 text-amber-500 shrink-0" />,
-          insurer: "ICICI Lombard",
-          coverage: 1500000,
-          premium: 6000,
-          nominee: "Mother",
-          status: "Active"
-        }
-      ];
-    }
-
     const defaultIconMeta: Record<string, { icon: any; color: string }> = {
       HEALTH_INSURANCE: { icon: HeartPulse, color: "text-emerald-600" },
       LIFE_INSURANCE: { icon: ShieldCheck, color: "text-blue-600" },
@@ -263,7 +214,7 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
         icon: <IconComp className={`h-4.5 w-4.5 ${iconMeta.color} shrink-0`} />
       };
     });
-  }, [essentials, hasData]);
+  }, [essentials]);
 
   // Will & Nominees updates checklist
   const NomineeChecklist = [
@@ -274,12 +225,28 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
   ];
 
   // AI insights checklines
-  const aiInsights = [
-    { text: "Safety fund covers optimal monthly base expenses.", type: "check" },
-    { text: "Term life coverage is optimal based on outstanding liabilities.", type: "check" },
-    { text: "Will and Nominee configuration complete—guarantees assets security.", type: "check" },
-    { text: "Recommendation: Consider adding personal accident rider.", type: "warning" }
-  ];
+  const aiInsights = React.useMemo(() => {
+    const list = [];
+    if (emergencyReserve < 300000) {
+      list.push({ text: "Safety reserve fund is below the recommended 6-month buffer threshold of ₹3,00,000.", type: "warning" });
+    } else {
+      list.push({ text: "Safety reserve fund covers optimal monthly base expenses.", type: "check" });
+    }
+
+    if (lifeCover === 0) {
+      list.push({ text: "Term life coverage is missing. AI recommends establishing life coverage to protect dependents.", type: "warning" });
+    } else {
+      list.push({ text: "Term life coverage is active and helps protect your family's future.", type: "check" });
+    }
+
+    if (healthCover === 0) {
+      list.push({ text: "Health insurance is missing. AI recommends adding medical coverage to avoid hospital debt.", type: "warning" });
+    } else {
+      list.push({ text: "Health insurance is active and covers family protection cap.", type: "check" });
+    }
+
+    return list;
+  }, [emergencyReserve, lifeCover, healthCover]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
@@ -337,7 +304,7 @@ export default function EmergencyDetailView({ onBack, onAddClick, onUpgradeClick
             className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm text-xs font-bold transition-all active:scale-[0.98] outline-none cursor-pointer flex items-center gap-1.5"
           >
             <Plus className="h-3.5 w-3.5" />
-            Add Policy
+            Add Essential
           </Button>
         </div>
       </div>

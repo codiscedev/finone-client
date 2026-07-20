@@ -85,13 +85,9 @@ export default function GoalsDetailView({ onBack, onAddClick, onUpgradeClick }: 
   const [monthlySavings, setMonthlySavings] = React.useState(25000); // monthly additions in INR
 
   // KPI constants
-  const targetCorpus = goals.length > 0 
-    ? goals.reduce((acc, g) => acc + (Number(g.targetAmount) || 0), 0)
-    : 25000000; // ₹2.5 Cr fallback
+  const targetCorpus = goals.reduce((acc, g) => acc + (Number(g.targetAmount) || 0), 0);
   
-  const currentSavings = goals.length > 0
-    ? goals.reduce((acc, g) => acc + (Number(g.savedAmount) || 0), 0)
-    : 7000000; // ₹70L fallback
+  const currentSavings = goals.reduce((acc, g) => acc + (Number(g.savedAmount) || 0), 0);
   
   const currentAge = 30;
 
@@ -135,12 +131,7 @@ export default function GoalsDetailView({ onBack, onAddClick, onUpgradeClick }: 
   // Asset allocations aligned to goals
   const goalSplits = React.useMemo(() => {
     if (goals.length === 0) {
-      return [
-        { name: "Retirement Fund", pct: 60, val: 15000000, color: "bg-blue-600", stroke: "stroke-blue-600" },
-        { name: "Kids Education", pct: 20, val: 5000000, color: "bg-emerald-500", stroke: "stroke-emerald-500" },
-        { name: "House Downpayment", pct: 12, val: 3000000, color: "bg-amber-500", stroke: "stroke-amber-500" },
-        { name: "Luxury Travel", pct: 8, val: 2000000, color: "bg-purple-500", stroke: "stroke-purple-500" }
-      ];
+      return [];
     }
     
     const colors = ["bg-blue-600", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-rose-500", "bg-cyan-500", "bg-teal-500"];
@@ -162,52 +153,7 @@ export default function GoalsDetailView({ onBack, onAddClick, onUpgradeClick }: 
   // Goal holdings rows
   const goalRows = React.useMemo(() => {
     if (goals.length === 0) {
-      return [
-        {
-          id: "mock-1",
-          name: "Retirement Fund",
-          categoryName: "Retirement",
-          icon: <Target className="h-4 w-4 text-blue-600 shrink-0" />,
-          target: 25000000,
-          current: 7000000,
-          match: "92%",
-          progress: 28,
-          notes: "Sandbox Retirement simulation targets."
-        },
-        {
-          id: "mock-2",
-          name: "Kids Education",
-          categoryName: "Learning",
-          icon: <GraduationCap className="h-4 w-4 text-emerald-600 shrink-0" />,
-          target: 5000000,
-          current: 1500000,
-          match: "80%",
-          progress: 30,
-          notes: "Undergrad funding."
-        },
-        {
-          id: "mock-3",
-          name: "House Downpayment",
-          categoryName: "Finance",
-          icon: <Building2 className="h-4 w-4 text-amber-500 shrink-0" />,
-          target: 4000000,
-          current: 1600000,
-          match: "88%",
-          progress: 40,
-          notes: "Downpayment for property purchase."
-        },
-        {
-          id: "mock-4",
-          name: "Luxury Travel",
-          categoryName: "Personal",
-          icon: <Compass className="h-4 w-4 text-purple-600 shrink-0" />,
-          target: 1000000,
-          current: 400000,
-          match: "75%",
-          progress: 40,
-          notes: "Vacation saving."
-        }
-      ];
+      return [];
     }
 
     const defaultIconMeta: Record<string, { icon: any; color: string }> = {
@@ -247,12 +193,49 @@ export default function GoalsDetailView({ onBack, onAddClick, onUpgradeClick }: 
   }, [goals]);
 
   // AI Insights checklines
-  const aiInsights = [
-    { text: "Retirement target matching 92% confidence score.", type: "check" },
-    { text: "Recommend increasing equity allocation in Mid-cap funds for Kids Education.", type: "warning" },
-    { text: "Emergency fund covers 8 months of goal SIP contributions.", type: "check" },
-    { text: "House downpayment goal is 40% complete—on track for 2029 purchase.", type: "check" }
-  ];
+  const aiInsights = React.useMemo(() => {
+    if (goals.length === 0) {
+      return [
+        { text: "No goals added yet. Add your first goal to get personalized AI planning insights.", type: "warning" }
+      ];
+    }
+
+    const insights = [];
+    
+    // Check total target vs savings
+    const progressPct = targetCorpus > 0 ? Math.round((currentSavings / targetCorpus) * 100) : 0;
+    insights.push({
+      text: `Your overall goals are ${progressPct}% funded. Keep investing to reach your ${formatCurrency(targetCorpus)} target.`,
+      type: "check"
+    });
+
+    // Generate specific insights based on goals
+    goals.forEach((g) => {
+      const target = Number(g.targetAmount) || 0;
+      const current = Number(g.savedAmount) || 0;
+      const pct = target > 0 ? Math.round((current / target) * 100) : 0;
+      
+      if (pct < 20) {
+        insights.push({
+          text: `Goal "${g.name}" is in early stages (${pct}% funded). Consider setting up a monthly SIP to build momentum.`,
+          type: "warning"
+        });
+      } else if (pct >= 80) {
+        insights.push({
+          text: `Goal "${g.name}" is near completion (${pct}% funded)! Great job staying on track.`,
+          type: "check"
+        });
+      }
+    });
+
+    // General reminder
+    insights.push({
+      text: "Emergency fund checks out. Recommend review of asset allocations quarterly.",
+      type: "check"
+    });
+
+    return insights;
+  }, [goals, targetCorpus, currentSavings]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
@@ -484,27 +467,38 @@ export default function GoalsDetailView({ onBack, onAddClick, onUpgradeClick }: 
 
           <div className="flex justify-center items-center py-4 relative my-3">
             <svg className="w-32 h-32">
-              {goalSplits.map((split, idx) => {
-                const r = 48;
-                const circumference = 2 * Math.PI * r;
-                const cumulativePct = goalSplits.slice(0, idx).reduce((sum, item) => sum + item.pct, 0);
-                const rotation = (cumulativePct / 100) * 360 - 90;
-                return (
-                  <circle
-                    key={idx}
-                    cx="64"
-                    cy="64"
-                    r={r}
-                    className={split.stroke}
-                    strokeWidth="12"
-                    fill="transparent"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={circumference - (circumference * Math.max(1, split.pct)) / 100}
-                    transform={`rotate(${rotation} 64 64)`}
-                    style={{ transition: "stroke-dashoffset 0.5s ease" }}
-                  />
-                );
-              })}
+              {goalSplits.length > 0 ? (
+                goalSplits.map((split, idx) => {
+                  const r = 48;
+                  const circumference = 2 * Math.PI * r;
+                  const cumulativePct = goalSplits.slice(0, idx).reduce((sum, item) => sum + item.pct, 0);
+                  const rotation = (cumulativePct / 100) * 360 - 90;
+                  return (
+                    <circle
+                      key={idx}
+                      cx="64"
+                      cy="64"
+                      r={r}
+                      className={split.stroke}
+                      strokeWidth="12"
+                      fill="transparent"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={circumference - (circumference * Math.max(1, split.pct)) / 100}
+                      transform={`rotate(${rotation} 64 64)`}
+                      style={{ transition: "stroke-dashoffset 0.5s ease" }}
+                    />
+                  );
+                })
+              ) : (
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="48"
+                  className="stroke-zinc-100"
+                  strokeWidth="12"
+                  fill="transparent"
+                />
+              )}
             </svg>
             <div className="absolute flex flex-col items-center">
               <span className="text-[9px] font-bold text-zinc-400 uppercase">Goals</span>
@@ -549,41 +543,49 @@ export default function GoalsDetailView({ onBack, onAddClick, onUpgradeClick }: 
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50 font-medium">
-              {goalRows.map((row, idx) => (
-                <tr key={idx} className="hover:bg-zinc-50/40 transition-colors">
-                  <td className="p-4 pl-5 flex items-center gap-2.5 text-zinc-800 font-bold">
-                    {row.icon}
-                    <span>{row.name}</span>
-                  </td>
-                  <td className="p-4 text-zinc-900 font-bold">{formatCurrency(row.target)}</td>
-                  <td className="p-4 text-zinc-900 font-bold">{formatCurrency(row.current)}</td>
-                  <td className="p-4 text-blue-600 font-bold">{row.match} Match</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 bg-zinc-100 rounded-full overflow-hidden shrink-0">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${row.progress}%` }}
-                        />
+              {goalRows.length > 0 ? (
+                goalRows.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-zinc-50/40 transition-colors">
+                    <td className="p-4 pl-5 flex items-center gap-2.5 text-zinc-800 font-bold">
+                      {row.icon}
+                      <span>{row.name}</span>
+                    </td>
+                    <td className="p-4 text-zinc-900 font-bold">{formatCurrency(row.target)}</td>
+                    <td className="p-4 text-zinc-900 font-bold">{formatCurrency(row.current)}</td>
+                    <td className="p-4 text-blue-600 font-bold">{row.match} Match</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-16 bg-zinc-100 rounded-full overflow-hidden shrink-0">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full"
+                            style={{ width: `${row.progress}%` }}
+                          />
+                        </div>
+                        <span className="font-bold text-zinc-900">{row.progress}%</span>
                       </div>
-                      <span className="font-bold text-zinc-900">{row.progress}%</span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-center pr-5">
-                    {!row.id.toString().startsWith("mock-") ? (
-                      <button
-                        onClick={() => handleDeleteGoal(row.id)}
-                        className="h-6 w-6 rounded-md hover:bg-red-50 flex items-center justify-center mx-auto text-zinc-400 hover:text-red-600 cursor-pointer transition-colors outline-none"
-                        title="Delete Goal"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    ) : (
-                      <span className="text-[10px] font-bold text-zinc-450 italic">Sandbox</span>
-                    )}
+                    </td>
+                    <td className="p-4 text-center pr-5">
+                      {!row.id.toString().startsWith("mock-") ? (
+                        <button
+                          onClick={() => handleDeleteGoal(row.id)}
+                          className="h-6 w-6 rounded-md hover:bg-red-50 flex items-center justify-center mx-auto text-zinc-400 hover:text-red-600 cursor-pointer transition-colors outline-none"
+                          title="Delete Goal"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-bold text-zinc-455 italic">Sandbox</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-zinc-450 font-bold italic">
+                    No active goals found. Click "+ Add Goal" above to create one.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

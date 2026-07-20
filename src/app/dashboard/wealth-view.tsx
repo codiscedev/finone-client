@@ -98,14 +98,105 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
     }
   };
 
+  const [investments, setInvestments] = React.useState<any[]>([]);
+
+  const fetchInvestments = async () => {
+    if (!dbUser?.userId) return;
+    try {
+      const res = await apiClient.get(`/v1/investment/users/${dbUser.userId}`);
+      if (res.data?.success) {
+        setInvestments(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching investments in dashboard:", err);
+    }
+  };
+
   React.useEffect(() => {
     if (dbUser) {
       fetchAssets();
       fetchDebts();
       fetchGoals();
       fetchEssentials();
+      fetchInvestments();
     }
   }, [dbUser]);
+
+  // Investments Card derived variables
+  const {
+    investmentsInvested,
+    investmentsCurrentValue,
+    investmentsProfit,
+    investmentsProfitPercent,
+    overallCagr,
+    monthlySipTotal,
+    categorySplits
+  } = React.useMemo(() => {
+    const invested = investments.reduce((sum, item) => sum + (Number(item.investedAmount) || 0), 0);
+    const currentValue = investments.reduce((sum, item) => sum + (Number(item.currentValue) || Number(item.investedAmount) || 0), 0);
+    const profit = currentValue - invested;
+    const profitPercent = invested > 0 ? Number(((profit / invested) * 100).toFixed(1)) : 0;
+
+    let overallCagr = 0;
+    if (currentValue > 0) {
+      const weightedSum = investments.reduce((sum, item) => {
+        const val = Number(item.currentValue) || Number(item.investedAmount) || 0;
+        const rate = Number(item.expectedReturnPct) || 0;
+        return sum + val * rate;
+      }, 0);
+      overallCagr = Number((weightedSum / currentValue).toFixed(1));
+    }
+
+    const sipsTotal = investments.filter(item => item.isSip).reduce((sum, item) => sum + (Number(item.sipAmount) || 0), 0);
+
+    // Grouping investments dynamically by their actual category name
+    const groups: { [key: string]: number } = {};
+    investments.forEach((item) => {
+      const name = item.categoryName || "Other";
+      groups[name] = (groups[name] || 0) + (Number(item.currentValue) || Number(item.investedAmount) || 0);
+    });
+
+    const totalVal = currentValue || 1;
+    const splits = Object.keys(groups).map((name) => {
+      const val = groups[name];
+      const pct = currentValue > 0 ? Math.round((val / totalVal) * 100) : 0;
+      return {
+        name,
+        pct,
+        val
+      };
+    }).sort((a, b) => b.val - a.val);
+
+    return {
+      investmentsInvested: invested,
+      investmentsCurrentValue: currentValue,
+      investmentsProfit: profit,
+      investmentsProfitPercent: profitPercent,
+      overallCagr,
+      monthlySipTotal: sipsTotal,
+      categorySplits: splits
+    };
+  }, [investments]);
+
+  const formatCompact = (val: number) => {
+    if (val >= 100000) {
+      return `₹${(val / 100000).toFixed(2)}L`;
+    }
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0
+    }).format(val);
+  };
+
+  const formatINR = (val: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0
+    }).format(val);
+  };
+
 
   // Asset Card derived variables
   const { totalValuation, appreciatingTotal, depreciatingTotal, gainPercent, assetAllocationShares } = React.useMemo(() => {
@@ -241,12 +332,13 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   }, [goals]);
 
   // Essentials totals
-  const { totalSafetyReserve, totalInsurancePremium, totalInsuranceCover, monthsCoverage, lifeCoverAmount, healthCoverAmount } = React.useMemo(() => {
+  const { totalSafetyReserve, totalInsurancePremium, totalInsuranceCover, monthsCoverage, lifeCoverAmount, healthCoverAmount, essentialSplits } = React.useMemo(() => {
     let reserves = 0;
     let premium = 0;
     let cover = 0;
     let life = 0;
     let health = 0;
+    const groups: { [key: string]: number } = {};
 
     essentials.forEach((e) => {
       const catName = e.category?.name || e.categoryName || "";
@@ -264,10 +356,18 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
       } else {
         reserves += sum;
       }
+
+      const name = catName || "Other";
+      groups[name] = (groups[name] || 0) + sum;
     });
 
     const monthlyExpense = 50000; // standard default monthly expense base (INR)
     const months = monthlyExpense > 0 ? (reserves / monthlyExpense).toFixed(1) : "0.0";
+
+    const splits = Object.entries(groups).map(([name, val]) => ({
+      name,
+      val
+    })).sort((a, b) => b.val - a.val);
 
     return {
       totalSafetyReserve: reserves,
@@ -275,7 +375,8 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
       totalInsuranceCover: cover,
       monthsCoverage: months,
       lifeCoverAmount: life,
-      healthCoverAmount: health
+      healthCoverAmount: health,
+      essentialSplits: splits
     };
   }, [essentials]);
 
@@ -289,11 +390,6 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   const [showEmergencyDetails, setShowEmergencyDetails] = React.useState(false);
   const [monthlySavings, setMonthlySavings] = React.useState(2500); // Slider for monthly savings
   const [returnRate, setReturnRate] = React.useState(8); // Slider for return rate in %
-
-  // Retirement Goal Calculator state (Goals Card)
-  const [targetRetireAge, setTargetRetireAge] = React.useState(60);
-  const [currentAge, setCurrentAge] = React.useState(30);
-  const currentSavings = totalGoalSaved > 0 ? totalGoalSaved : 1500000;
 
   // Dynamic Net Worth Projection calculations
   const calculateProjection = (years: number) => {
@@ -310,30 +406,10 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
     return Math.round(fvPrincipal + fvAnnuity);
   };
 
-  // Dynamic Retirement Corpus Calculator calculations
-  const yearsToRetire = targetRetireAge - currentAge;
-  const retirementRequiredCorpus = 2500000; // Target retirement corpus: $2.5M
-  
-  const calculateRetirementProgress = () => {
-    const r = 0.07; // Assuming conservative 7% growth for retirement calculations
-    const n = 12;
-    const principal = currentSavings;
-    const PMT = 1500; // current monthly retirement SIP
-    
-    if (yearsToRetire <= 0) return principal;
-    const fvPrincipal = principal * Math.pow(1 + r/n, n * yearsToRetire);
-    const fvAnnuity = PMT * ((Math.pow(1 + r/n, n * yearsToRetire) - 1) / (r/n)) * (1 + r/n);
-    
-    return Math.round(fvPrincipal + fvAnnuity);
-  };
-
-  const projectedRetirementCorpus = calculateRetirementProgress();
-  const corpusPercentage = Math.min(Math.round((projectedRetirementCorpus / retirementRequiredCorpus) * 100), 100);
-
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       maximumFractionDigits: 0
     }).format(val);
   };
@@ -351,7 +427,16 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   }
 
   if (showInvestmentDetails) {
-    return <InvestmentDetailView onBack={() => setShowInvestmentDetails(false)} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+    return (
+      <InvestmentDetailView
+        onBack={() => {
+          fetchInvestments();
+          setShowInvestmentDetails(false);
+        }}
+        onAddClick={onAddClick}
+        onUpgradeClick={onUpgradeClick}
+      />
+    );
   }
 
   if (showGoalDetails) {
@@ -399,9 +484,394 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* ==========================================
-            1. Financial Health Card (4 Columns)
+            1. Assets Card (4 Columns)
             ========================================== */}
         <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
+          <div className="flex justify-between items-start">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <Coins className="h-5 w-5" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Asset</button>
+              <span className="text-zinc-200">|</span>
+              <button
+                onClick={() => setSelectedAsset("overview")}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
+              >
+                Details <ChevronRight className="h-3 w-3 ml-0.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <h3 className="text-lg font-bold text-zinc-900">Assets</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Asset allocations and appreciation summary</p>
+          </div>
+
+          <div className="my-5">
+            <p className="text-2xl font-bold tracking-tight text-zinc-900">{formatCurrency(totalValuation)}</p>
+            <p className="text-xs mt-1 text-zinc-500 flex items-center gap-1">
+              <span className={`font-bold px-1 rounded ${gainPercent >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-650 bg-red-50"}`}>
+                {gainPercent >= 0 ? "+" : ""}{gainPercent}% Yield
+              </span>
+              <span>across {assets.length} connected assets</span>
+            </p>
+          </div>
+
+          {/* Asset Type Stack */}
+          <div className="space-y-4 pt-4 border-t border-zinc-100">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Appreciating</p>
+                <p className="text-sm font-bold text-zinc-900 mt-0.5">{formatCurrency(appreciatingTotal)}</p>
+                <span className="text-[10px] text-emerald-650 font-semibold">Real estate & Stocks</span>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Depreciating</p>
+                <p className="text-sm font-bold text-zinc-900 mt-0.5">{formatCurrency(depreciatingTotal)}</p>
+                <span className="text-[10px] text-zinc-400 font-semibold">Automobile assets</span>
+              </div>
+            </div>
+
+            {/* Asset Distribution Bar chart */}
+            <div>
+              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 mb-1.5">Asset Allocation</p>
+              {totalValuation > 0 ? (
+                <>
+                  <div className="h-3.5 w-full bg-zinc-100 rounded-full overflow-hidden flex">
+                    {assetAllocationShares.map((share, idx) => (
+                      share.pct > 0 && (
+                        <div
+                          key={idx}
+                          className={`h-full ${share.color}`}
+                          style={{ width: `${share.pct}%` }}
+                          title={`${share.name} (${share.pct}%)`}
+                        />
+                      )
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 items-center text-[9px] text-zinc-400 font-bold mt-2">
+                    {assetAllocationShares.map((share, idx) => (
+                      share.pct > 0 && (
+                        <span key={idx} className="flex items-center gap-1.5">
+                          <span className={`h-1.5 w-1.5 rounded-full ${share.color}`} />
+                          {share.name} ({share.pct}%)
+                        </span>
+                      )
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-zinc-400 text-[10px] font-bold py-2 bg-zinc-50 rounded-lg text-center border border-dashed border-zinc-200">
+                  No assets added yet
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ==========================================
+            2. Debts Card (4 Columns)
+            ========================================== */}
+        <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
+          <div className="flex justify-between items-start">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Loan</button>
+              <span className="text-zinc-200">|</span>
+              <button 
+                onClick={() => setShowDebtDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
+              >
+                Details <ChevronRight className="h-3 w-3 ml-0.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <h3 className="text-lg font-bold text-zinc-900">Debts</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Outstanding liabilities and interest structures</p>
+          </div>
+
+          <div className="my-5">
+            <p className="text-2xl font-bold tracking-tight text-zinc-900">{formatCurrency(totalDebtOutstanding)}</p>
+            <p className="text-xs mt-1 text-zinc-500 flex items-center gap-2">
+              <span className={`font-bold px-1 rounded ${dtiRatio > 35 ? "text-red-600 bg-red-50" : dtiRatio > 15 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50"}`}>
+                {dtiRatio}% DTI
+              </span>
+              <span>Debt-to-Income ratio</span>
+            </p>
+          </div>
+
+          {/* Debt metrics details */}
+          <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
+            <div className="flex justify-between">
+              <span className="text-zinc-500 font-semibold">Active Liabilities:</span>
+              <span className="font-bold text-zinc-900">{liabilitiesSummary}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-500 font-semibold">Average Interest Rate:</span>
+              <span className="font-bold text-zinc-900">{averageInterestRate}% APR</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-500 font-semibold">Total Monthly EMI:</span>
+              <span className="font-bold text-zinc-900">{formatCurrency(totalMonthlyEmi)} / mo</span>
+            </div>
+
+            {/* AI avalanche suggestion */}
+            {debts.length > 0 && (
+              <div className="rounded-xl bg-orange-50/50 p-3.5 border border-orange-100/50">
+                <div className="flex items-center gap-1.5 text-orange-600 mb-1">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-xs font-bold">AI Debt-Avalanche Strategy</span>
+                </div>
+                <p className="text-[11px] text-zinc-650 leading-normal">
+                  Prioritize extra prepayments on your highest-rate loan. Your average rate is <span className="font-bold text-red-650">{averageInterestRate}% APR</span> across {debts.length} active liabilities.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ==========================================
+            3. Goals Card (4 Columns)
+            ========================================== */}
+        <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
+          <div className="flex justify-between items-start">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Target className="h-5 w-5" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Goal</button>
+              <span className="text-zinc-200">|</span>
+              <button 
+                onClick={() => setShowGoalDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
+              >
+                Details <ChevronRight className="h-3 w-3 ml-0.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <h3 className="text-lg font-bold text-zinc-900">Goals Planner</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">{goals.length} Goals Tracked | {activeGoalsCount} Active</p>
+          </div>
+
+          {/* Dynamic Goals progress */}
+          <div className="my-5 bg-zinc-50/50 p-4 rounded-xl border border-zinc-150 space-y-2">
+            <div className="flex justify-between items-end text-xs mb-1.5 font-semibold text-zinc-800">
+              <div>
+                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Overall Goals Progress</span>
+                <p className="text-lg font-black text-zinc-900 mt-0.5">{formatCurrency(totalGoalSaved)} / {formatCurrency(totalGoalTarget)}</p>
+              </div>
+              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
+                goalFundingPercentage >= 100 ? "text-emerald-600 bg-emerald-50 border-emerald-100" : "text-blue-600 bg-blue-50 border-blue-100"
+              }`}>
+                {goalFundingPercentage}% Funded
+              </span>
+            </div>
+            <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-pulse" style={{ width: `${Math.min(goalFundingPercentage, 100)}%` }} />
+            </div>
+          </div>
+
+          {/* Individual Goals List (filling white space) */}
+          <div className="mt-4 pt-4 border-t border-zinc-100 space-y-3">
+            <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Goals Breakdown</p>
+            {goals.length > 0 ? (
+              <div className="space-y-3">
+                {goals.slice(0, 3).map((goal, idx) => {
+                  const target = Number(goal.targetAmount) || 0;
+                  const saved = Number(goal.savedAmount) || 0;
+                  const pct = target > 0 ? Math.min(Math.round((saved / target) * 100), 100) : 0;
+                  return (
+                    <div key={goal.id || idx} className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-semibold text-zinc-700">
+                        <span className="truncate max-w-[60%]">{goal.name}</span>
+                        <span className="text-zinc-500 font-bold">{pct}% ({formatCurrency(saved)} / {formatCurrency(target)})</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-600 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {goals.length > 3 && (
+                  <p className="text-[9px] text-zinc-450 text-center font-bold">
+                    + {goals.length - 3} more goals tracked
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-zinc-450 text-[10px] font-bold py-4 bg-zinc-50 rounded-xl text-center border border-dashed border-zinc-200">
+                No active goals added yet
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ==========================================
+            4. Emergency Fund & Essentials (6 Columns)
+            ========================================== */}
+        <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
+          <div className="flex justify-between items-start">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Essential</button>
+              <span className="text-zinc-200">|</span>
+              <button
+                onClick={() => setShowEmergencyDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
+              >
+                Details <ChevronRight className="h-3 w-3 ml-0.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <h3 className="text-lg font-bold text-zinc-900">Essentials</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Insurance policies and safety capital protection</p>
+          </div>
+
+          {/* Emergency Fund coverage progress */}
+          <div className="my-5">
+            <div className="flex justify-between items-end text-xs mb-1.5">
+              <div>
+                <span className="text-zinc-400 font-semibold">Safety Reserve Capital</span>
+                <p className="text-xl font-bold text-zinc-900 mt-0.5">
+                  {formatCurrency(totalSafetyReserve)} / {formatCurrency(300000)} target
+                </p>
+              </div>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                totalSafetyReserve >= 300000 ? "text-emerald-600 bg-emerald-55 border border-emerald-100/30" : "text-amber-600 bg-amber-55 border border-amber-100/30"
+              }`}>
+                {totalSafetyReserve > 0 ? Math.round((totalSafetyReserve / 300000) * 100) : 0}% Funded
+              </span>
+            </div>
+            <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(totalSafetyReserve > 0 ? Math.round((totalSafetyReserve / 300000) * 100) : 0, 100)}%` }} />
+            </div>
+            <p className="text-[10px] text-zinc-500 mt-1">Provides <span className="font-bold text-zinc-800">{monthsCoverage} Months</span> of basic household expense coverage.</p>
+          </div>          {/* Insurance and nominee checklist */}
+          {essentialSplits.length > 0 ? (
+            <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Protective Assets & Coverages</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                  {essentialSplits.map((split, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-0.5">
+                      <span className="text-zinc-555 truncate mr-2">{split.name}:</span>
+                      <span className="font-semibold text-zinc-900 shrink-0">
+                        {formatCurrency(split.val)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* AI Warning reminder */}
+              <div className="rounded-xl bg-blue-50/50 p-3.5 border border-blue-100/50 flex items-start gap-2.5 mt-2">
+                <Sparkles className="h-4.5 w-4.5 text-blue-655 shrink-0 mt-0.5 animate-pulse" />
+                <p className="text-[11px] text-zinc-600 leading-normal">
+                  {healthCoverAmount === 0 || lifeCoverAmount === 0 ? (
+                    <span className="text-amber-700 font-bold">AI recommends adding health/life coverage limits to correctly construct protective cushions.</span>
+                  ) : (
+                    "AI confirms coverage levels are healthy. Keep tracking premium renewal timelines."
+                  )}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-4 border-t border-zinc-100 text-xs text-center text-zinc-450 italic font-bold">
+              No essentials recorded. Add a policy or safety reserve to see details.
+            </div>
+          )}
+        </div>
+
+        {/* ==========================================
+            5. Investments Card (6 Columns)
+            ========================================== */}
+        <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
+          <div className="flex justify-between items-start">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Briefcase className="h-5 w-5" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Investment</button>
+              <span className="text-zinc-200">|</span>
+              <button
+                onClick={() => setShowInvestmentDetails(true)}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
+              >
+                Details <ChevronRight className="h-3 w-3 ml-0.5" />
+              </button>
+            </div>
+          </div>
+          <div className="mt-5">
+            <h3 className="text-lg font-bold text-zinc-900">Investments</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Asset securities and equity CAGR metrics</p>
+          </div>
+
+          <div className="my-5 flex justify-between items-end">
+            <div>
+              <p className="text-3xl font-extrabold tracking-tight text-zinc-900">{formatINR(investmentsCurrentValue)}</p>
+              <p className="text-xs mt-1 text-zinc-500">Portfolio allocations index</p>
+            </div>
+            <div className="text-right">
+              <p className={`text-xs font-semibold px-2 py-0.5 rounded-md inline-block ${investmentsProfit >= 0 ? "text-emerald-600 bg-emerald-50" : "text-rose-600 bg-rose-50"}`}>
+                {investmentsProfit >= 0 ? "+" : ""}{formatINR(investmentsProfit)} Profit
+              </p>
+              <p className="text-[10px] text-zinc-400 mt-1">Overall Expected Return: {overallCagr}%</p>
+            </div>
+          </div>
+
+          {/* Allocation Details */}
+          {categorySplits.length > 0 ? (
+            <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Asset Allocation Breakdown</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                  {categorySplits.map((split, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-0.5">
+                      <span className="text-zinc-555 truncate mr-2">{split.name}:</span>
+                      <span className="font-semibold text-zinc-900 shrink-0">
+                        {split.pct}% ({formatCompact(split.val)})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* SIP & Goal alignment details */}
+              {monthlySipTotal > 0 && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 border border-zinc-100 mt-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-blue-500" />
+                    <div>
+                      <p className="font-semibold text-zinc-900">Active Monthly SIP: {formatINR(monthlySipTotal)}/mo</p>
+                      <p className="text-[10px] text-zinc-500">Aligned with retirement goal targets</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-zinc-400">92% Match</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="pt-4 border-t border-zinc-100 text-xs text-center text-zinc-450 italic font-bold">
+              No allocations recorded. Add an investment to see breakdown.
+            </div>
+          )}
+        </div>
+
+        {/* ==========================================
+            6. Financial Health Card (6 Columns)
+            ========================================== */}
+        <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
           <div className="flex justify-between items-start">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
               <HeartPulse className="h-5 w-5" />
@@ -488,169 +958,8 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
               </p>
             </div>
           </div>
-        </div>
-
-        <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-          <div className="flex justify-between items-start">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <Coins className="h-5 w-5" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Asset</button>
-              <span className="text-zinc-200">|</span>
-              <button
-                onClick={() => setSelectedAsset("overview")}
-                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
-              >
-                Details <ChevronRight className="h-3 w-3 ml-0.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <h3 className="text-lg font-bold text-zinc-900">Assets</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Asset allocations and appreciation summary</p>
-          </div>
-
-          <div className="my-5">
-            <p className="text-2xl font-bold tracking-tight text-zinc-900">{formatCurrency(totalValuation)}</p>
-            <p className="text-xs mt-1 text-zinc-500 flex items-center gap-1">
-              <span className={`font-bold px-1 rounded ${gainPercent >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-650 bg-red-50"}`}>
-                {gainPercent >= 0 ? "+" : ""}{gainPercent}% Yield
-              </span>
-              <span>across {assets.length} connected assets</span>
-            </p>
-          </div>
-
-          {/* Asset Type Stack */}
-          <div className="space-y-4 pt-4 border-t border-zinc-100">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Appreciating</p>
-                <p className="text-sm font-bold text-zinc-900 mt-0.5">{formatCurrency(appreciatingTotal)}</p>
-                <span className="text-[10px] text-emerald-650 font-semibold">Real estate & Stocks</span>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Depreciating</p>
-                <p className="text-sm font-bold text-zinc-900 mt-0.5">{formatCurrency(depreciatingTotal)}</p>
-                <span className="text-[10px] text-zinc-400 font-semibold">Automobile assets</span>
-              </div>
-            </div>
-
-            {/* Asset Distribution Bar chart */}
-            <div>
-              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 mb-1.5">Asset Allocation</p>
-              {totalValuation > 0 ? (
-                <>
-                  <div className="h-3.5 w-full bg-zinc-100 rounded-full overflow-hidden flex">
-                    {assetAllocationShares.map((share, idx) => (
-                      share.pct > 0 && (
-                        <div
-                          key={idx}
-                          className={`h-full ${share.color}`}
-                          style={{ width: `${share.pct}%` }}
-                          title={`${share.name} (${share.pct}%)`}
-                        />
-                      )
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 items-center text-[9px] text-zinc-400 font-bold mt-2">
-                    {assetAllocationShares.map((share, idx) => (
-                      share.pct > 0 && (
-                        <span key={idx} className="flex items-center gap-1.5">
-                          <span className={`h-1.5 w-1.5 rounded-full ${share.color}`} />
-                          {share.name} ({share.pct}%)
-                        </span>
-                      )
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="text-zinc-400 text-[10px] font-bold py-2 bg-zinc-50 rounded-lg text-center border border-dashed border-zinc-200">
-                  No assets added yet
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ==========================================
-            3. Debts Card (4 Columns)
-            ========================================== */}
-        <div className="lg:col-span-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-          <div className="flex justify-between items-start">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
-              <ShieldAlert className="h-5 w-5" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Loan</button>
-              <span className="text-zinc-200">|</span>
-              <button 
-                onClick={() => setShowDebtDetails(true)}
-                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
-              >
-                Details <ChevronRight className="h-3 w-3 ml-0.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <h3 className="text-lg font-bold text-zinc-900">Debts</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Outstanding liabilities and interest structures</p>
-          </div>
-
-          <div className="my-5">
-            <p className="text-2xl font-bold tracking-tight text-zinc-900">{formatCurrency(totalDebtOutstanding)}</p>
-            <p className="text-xs mt-1 text-zinc-500 flex items-center gap-2">
-              <span className={`font-bold px-1 rounded ${dtiRatio > 35 ? "text-red-600 bg-red-50" : dtiRatio > 15 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50"}`}>
-                {dtiRatio}% DTI
-              </span>
-              <span>Debt-to-Income ratio</span>
-            </p>
-          </div>
-
-          {/* Debt metrics details */}
-          <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
-            <div className="flex justify-between">
-              <span className="text-zinc-500 font-semibold">Active Liabilities:</span>
-              <span className="font-bold text-zinc-900">{liabilitiesSummary}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-500 font-semibold">Average Interest Rate:</span>
-              <span className="font-bold text-zinc-900">{averageInterestRate}% APR</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-500 font-semibold">Total Monthly EMI:</span>
-              <span className="font-bold text-zinc-900">{formatCurrency(totalMonthlyEmi)} / mo</span>
-            </div>
-
-            {/* AI avalanche suggestion */}
-            {debts.length > 0 ? (
-              <div className="rounded-xl bg-orange-50/50 p-3.5 border border-orange-100/50">
-                <div className="flex items-center gap-1.5 text-orange-600 mb-1">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-xs font-bold">AI Debt-Avalanche Strategy</span>
-                </div>
-                <p className="text-[11px] text-zinc-650 leading-normal">
-                  Prioritize extra prepayments on your highest-rate loan. Your average rate is <span className="font-bold text-red-650">{averageInterestRate}% APR</span> across {debts.length} active liabilities.
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-xl bg-emerald-50/50 p-3.5 border border-emerald-100/50">
-                <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
-                  <ShieldCheck className="h-4 w-4" />
-                  <span className="text-xs font-bold">AI Debt health Strategy</span>
-                </div>
-                <p className="text-[11px] text-zinc-650 leading-normal">
-                  You are completely debt free! Keep maintaining a robust savings rate and invest in appreciating assets.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ==========================================
-            4. Net Worth Prediction Card (6 Columns)
+        </div>        {/* ==========================================
+            7. Net Worth Prediction Card (6 Columns)
             ========================================== */}
         <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
           <div className="flex justify-between items-start">
@@ -740,283 +1049,6 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
                 <span className="text-[10px] text-zinc-500 font-semibold">20 Years</span>
                 <p className="text-xs font-bold text-zinc-900 mt-1">{formatCurrency(calculateProjection(20))}</p>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ==========================================
-            5. Investments Card (6 Columns)
-            ========================================== */}
-        <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-          <div className="flex justify-between items-start">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Briefcase className="h-5 w-5" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Investment</button>
-              <span className="text-zinc-200">|</span>
-              <button
-                onClick={() => setShowInvestmentDetails(true)}
-                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center outline-none cursor-pointer"
-              >
-                Details <ChevronRight className="h-3 w-3 ml-0.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <h3 className="text-lg font-bold text-zinc-900">Investments</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Asset securities and equity CAGR metrics</p>
-          </div>
-
-          <div className="my-5 flex justify-between items-end">
-            <div>
-              <p className="text-3xl font-extrabold tracking-tight text-zinc-900">₹45,80,000</p>
-              <p className="text-xs mt-1 text-zinc-500">Portfolio allocations index</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md inline-block">+₹8,24,000 Total Profit</p>
-              <p className="text-[10px] text-zinc-400 mt-1">Overall CAGR: 12.4%</p>
-            </div>
-          </div>
-
-          {/* Allocation Details */}
-          <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Equity Breakdown</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Mutual Funds:</span>
-                  <span className="font-semibold text-zinc-900">45% (₹20.61L)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Tech Stocks:</span>
-                  <span className="font-semibold text-zinc-900">30% (₹13.74L)</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Fixed Income</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">EPF & PPF:</span>
-                  <span className="font-semibold text-zinc-900">20% (₹9.16L)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Liquid Cash:</span>
-                  <span className="font-semibold text-zinc-900">5% (₹2.29L)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* SIP & Goal alignment details */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 border border-zinc-100">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-500" />
-                <div>
-                  <p className="font-semibold text-zinc-900">Active Monthly SIP: ₹15,000/mo</p>
-                  <p className="text-[10px] text-zinc-500">Aligned with retirement goal targets</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-zinc-400">92% Match</span>
-            </div>
-          </div>
-        </div>
-
-        {/* ==========================================
-            6. Goals Card (6 Columns)
-            ========================================== */}
-        <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-          <div className="flex justify-between items-start">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Target className="h-5 w-5" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Goal</button>
-              <span className="text-zinc-200">|</span>
-              <button 
-                onClick={() => setShowGoalDetails(true)}
-                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
-              >
-                Details <ChevronRight className="h-3 w-3 ml-0.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <h3 className="text-lg font-bold text-zinc-900">Goals Planner</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">{goals.length} Goals Tracked | {activeGoalsCount} Active</p>
-          </div>
-
-          {/* Dynamic Goals progress */}
-          <div className="my-5 bg-zinc-50/50 p-4 rounded-xl border border-zinc-150 space-y-2">
-            <div className="flex justify-between items-end text-xs mb-1.5 font-semibold text-zinc-800">
-              <div>
-                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Overall Goals Progress</span>
-                <p className="text-lg font-black text-zinc-900 mt-0.5">{formatCurrency(totalGoalSaved)} / {formatCurrency(totalGoalTarget)}</p>
-              </div>
-              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
-                goalFundingPercentage >= 100 ? "text-emerald-600 bg-emerald-50 border-emerald-100" : "text-blue-600 bg-blue-50 border-blue-100"
-              }`}>
-                {goalFundingPercentage}% Funded
-              </span>
-            </div>
-            <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-pulse" style={{ width: `${Math.min(goalFundingPercentage, 100)}%` }} />
-            </div>
-          </div>
-
-          {/* Calculator Controls */}
-          <div className="space-y-4 my-5 bg-zinc-50 p-4 rounded-xl border border-zinc-100">
-            <div className="flex items-center justify-between text-xs font-semibold text-zinc-700">
-              <span>Simulated Target Retirement Age:</span>
-              <span className="text-blue-600 font-bold">{targetRetireAge} Years</span>
-            </div>
-            <input
-              type="range"
-              min="50"
-              max="70"
-              step="1"
-              value={targetRetireAge}
-              onChange={(e) => setTargetRetireAge(Number(e.target.value))}
-              className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-            />
-
-            <div className="grid grid-cols-2 gap-4 text-xs pt-2 border-t border-zinc-200/50">
-              <div>
-                <span className="text-zinc-500">Current Savings:</span>
-                <p className="font-bold text-zinc-900 mt-0.5">{formatCurrency(currentSavings)}</p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Required monthly SIP:</span>
-                <p className="font-bold text-zinc-900 mt-0.5">₹15,000 / mo</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress metric */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between items-center text-xs font-semibold text-zinc-800 mb-1.5">
-                <span>Retirement Corpus Progress (Target ₹2.5 Cr)</span>
-                <span>{corpusPercentage}% Probability</span>
-              </div>
-              <div className="h-2.5 w-full bg-zinc-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${corpusPercentage}%` }} />
-              </div>
-              <p className="text-[10px] text-zinc-400 mt-1">Projected corpus: {formatCurrency(projectedRetirementCorpus)} by age {targetRetireAge}</p>
-            </div>
-
-            {/* Other targets summary */}
-            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-3 border-t border-zinc-100">
-              <div>
-                <span className="text-[10px] text-zinc-400 font-semibold block">Child Education</span>
-                <p className="font-bold text-zinc-900 mt-0.5">₹12L</p>
-                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded inline-block mt-1">94% probability</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-zinc-400 font-semibold block">House Purchase</span>
-                <p className="font-bold text-zinc-900 mt-0.5">₹65L</p>
-                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded inline-block mt-1">82% probability</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-zinc-400 font-semibold block">Vacation</span>
-                <p className="font-bold text-zinc-900 mt-0.5">₹1.5L</p>
-                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded inline-block mt-1">99% probability</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ==========================================
-            7. Emergency Fund & Essentials (6 Columns)
-            ========================================== */}
-        <div className="lg:col-span-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group">
-          <div className="flex justify-between items-start">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={onAddClick} className="text-xs text-zinc-400 font-semibold hover:text-zinc-650 transition-colors cursor-pointer">+ Add Essential</button>
-              <span className="text-zinc-200">|</span>
-              <button
-                onClick={() => setShowEmergencyDetails(true)}
-                className="text-xs text-blue-600 font-semibold hover:text-blue-700 transition-colors flex items-center cursor-pointer outline-none"
-              >
-                Details <ChevronRight className="h-3 w-3 ml-0.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <h3 className="text-lg font-bold text-zinc-900">Essentials</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Insurance policies and safety capital protection</p>
-          </div>
-
-          {/* Emergency Fund coverage progress */}
-          <div className="my-5">
-            <div className="flex justify-between items-end text-xs mb-1.5">
-              <div>
-                <span className="text-zinc-400 font-semibold">Safety Reserve Capital</span>
-                <p className="text-xl font-bold text-zinc-900 mt-0.5">
-                  {formatCurrency(totalSafetyReserve)} / {formatCurrency(300000)} target
-                </p>
-              </div>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                totalSafetyReserve >= 300000 ? "text-emerald-600 bg-emerald-50 border border-emerald-105" : "text-amber-600 bg-amber-50 border border-amber-105"
-              }`}>
-                {totalSafetyReserve > 0 ? Math.round((totalSafetyReserve / 300000) * 100) : 0}% Funded
-              </span>
-            </div>
-            <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(totalSafetyReserve > 0 ? Math.round((totalSafetyReserve / 300000) * 100) : 0, 100)}%` }} />
-            </div>
-            <p className="text-[10px] text-zinc-500 mt-1">Provides <span className="font-bold text-zinc-800">{monthsCoverage} Months</span> of basic household expense coverage.</p>
-          </div>
-
-          {/* Insurance and nominee checklist */}
-          <div className="space-y-4 pt-4 border-t border-zinc-100 text-xs">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Policies Status</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Health Insurance:</span>
-                  <span className={`font-bold ${healthCoverAmount > 0 ? "text-emerald-600" : "text-amber-500"}`}>
-                    {healthCoverAmount > 0 ? formatCurrency(healthCoverAmount) : "Missing!"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Life Insurance:</span>
-                  <span className={`font-bold ${lifeCoverAmount > 0 ? "text-emerald-600" : "text-amber-500"}`}>
-                    {lifeCoverAmount > 0 ? formatCurrency(lifeCoverAmount) : "Missing!"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Other Protection:</span>
-                  <span className="font-bold text-emerald-600">Active</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Estate Audits</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Will Documented:</span>
-                  <span className="font-bold text-emerald-600">Active</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Nominees Assigned:</span>
-                  <span className="font-bold text-emerald-600">Active</span>
-                </div>
-              </div>
-            </div>
-
-            {/* AI Warning reminder */}
-            <div className="rounded-xl bg-blue-50/50 p-3.5 border border-blue-100/50 flex items-start gap-2.5">
-              <Sparkles className="h-4.5 w-4.5 text-blue-600 shrink-0 mt-0.5 animate-pulse" />
-              <p className="text-[11px] text-zinc-600 leading-normal">
-                {healthCoverAmount === 0 || lifeCoverAmount === 0 ? (
-                  <span className="text-amber-700 font-bold">AI recommends adding health/life coverage limits to correctly construct protective cushions.</span>
-                ) : (
-                  "AI confirms coverage levels are healthy. Keep tracking premium renewal timelines."
-                )}
-              </p>
             </div>
           </div>
         </div>

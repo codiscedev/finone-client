@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
+import { onIdTokenChanged, signOut, User as FirebaseUser } from "firebase/auth";
 import { auth } from "./firebase";
 import { apiClient } from "./api";
 
@@ -18,6 +18,8 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   dbUser: DbUser | null;
   loading: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   logout: () => Promise<void>;
 }
 
@@ -25,6 +27,8 @@ const AuthContext = React.createContext<AuthContextType>({
   firebaseUser: null,
   dbUser: null,
   loading: true,
+  authError: null,
+  clearAuthError: () => { },
   logout: async () => { },
 });
 
@@ -34,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = React.useState<FirebaseUser | null>(null);
   const [dbUser, setDbUser] = React.useState<DbUser | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [authError, setAuthError] = React.useState<string | null>(null);
 
   // Initialize dbUser state from sessionStorage if available (prevents flicker on reload)
   React.useEffect(() => {
@@ -48,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
         setFirebaseUser(currentUser);
         try {
@@ -62,8 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             throw new Error("Unsuccessful response from backend login");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Backend auth sync failed:", err);
+          const errMsg = err.response?.data?.message || err.message || "Backend synchronization failed.";
+          setAuthError(errMsg);
           // Reset states to force redirect to /login and clear stale sessions
           setFirebaseUser(null);
           setDbUser(null);
@@ -114,8 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearAuthError = () => setAuthError(null);
+
   return (
-    <AuthContext.Provider value={{ firebaseUser, dbUser, loading, logout }}>
+    <AuthContext.Provider value={{ firebaseUser, dbUser, loading, authError, clearAuthError, logout }}>
       {children}
     </AuthContext.Provider>
   );
