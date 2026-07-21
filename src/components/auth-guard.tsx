@@ -18,15 +18,15 @@ interface AuthGuardProps {
  *  - If user is authenticated: renders children normally.
  */
 export default function AuthGuard({ children }: AuthGuardProps) {
-  const { user, loading } = useAuth();
+  const { firebaseUser, loading } = useAuth();
   const router = useRouter();
 
   React.useEffect(() => {
     // Only act once Firebase has resolved (loading === false)
-    if (!loading && !user) {
+    if (!loading && !firebaseUser) {
       router.replace("/login");
     }
-  }, [user, loading, router]);
+  }, [firebaseUser, loading, router]);
 
   // ── Loading state ─────────────────────────────────────────────
   if (loading) {
@@ -51,7 +51,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   }
 
   // ── Not authenticated — render nothing while redirect happens ──
-  if (!user) {
+  if (!firebaseUser) {
     return null;
   }
 
