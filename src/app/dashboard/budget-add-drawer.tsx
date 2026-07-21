@@ -17,7 +17,7 @@ interface BudgetAddDrawerProps {
   onAdd: (budget: {
     name: string;
     budgetAmount: number;
-    category: string;
+    categoryId: string;
   }) => void;
 }
 
@@ -70,10 +70,13 @@ export default function BudgetAddDrawer({
     e.preventDefault();
     if (!form.name.trim() || !form.budgetAmount || !form.category) return;
 
+    const selectedCat = categories.find(c => c.name === form.category);
+    if (!selectedCat) return;
+
     onAdd({
       name: form.name,
       budgetAmount: parseFloat(form.budgetAmount),
-      category: form.category,
+      categoryId: selectedCat.id,
     });
   };
 

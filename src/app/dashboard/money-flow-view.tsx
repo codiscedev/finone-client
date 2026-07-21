@@ -310,64 +310,112 @@ export default function MoneyFlowView() {
   }, [fetchReviewCount]);
 
   // ---- Transactions ----
-  const [transactions, setTransactions] = React.useState<Transaction[]>(() => {
-    if (typeof window !== "undefined") {
-      const s = localStorage.getItem("finone_transactions_v2");
-      return s ? JSON.parse(s) : INITIAL_TRANSACTIONS;
-    }
-    return INITIAL_TRANSACTIONS;
-  });
-  React.useEffect(() => { localStorage.setItem("finone_transactions_v2", JSON.stringify(transactions)); }, [transactions]);
+  const [transactions, setTransactions] = React.useState<Transaction[]>([]);
 
   // ---- Categories ----
-  const [categories, setCategories] = React.useState<Category[]>(() => {
-    if (typeof window !== "undefined") {
-      const s = localStorage.getItem("finone_categories");
-      return s ? JSON.parse(s) : INITIAL_CATEGORIES;
-    }
-    return INITIAL_CATEGORIES;
-  });
-  React.useEffect(() => { localStorage.setItem("finone_categories", JSON.stringify(categories)); }, [categories]);
+  const [categories, setCategories] = React.useState<Category[]>([]);
 
   // ---- Recurring ----
-  const [recurringBills, setRecurringBills] = React.useState<RecurringBill[]>(() => {
-    if (typeof window !== "undefined") {
-      const s = localStorage.getItem("finone_recurring");
-      return s ? JSON.parse(s) : INITIAL_RECURRING;
-    }
-    return INITIAL_RECURRING;
-  });
-  React.useEffect(() => { localStorage.setItem("finone_recurring", JSON.stringify(recurringBills)); }, [recurringBills]);
+  const [recurringBills, setRecurringBills] = React.useState<RecurringBill[]>([]);
 
   // ---- Budget ----
-  const [budgets, setBudgets] = React.useState<BudgetItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const s = localStorage.getItem("finone_budgets");
-      return s ? JSON.parse(s) : INITIAL_BUDGETS;
-    }
-    return INITIAL_BUDGETS;
-  });
-  React.useEffect(() => { localStorage.setItem("finone_budgets", JSON.stringify(budgets)); }, [budgets]);
+  const [budgets, setBudgets] = React.useState<BudgetItem[]>([]);
 
   // ---- Income ----
-  const [incomeItems, setIncomeItems] = React.useState<IncomeItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const s = localStorage.getItem("finone_income");
-      return s ? JSON.parse(s) : INITIAL_INCOME;
-    }
-    return INITIAL_INCOME;
-  });
-  React.useEffect(() => { localStorage.setItem("finone_income", JSON.stringify(incomeItems)); }, [incomeItems]);
+  const [incomeItems, setIncomeItems] = React.useState<IncomeItem[]>([]);
 
   // ---- Credit Cards ----
-  const [creditCards, setCreditCards] = React.useState<CreditCardItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const s = localStorage.getItem("finone_credit_cards");
-      return s ? JSON.parse(s) : INITIAL_CREDIT_CARDS;
+  const [creditCards, setCreditCards] = React.useState<CreditCardItem[]>([]);
+
+  const fetchData = React.useCallback(async () => {
+    if (!dbUser) return;
+    try {
+      const [txRes, catRes, billRes, budgetRes, incRes, cardRes] = await Promise.all([
+        apiClient.get(`/v1/transaction/users/${dbUser.userId}`),
+        apiClient.get(`/v1/category/users/${dbUser.userId}`),
+        apiClient.get(`/v1/bill/users/${dbUser.userId}`),
+        apiClient.get(`/v1/budget/users/${dbUser.userId}`),
+        apiClient.get(`/v1/income/users/${dbUser.userId}`),
+        apiClient.get(`/v1/creditcard/users/${dbUser.userId}`),
+      ]);
+
+      if (txRes.data?.success) {
+        setTransactions(txRes.data.data.map((tx: any) => ({
+          id: tx.id,
+          date: tx.transactionDate,
+          amount: tx.amount,
+          merchant: tx.merchant || "Unknown",
+          category: tx.categoryName || "Other",
+          description: tx.note || "",
+          type: tx.type.toLowerCase(),
+          paymentMethod: tx.accountLast4 ? `Card ending in *${tx.accountLast4}` : "Other",
+          tags: tx.tags ? tx.tags.split(",") : [],
+        })));
+      }
+
+      if (catRes.data?.success) {
+        setCategories(catRes.data.data.map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          subcategories: [],
+          maxCap: 0,
+          description: "",
+          color: cat.color || "#94a3b8",
+        })));
+      }
+
+      if (billRes.data?.success) {
+        setRecurringBills(billRes.data.data.map((bill: any) => ({
+          id: bill.id,
+          name: bill.name,
+          dateOfDebit: bill.dateOfDebit ? bill.dateOfDebit.toString() : "",
+          amount: bill.amount,
+          frequency: bill.frequency,
+          category: bill.category || "",
+          subcategory: bill.subcategory || "",
+          paymentMethod: bill.paymentMethod || "",
+        })));
+      }
+
+      if (budgetRes.data?.success) {
+        setBudgets(budgetRes.data.data.map((b: any) => ({
+          id: b.id,
+          name: b.budgetName,
+          budgetAmount: b.budgetAmount,
+          category: b.categoryName || "",
+        })));
+      }
+
+      if (incRes.data?.success) {
+        setIncomeItems(incRes.data.data.map((inc: any) => ({
+          id: inc.id,
+          source: inc.incomeSource,
+          amount: inc.amount,
+          fetchType: inc.fetchType,
+          dateOfCredit: inc.dateOfCredit,
+          isFixed: inc.incomeType === "Fixed",
+        })));
+      }
+
+      if (cardRes.data?.success) {
+        setCreditCards(cardRes.data.data.map((c: any) => ({
+          id: c.id,
+          cardName: c.cardName,
+          lastFour: c.lastFour,
+          creditLimit: c.creditLimit,
+          outstanding: 0,
+          minDue: 0,
+          dueDate: c.dueDate ? `${c.dueDate}th` : "",
+        })));
+      }
+    } catch (e) {
+      console.error("Failed to load Money Flow data", e);
     }
-    return INITIAL_CREDIT_CARDS;
-  });
-  React.useEffect(() => { localStorage.setItem("finone_credit_cards", JSON.stringify(creditCards)); }, [creditCards]);
+  }, [dbUser]);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // ---- Derived Totals ----
   const expenseList = React.useMemo(() => transactions.filter(t => t.type === "expense"), [transactions]);
@@ -377,7 +425,7 @@ export default function MoneyFlowView() {
 
   // ---- Handle import from drawer ----
   const handleImport = (items: any[]) => {
-    setTransactions(prev => [...items.map(i => ({ ...i, referenceId: i.referenceId || undefined })), ...prev]);
+    fetchData();
   };
 
   const SUB_TABS: { key: SubTab; label: string; icon: React.ElementType }[] = [
@@ -640,17 +688,28 @@ function SpendingTab({
     maxCap: "", description: "", color: "#6366f1",
   });
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (!newCat.name.trim()) return;
-    const cat: Category = {
-      id: "cat_" + Date.now(),
-      name: newCat.name,
-      subcategories: newCat.subcatName ? [{ name: newCat.subcatName, priority: newCat.subcatPriority }] : [],
-      maxCap: parseFloat(newCat.maxCap) || 0,
-      description: newCat.description,
-      color: newCat.color,
-    };
-    setCategories(prev => [...prev, cat]);
+    try {
+      const res = await apiClient.post("/v1/category", {
+        name: newCat.name,
+        color: newCat.color,
+        type: "EXPENSE"
+      });
+      if (res.data?.success) {
+        const cat = res.data.data;
+        setCategories(prev => [...prev, {
+          id: cat.id,
+          name: cat.name,
+          subcategories: [],
+          maxCap: 0,
+          description: "",
+          color: cat.color || "#94a3b8",
+        }]);
+      }
+    } catch (err) {
+      console.log("Failed to add category", err);
+    }
     setNewCat({ name: "", subcatName: "", subcatPriority: "Medium", maxCap: "", description: "", color: "#6366f1" });
     setShowAddCategory(false);
   };
@@ -853,7 +912,14 @@ function SpendingTab({
                       </td>
                       <td className="p-3.5 text-center">
                         <button
-                          onClick={() => setTransactions(prev => prev.filter(x => x.id !== t.id))}
+                          onClick={async () => {
+                            try {
+                              await apiClient.delete(`/v1/transaction/${t.id}`);
+                              setTransactions(prev => prev.filter(x => x.id !== t.id));
+                            } catch (err) {
+                              console.error("Failed to delete transaction", err);
+                            }
+                          }}
                           className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -943,7 +1009,7 @@ function RecurringBillsTab({
     }, 0);
   }, [bills]);
 
-  const handleAddBill = (newBill: {
+  const handleAddBill = async (newBill: {
     name: string;
     dateOfDebit: string;
     amount: number;
@@ -952,7 +1018,32 @@ function RecurringBillsTab({
     subcategory: string;
     paymentMethod: string;
   }) => {
-    setBills(prev => [...prev, { id: "rec_" + Date.now(), ...newBill }]);
+    try {
+      const res = await apiClient.post("/v1/bill", {
+        billName: newBill.name,
+        dayOfDebit: parseInt(newBill.dateOfDebit, 10),
+        amount: newBill.amount,
+        frequency: newBill.frequency,
+        category: newBill.category,
+        subcategory: newBill.subcategory,
+        paymentMethod: newBill.paymentMethod,
+      });
+      if (res.data?.success) {
+        const b = res.data.data;
+        setBills(prev => [...prev, {
+          id: b.id,
+          name: b.name,
+          dateOfDebit: b.dateOfDebit ? b.dateOfDebit.toString() : "",
+          amount: b.amount,
+          frequency: b.frequency,
+          category: b.category || "",
+          subcategory: b.subcategory || "",
+          paymentMethod: b.paymentMethod || "",
+        }]);
+      }
+    } catch (err) {
+      console.error("Failed to add bill", err);
+    }
     setShowAdd(false);
   };
 
@@ -1017,7 +1108,14 @@ function RecurringBillsTab({
                   <td className="p-3.5 text-zinc-500">{b.subcategory || "—"}</td>
                   <td className="p-3.5 text-zinc-500">{b.paymentMethod}</td>
                   <td className="p-3.5 text-center">
-                    <button onClick={() => setBills(prev => prev.filter(x => x.id !== b.id))}
+                    <button onClick={async () => {
+                      try {
+                        await apiClient.delete(`/v1/bill/${b.id}`);
+                        setBills(prev => prev.filter(x => x.id !== b.id));
+                      } catch (err) {
+                        console.error("Failed to delete bill", err);
+                      }
+                    }}
                       className="p-1 rounded-lg text-zinc-300 hover:text-red-650 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1062,12 +1160,29 @@ function BudgetTab({
 
   const getSpent = (cat: string) => expenseList.filter(t => t.category === cat).reduce((s, t) => s + t.amount, 0);
 
-  const handleAddBudget = (newBudget: {
+  const handleAddBudget = async (newBudget: {
     name: string;
     budgetAmount: number;
-    category: string;
+    categoryId: string;
   }) => {
-    setBudgets(prev => [...prev, { id: "bud_" + Date.now(), ...newBudget }]);
+    try {
+      const res = await apiClient.post("/v1/budget", {
+        budgetName: newBudget.name,
+        budgetAmount: newBudget.budgetAmount,
+        categoryId: newBudget.categoryId,
+      });
+      if (res.data?.success) {
+        const b = res.data.data;
+        setBudgets(prev => [...prev, {
+          id: b.id,
+          name: b.budgetName,
+          budgetAmount: b.budgetAmount,
+          category: b.categoryName || "",
+        }]);
+      }
+    } catch (err) {
+      console.error("Failed to add budget", err);
+    }
     setShowAdd(false);
   };
 
@@ -1153,7 +1268,14 @@ function BudgetTab({
                       </div>
                     </td>
                     <td className="p-3.5 text-center">
-                      <button onClick={() => setBudgets(prev => prev.filter(x => x.id !== b.id))}
+                      <button onClick={async () => {
+                        try {
+                          await apiClient.delete(`/v1/budget/${b.id}`);
+                          setBudgets(prev => prev.filter(x => x.id !== b.id));
+                        } catch (err) {
+                          console.error("Failed to delete budget", err);
+                        }
+                      }}
                         className="p-1 rounded-lg text-zinc-300 hover:text-red-650 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -1201,14 +1323,35 @@ function IncomeTab({
 
   const total = incomeItems.reduce((s, i) => s + calcAmount(i), 0);
 
-  const handleAddIncome = (newIncome: {
+  const handleAddIncome = async (newIncome: {
     source: string;
     amount: number;
     dateOfCredit: string;
     isFixed: boolean;
     fetchType: "Manual" | "Auto";
   }) => {
-    setIncomeItems(prev => [...prev, { id: "inc_" + Date.now(), ...newIncome }]);
+    try {
+      const res = await apiClient.post("/v1/income", {
+        incomeSource: newIncome.source,
+        amount: newIncome.amount,
+        dateOfCredit: newIncome.dateOfCredit,
+        incomeType: newIncome.isFixed ? "Fixed" : "One-time",
+        fetchType: newIncome.fetchType,
+      });
+      if (res.data?.success) {
+        const inc = res.data.data;
+        setIncomeItems(prev => [...prev, {
+          id: inc.id,
+          source: inc.incomeSource,
+          amount: inc.amount,
+          fetchType: inc.fetchType,
+          dateOfCredit: inc.dateOfCredit,
+          isFixed: inc.incomeType === "Fixed",
+        }]);
+      }
+    } catch (err) {
+      console.error("Failed to add income", err);
+    }
     setShowAdd(false);
   };
 
@@ -1296,7 +1439,14 @@ function IncomeTab({
                   </td>
                   <td className="p-3.5 font-mono text-zinc-500">{item.dateOfCredit}</td>
                   <td className="p-3.5 text-center">
-                    <button onClick={() => setIncomeItems(prev => prev.filter(x => x.id !== item.id))}
+                    <button onClick={async () => {
+                      try {
+                        await apiClient.delete(`/v1/income/${item.id}`);
+                        setIncomeItems(prev => prev.filter(x => x.id !== item.id));
+                      } catch (err) {
+                        console.error("Failed to delete income", err);
+                      }
+                    }}
                       className="p-1 rounded-lg text-zinc-300 hover:text-red-650 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1340,18 +1490,36 @@ function CreditCardTab({
   const totalLimit = cards.reduce((s, c) => s + c.creditLimit, 0);
   const overallUtilization = totalLimit > 0 ? Math.round((totalOutstanding / totalLimit) * 100) : 0;
 
-  const handleAddCard = (newCard: {
+  const handleAddCard = async (newCard: {
     cardName: string;
     lastFour: string;
     creditLimit: number;
     outstanding: number;
     minDue: number;
-    dueDate: string;
+    dueDate: number;
   }) => {
-    setCards(prev => [...prev, {
-      id: "cc_" + Date.now(),
-      ...newCard
-    }]);
+    try {
+      const res = await apiClient.post("/v1/creditcard", {
+        cardName: newCard.cardName,
+        lastFour: newCard.lastFour,
+        creditLimit: newCard.creditLimit,
+        dueDate: newCard.dueDate,
+      });
+      if (res.data?.success) {
+        const card = res.data.data;
+        setCards(prev => [...prev, {
+          id: card.id,
+          cardName: card.cardName,
+          lastFour: card.lastFour,
+          creditLimit: card.creditLimit,
+          outstanding: 0,
+          minDue: 0,
+          dueDate: card.dueDate ? `${card.dueDate}th` : "",
+        }]);
+      }
+    } catch (err) {
+      console.error("Failed to add credit card", err);
+    }
     setShowAdd(false);
   };
 
@@ -1441,7 +1609,14 @@ function CreditCardTab({
                       </div>
                     </td>
                     <td className="p-3.5 text-center">
-                      <button onClick={() => setCards(prev => prev.filter(x => x.id !== c.id))}
+                      <button onClick={async () => {
+                        try {
+                          await apiClient.delete(`/v1/creditcard/${c.id}`);
+                          setCards(prev => prev.filter(x => x.id !== c.id));
+                        } catch (err) {
+                          console.error("Failed to delete credit card", err);
+                        }
+                      }}
                         className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

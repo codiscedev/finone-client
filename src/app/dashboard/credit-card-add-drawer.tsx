@@ -13,7 +13,7 @@ interface CreditCardAddDrawerProps {
     creditLimit: number;
     outstanding: number;
     minDue: number;
-    dueDate: string;
+    dueDate: number;
   }) => void;
 }
 
@@ -73,7 +73,7 @@ export default function CreditCardAddDrawer({
       creditLimit: parseFloat(form.creditLimit),
       outstanding: 0,
       minDue: 0,
-      dueDate: form.dueDate,
+      dueDate: parseInt(form.dueDate, 10),
     });
   };
 
@@ -148,17 +148,17 @@ export default function CreditCardAddDrawer({
               </div>
             </FormField>
 
-            <FormField label="Due Date" required>
-              <div className="relative">
-                <input
-                  type="date"
-                  required
-                  className={`${inputCls} pl-8`}
-                  value={form.dueDate}
-                  onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
-                />
-                <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400 pointer-events-none" />
-              </div>
+            <FormField label="Due Day of Month" required>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                required
+                className={inputCls}
+                value={form.dueDate}
+                onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
+                placeholder="e.g. 20"
+              />
             </FormField>
 
             {/* Security notice badge */}

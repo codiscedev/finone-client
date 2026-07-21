@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { apiClient } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import {
   X,
   Plus,
@@ -84,6 +85,31 @@ export default function TransactionOnboardingDrawer({
   onImport,
   initialMode
 }: TransactionOnboardingDrawerProps) {
+  const { dbUser } = useAuth();
+  const [backendCategories, setBackendCategories] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (isOpen && dbUser) {
+      apiClient.get(`/v1/category/users/${dbUser.userId}`)
+        .then(res => {
+          if (res.data && res.data.success) {
+            setBackendCategories(res.data.data);
+          }
+        })
+        .catch(err => console.error("Failed to load categories in drawer", err));
+    }
+  }, [isOpen, dbUser]);
+
+  const expenseCategories = React.useMemo(() => {
+    const list = backendCategories.filter(c => c.type === "EXPENSE").map(c => c.name);
+    return list.length > 0 ? list : EXPENSE_CATEGORIES;
+  }, [backendCategories]);
+
+  const incomeCategories = React.useMemo(() => {
+    const list = backendCategories.filter(c => c.type === "INCOME").map(c => c.name);
+    return list.length > 0 ? list : INCOME_CATEGORIES;
+  }, [backendCategories]);
+
   // Steps: 1 = Selector, 2 = Connection / Inputs, 3 = Column Mapping (Files Only), 4 = Preview, 5 = Summary
   const [step, setStep] = React.useState(1);
   const [importMethod, setImportMethod] = React.useState<"manual" | "file" | "sms" | "gmail" | null>(null);
@@ -169,7 +195,7 @@ export default function TransactionOnboardingDrawer({
   const [formData, setFormData] = React.useState({
     date: new Date().toISOString().split("T")[0],
     amount: "",
-    category: EXPENSE_CATEGORIES[0],
+    category: "",
     subcategory: "",
     account: MOCK_ACCOUNTS[0],
     paymentMethod: PAYMENT_METHODS[0],
@@ -241,8 +267,13 @@ export default function TransactionOnboardingDrawer({
       setFileHeaders([]);
       setOcrSuccess(false);
       setOcrLoading(false);
+      
+      setFormData(prev => ({
+        ...prev,
+        category: formType === "expense" ? expenseCategories[0] || "" : incomeCategories[0] || ""
+      }));
     }
-  }, [isOpen, initialMode]);
+  }, [isOpen, initialMode, formType, expenseCategories, incomeCategories]);
 
   // Handle Close
   const handleClose = () => {
@@ -417,33 +448,35 @@ export default function TransactionOnboardingDrawer({
     e.preventDefault();
     if (!formData.amount || !formData.merchant) return;
 
-    const newTx = {
-      id: "tx_manual_" + Date.now(),
-      date: formData.date,
-      amount: parseFloat(formData.amount),
-      category: formData.category,
-      merchant: formData.merchant,
-      description: formData.description || `Manual ${formType}`,
-      type: formType,
-      account: formData.account,
-      paymentMethod: formData.paymentMethod,
-      tags: formData.tags ? formData.tags.split(",").map(t => t.trim()) : [],
-      location: formData.location || undefined,
-      isRecurring: formData.isRecurring,
-      recurringFrequency: formData.isRecurring ? formData.recurringFrequency : undefined,
-      splits: formData.isSplit ? formData.splits.map(s => ({ name: s.name, amount: parseFloat(s.amount) })) : undefined
-    };
+    const selectedCat = backendCategories.find(c => c.name === formData.category);
+    const categoryId = selectedCat ? selectedCat.id : null;
 
-    onImport([newTx]);
-    
-    setSummaryMetrics({
-      imported: 1,
-      skipped: 0,
-      duplicates: 0,
-      failed: 0,
-      confidence: 100
+    apiClient.post("/v1/transaction", {
+      amount: parseFloat(formData.amount),
+      type: formType.toUpperCase(),
+      note: formData.description || `Manual ${formType}`,
+      merchant: formData.merchant,
+      transactionDate: formData.date,
+      tags: formData.tags || "",
+      isRecurring: formData.isRecurring,
+      categoryId: categoryId,
+    })
+    .then(res => {
+      if (res.data && res.data.success) {
+        onImport([]);
+        setSummaryMetrics({
+          imported: 1,
+          skipped: 0,
+          duplicates: 0,
+          failed: 0,
+          confidence: 100
+        });
+        setStep(5);
+      }
+    })
+    .catch(err => {
+      console.error("Failed to save transaction", err);
     });
-    setStep(5);
   };
 
   // Download Sample Template CSV helper
@@ -663,7 +696,7 @@ export default function TransactionOnboardingDrawer({
                         setFormType(t as any);
                         setFormData(prev => ({
                           ...prev,
-                          category: t === "expense" ? EXPENSE_CATEGORIES[0] : INCOME_CATEGORIES[0]
+                          category: t === "expense" ? expenseCategories[0] || "" : incomeCategories[0] || ""
                         }));
                       }}
                       className={`h-8 rounded-lg text-xs font-bold transition-all ${
@@ -767,8 +800,8 @@ export default function TransactionOnboardingDrawer({
                     onChange={e => setFormData(prev => ({ ...prev, category: e.target.value }))}
                   >
                     {formType === "expense"
-                      ? EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
-                      : INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
+                      ? expenseCategories.map(c => <option key={c} value={c}>{c}</option>)
+                      : incomeCategories.map(c => <option key={c} value={c}>{c}</option>)
                     }
                   </Select>
                 </div>
@@ -1403,8 +1436,8 @@ export default function TransactionOnboardingDrawer({
                                 }`}
                               >
                                 {t.type === "expense"
-                                  ? EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
-                                  : INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
+                                  ? expenseCategories.map(c => <option key={c} value={c}>{c}</option>)
+                                  : incomeCategories.map(c => <option key={c} value={c}>{c}</option>)
                                 }
                               </Select>
                             </div>
