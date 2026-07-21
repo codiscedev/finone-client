@@ -35,8 +35,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import TransactionOnboardingDrawer from "./transaction-onboarding-drawer";
+import CreditCardAddDrawer from "./credit-card-add-drawer";
+import BudgetAddDrawer from "./budget-add-drawer";
+import RecurringBillAddDrawer from "./recurring-bill-add-drawer";
+import IncomeAddDrawer from "./income-add-drawer";
 import { useAuth } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/use-currency";
+import { apiClient } from "@/lib/api";
+import ReviewQueueDrawer from "./review-queue-drawer";
 
 // ============================================================
 // TYPES
@@ -284,6 +290,25 @@ export default function MoneyFlowView() {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   const [drawerMode, setDrawerMode] = React.useState<"manual" | "import" | null>(null);
 
+  // ---- Review Queue ----
+  const [reviewCount, setReviewCount] = React.useState(0);
+  const [isReviewOpen, setIsReviewOpen] = React.useState(false);
+
+  const fetchReviewCount = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get("/v1/imports/review");
+      if (res.data && res.data.success) {
+        setReviewCount(res.data.data.length);
+      }
+    } catch (e) {
+      console.log("Failed to load review queue count", e);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchReviewCount();
+  }, [fetchReviewCount]);
+
   // ---- Transactions ----
   const [transactions, setTransactions] = React.useState<Transaction[]>(() => {
     if (typeof window !== "undefined") {
@@ -366,6 +391,29 @@ export default function MoneyFlowView() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
+
+      {/* ── Review Warning Banner ── */}
+      {reviewCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 text-amber-800 rounded-lg shrink-0">
+              <AlertTriangle className="h-5 w-5 text-amber-600 animate-pulse" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-900">Imports Pending Review</p>
+              <p className="text-xs text-amber-600 font-semibold mt-0.5">
+                You have {reviewCount} transaction{reviewCount > 1 ? "s" : ""} pending review with low confidence levels. Please verify categorizations.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setIsReviewOpen(true)}
+            className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg h-9 px-4 font-bold text-xs shadow-xs"
+          >
+            Review Queue
+          </Button>
+        </div>
+      )}
 
       {/* ── Sub-tab Navigation ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-zinc-200 pb-3">
@@ -481,6 +529,30 @@ export default function MoneyFlowView() {
         onClose={() => setIsDrawerOpen(false)}
         onImport={handleImport}
         initialMode={drawerMode}
+      />
+
+      {/* Review Queue Drawer */}
+      <ReviewQueueDrawer
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        categories={categories}
+        onRefresh={fetchReviewCount}
+        onApprove={(tx) => {
+          // Append newly approved transaction directly into the state
+          const newTx = {
+            id: tx.id,
+            date: tx.transactionDate,
+            amount: tx.amount,
+            category: tx.category?.name || "Uncategorized",
+            merchant: tx.merchant,
+            description: tx.note || "Gmail Import",
+            type: tx.type?.toLowerCase() || "expense",
+            account: tx.accountLast4 ? `Card ending in *${tx.accountLast4}` : "Imported Account",
+            paymentMethod: tx.paymentMethod || "Other",
+            tags: tx.tags ? tx.tags.split(",") : []
+          };
+          setTransactions(prev => [newTx, ...prev]);
+        }}
       />
     </div>
   );
@@ -862,10 +934,6 @@ function RecurringBillsTab({
   fmt: (v: number) => string;
 }) {
   const [showAdd, setShowAdd] = React.useState(false);
-  const [form, setForm] = React.useState({
-    name: "", dateOfDebit: "", amount: "", frequency: "Monthly" as "Daily" | "Monthly" | "Yearly",
-    category: "", subcategory: "", paymentMethod: "UPI",
-  });
 
   const totalMonthly = React.useMemo(() => {
     return bills.reduce((sum, b) => {
@@ -875,15 +943,16 @@ function RecurringBillsTab({
     }, 0);
   }, [bills]);
 
-  const handleAdd = () => {
-    if (!form.name || !form.amount) return;
-    setBills(prev => [...prev, {
-      id: "rec_" + Date.now(),
-      name: form.name, dateOfDebit: form.dateOfDebit, amount: parseFloat(form.amount),
-      frequency: form.frequency, category: form.category, subcategory: form.subcategory,
-      paymentMethod: form.paymentMethod,
-    }]);
-    setForm({ name: "", dateOfDebit: "", amount: "", frequency: "Monthly", category: "", subcategory: "", paymentMethod: "UPI" });
+  const handleAddBill = (newBill: {
+    name: string;
+    dateOfDebit: string;
+    amount: number;
+    frequency: "Daily" | "Monthly" | "Yearly";
+    category: string;
+    subcategory: string;
+    paymentMethod: string;
+  }) => {
+    setBills(prev => [...prev, { id: "rec_" + Date.now(), ...newBill }]);
     setShowAdd(false);
   };
 
@@ -949,7 +1018,7 @@ function RecurringBillsTab({
                   <td className="p-3.5 text-zinc-500">{b.paymentMethod}</td>
                   <td className="p-3.5 text-center">
                     <button onClick={() => setBills(prev => prev.filter(x => x.id !== b.id))}
-                      className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                      className="p-1 rounded-lg text-zinc-300 hover:text-red-650 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </td>
@@ -966,44 +1035,11 @@ function RecurringBillsTab({
         </div>
       </div>
 
-      {showAdd && (
-        <Modal title="Add Recurring Bill" onClose={() => setShowAdd(false)}>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Bill Name" required>
-              <input className={inputCls} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Netflix" />
-            </FormField>
-            <FormField label="Day of Debit" required>
-              <input className={inputCls} type="number" min="1" max="31" value={form.dateOfDebit} onChange={e => setForm(p => ({ ...p, dateOfDebit: e.target.value }))} placeholder="e.g. 5" />
-            </FormField>
-            <FormField label="Amount" required>
-              <input className={inputCls} type="number" min="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="e.g. 499" />
-            </FormField>
-            <FormField label="Frequency">
-              <select className={selectCls} value={form.frequency} onChange={e => setForm(p => ({ ...p, frequency: e.target.value as any }))}>
-                {FREQUENCIES.map(f => <option key={f}>{f}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Category">
-              <select className={selectCls} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
-                <option value="">Select category</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Sub-category">
-              <input className={inputCls} value={form.subcategory} onChange={e => setForm(p => ({ ...p, subcategory: e.target.value }))} placeholder="e.g. Streaming" />
-            </FormField>
-            <FormField label="Payment Method">
-              <select className={selectCls} value={form.paymentMethod} onChange={e => setForm(p => ({ ...p, paymentMethod: e.target.value }))}>
-                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </FormField>
-          </div>
-          <div className="flex gap-3 mt-5">
-            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Save Bill</Button>
-            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
-          </div>
-        </Modal>
-      )}
+      <RecurringBillAddDrawer
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        onAdd={handleAddBill}
+      />
     </div>
   );
 }
@@ -1021,16 +1057,17 @@ function BudgetTab({
   fmt: (v: number) => string;
 }) {
   const [showAdd, setShowAdd] = React.useState(false);
-  const [form, setForm] = React.useState({ name: "", budgetAmount: "", category: "" });
 
   const totalBudget = budgets.reduce((s, b) => s + b.budgetAmount, 0);
 
   const getSpent = (cat: string) => expenseList.filter(t => t.category === cat).reduce((s, t) => s + t.amount, 0);
 
-  const handleAdd = () => {
-    if (!form.name || !form.budgetAmount) return;
-    setBudgets(prev => [...prev, { id: "bud_" + Date.now(), name: form.name, budgetAmount: parseFloat(form.budgetAmount), category: form.category }]);
-    setForm({ name: "", budgetAmount: "", category: "" });
+  const handleAddBudget = (newBudget: {
+    name: string;
+    budgetAmount: number;
+    category: string;
+  }) => {
+    setBudgets(prev => [...prev, { id: "bud_" + Date.now(), ...newBudget }]);
     setShowAdd(false);
   };
 
@@ -1054,7 +1091,7 @@ function BudgetTab({
         </div>
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Spent</p>
-          <p className="text-2xl font-extrabold text-red-600 mt-1">
+          <p className="text-2xl font-extrabold text-red-650 mt-1">
             {fmt(budgets.reduce((s, b) => s + getSpent(b.category), 0))}
           </p>
         </div>
@@ -1100,8 +1137,8 @@ function BudgetTab({
                       </span>
                     </td>
                     <td className="p-3.5 text-right font-bold text-zinc-900">{fmt(b.budgetAmount)}</td>
-                    <td className={`p-3.5 text-right font-bold ${over ? "text-red-600" : "text-zinc-700"}`}>{fmt(spent)}</td>
-                    <td className={`p-3.5 text-right font-semibold ${over ? "text-red-500" : "text-emerald-600"}`}>
+                    <td className={`p-3.5 text-right font-bold ${over ? "text-red-650" : "text-zinc-700"}`}>{fmt(spent)}</td>
+                    <td className={`p-3.5 text-right font-semibold ${over ? "text-red-500" : "text-emerald-650"}`}>
                       {over ? `-${fmt(spent - b.budgetAmount)}` : fmt(b.budgetAmount - spent)}
                     </td>
                     <td className="p-3.5">
@@ -1112,12 +1149,12 @@ function BudgetTab({
                             style={{ width: `${Math.min(pct, 100)}%` }}
                           />
                         </div>
-                        <span className={`text-[10px] font-bold w-8 ${over ? "text-red-600" : pct > 80 ? "text-amber-600" : "text-emerald-600"}`}>{pct}%</span>
+                        <span className={`text-[10px] font-bold w-8 ${over ? "text-red-650" : pct > 80 ? "text-amber-600" : "text-emerald-600"}`}>{pct}%</span>
                       </div>
                     </td>
                     <td className="p-3.5 text-center">
                       <button onClick={() => setBudgets(prev => prev.filter(x => x.id !== b.id))}
-                        className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                        className="p-1 rounded-lg text-zinc-300 hover:text-red-650 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </td>
@@ -1134,28 +1171,12 @@ function BudgetTab({
         </div>
       </div>
 
-      {showAdd && (
-        <Modal title="Add Budget" onClose={() => setShowAdd(false)}>
-          <div className="grid grid-cols-1 gap-4">
-            <FormField label="Budget Name" required>
-              <input className={inputCls} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Monthly Groceries" />
-            </FormField>
-            <FormField label="Budget Amount" required>
-              <input className={inputCls} type="number" min="0" value={form.budgetAmount} onChange={e => setForm(p => ({ ...p, budgetAmount: e.target.value }))} placeholder="e.g. 8000" />
-            </FormField>
-            <FormField label="Category">
-              <select className={selectCls} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
-                <option value="">Select category</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-            </FormField>
-          </div>
-          <div className="flex gap-3 mt-5">
-            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Save Budget</Button>
-            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
-          </div>
-        </Modal>
-      )}
+      <BudgetAddDrawer
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        categories={categories}
+        onAdd={handleAddBudget}
+      />
     </div>
   );
 }
@@ -1172,10 +1193,6 @@ function IncomeTab({
 }) {
   const [viewMode, setViewMode] = React.useState<"monthly" | "yearly">("monthly");
   const [showAdd, setShowAdd] = React.useState(false);
-  const [form, setForm] = React.useState({
-    source: "", amount: "", fetchType: "Manual" as "Manual" | "Auto",
-    dateOfCredit: new Date().toISOString().split("T")[0], isFixed: true,
-  });
 
   const calcAmount = (item: IncomeItem) => {
     if (viewMode === "yearly") return item.isFixed ? item.amount * 12 : item.amount;
@@ -1184,14 +1201,14 @@ function IncomeTab({
 
   const total = incomeItems.reduce((s, i) => s + calcAmount(i), 0);
 
-  const handleAdd = () => {
-    if (!form.source || !form.amount) return;
-    setIncomeItems(prev => [...prev, {
-      id: "inc_" + Date.now(),
-      source: form.source, amount: parseFloat(form.amount),
-      fetchType: form.fetchType, dateOfCredit: form.dateOfCredit, isFixed: form.isFixed,
-    }]);
-    setForm({ source: "", amount: "", fetchType: "Manual", dateOfCredit: new Date().toISOString().split("T")[0], isFixed: true });
+  const handleAddIncome = (newIncome: {
+    source: string;
+    amount: number;
+    dateOfCredit: string;
+    isFixed: boolean;
+    fetchType: "Manual" | "Auto";
+  }) => {
+    setIncomeItems(prev => [...prev, { id: "inc_" + Date.now(), ...newIncome }]);
     setShowAdd(false);
   };
 
@@ -1261,10 +1278,10 @@ function IncomeTab({
               {incomeItems.map(item => (
                 <tr key={item.id} className="hover:bg-zinc-50/40 transition-colors group">
                   <td className="p-3.5 font-bold text-zinc-900">{item.source}</td>
-                  <td className="p-3.5 text-right font-bold text-emerald-600">{fmt(calcAmount(item))}</td>
+                  <td className="p-3.5 text-right font-bold text-zinc-900">{fmt(item.amount)}</td>
                   <td className="p-3.5">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      item.isFixed ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"
+                      item.isFixed ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-700"
                     }`}>
                       {item.isFixed ? "Fixed" : "One-time"}
                     </span>
@@ -1280,7 +1297,7 @@ function IncomeTab({
                   <td className="p-3.5 font-mono text-zinc-500">{item.dateOfCredit}</td>
                   <td className="p-3.5 text-center">
                     <button onClick={() => setIncomeItems(prev => prev.filter(x => x.id !== item.id))}
-                      className="p-1 rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                      className="p-1 rounded-lg text-zinc-300 hover:text-red-650 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </td>
@@ -1297,46 +1314,11 @@ function IncomeTab({
           </table>
         </div>
       </div>
-
-      {showAdd && (
-        <Modal title="Add Income" onClose={() => setShowAdd(false)}>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Income Source" required>
-              <input className={inputCls} value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))} placeholder="e.g. Salary, Freelance" />
-            </FormField>
-            <FormField label="Amount" required>
-              <input className={inputCls} type="number" min="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="e.g. 50000" />
-            </FormField>
-            <FormField label="Date of Credit">
-              <input className={inputCls} type="date" value={form.dateOfCredit} onChange={e => setForm(p => ({ ...p, dateOfCredit: e.target.value }))} />
-            </FormField>
-            <FormField label="Fetch Type">
-              <select className={selectCls} value={form.fetchType} onChange={e => setForm(p => ({ ...p, fetchType: e.target.value as any }))}>
-                <option value="Manual">Manual</option>
-                <option value="Auto">Auto (API)</option>
-              </select>
-            </FormField>
-            <div className="col-span-2">
-              <FormField label="Income Type">
-                <div className="flex items-center gap-3 p-1 bg-zinc-100 rounded-xl">
-                  <button type="button" onClick={() => setForm(p => ({ ...p, isFixed: true }))}
-                    className={`flex-1 h-8 rounded-lg text-xs font-bold transition-all ${form.isFixed ? "bg-white shadow-sm text-zinc-900" : "text-zinc-500"}`}>
-                    Fixed (Recurring)
-                  </button>
-                  <button type="button" onClick={() => setForm(p => ({ ...p, isFixed: false }))}
-                    className={`flex-1 h-8 rounded-lg text-xs font-bold transition-all ${!form.isFixed ? "bg-white shadow-sm text-zinc-900" : "text-zinc-500"}`}>
-                    One-time
-                  </button>
-                </div>
-              </FormField>
-            </div>
-          </div>
-          <div className="flex gap-3 mt-5">
-            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Save Income</Button>
-            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
-          </div>
-        </Modal>
-      )}
+      <IncomeAddDrawer
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        onAdd={handleAddIncome}
+      />
     </div>
   );
 }
@@ -1353,23 +1335,23 @@ function CreditCardTab({
   currency: string;
 }) {
   const [showAdd, setShowAdd] = React.useState(false);
-  const [form, setForm] = React.useState({
-    cardName: "", lastFour: "", creditLimit: "", outstanding: "", minDue: "", dueDate: "",
-  });
 
   const totalOutstanding = cards.reduce((s, c) => s + c.outstanding, 0);
   const totalLimit = cards.reduce((s, c) => s + c.creditLimit, 0);
   const overallUtilization = totalLimit > 0 ? Math.round((totalOutstanding / totalLimit) * 100) : 0;
 
-  const handleAdd = () => {
-    if (!form.cardName || !form.creditLimit) return;
+  const handleAddCard = (newCard: {
+    cardName: string;
+    lastFour: string;
+    creditLimit: number;
+    outstanding: number;
+    minDue: number;
+    dueDate: string;
+  }) => {
     setCards(prev => [...prev, {
       id: "cc_" + Date.now(),
-      cardName: form.cardName, lastFour: form.lastFour,
-      creditLimit: parseFloat(form.creditLimit), outstanding: parseFloat(form.outstanding) || 0,
-      minDue: parseFloat(form.minDue) || 0, dueDate: form.dueDate,
+      ...newCard
     }]);
-    setForm({ cardName: "", lastFour: "", creditLimit: "", outstanding: "", minDue: "", dueDate: "" });
     setShowAdd(false);
   };
 
@@ -1477,34 +1459,11 @@ function CreditCardTab({
         </div>
       </div>
 
-      {showAdd && (
-        <Modal title="Add Credit Card" onClose={() => setShowAdd(false)}>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Card Name" required>
-              <input className={inputCls} value={form.cardName} onChange={e => setForm(p => ({ ...p, cardName: e.target.value }))} placeholder="e.g. HDFC Regalia" />
-            </FormField>
-            <FormField label="Last 4 Digits">
-              <input className={inputCls} maxLength={4} value={form.lastFour} onChange={e => setForm(p => ({ ...p, lastFour: e.target.value.replace(/\D/, "") }))} placeholder="e.g. 4829" />
-            </FormField>
-            <FormField label="Credit Limit" required>
-              <input className={inputCls} type="number" min="0" value={form.creditLimit} onChange={e => setForm(p => ({ ...p, creditLimit: e.target.value }))} placeholder="e.g. 300000" />
-            </FormField>
-            <FormField label="Outstanding Balance">
-              <input className={inputCls} type="number" min="0" value={form.outstanding} onChange={e => setForm(p => ({ ...p, outstanding: e.target.value }))} placeholder="e.g. 24500" />
-            </FormField>
-            <FormField label="Minimum Due">
-              <input className={inputCls} type="number" min="0" value={form.minDue} onChange={e => setForm(p => ({ ...p, minDue: e.target.value }))} placeholder="e.g. 1225" />
-            </FormField>
-            <FormField label="Due Date">
-              <input className={inputCls} type="date" value={form.dueDate} onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} />
-            </FormField>
-          </div>
-          <div className="flex gap-3 mt-5">
-            <Button onClick={handleAdd} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold">Add Card</Button>
-            <Button onClick={() => setShowAdd(false)} variant="outline" className="h-9 px-4 rounded-xl text-xs font-bold">Cancel</Button>
-          </div>
-        </Modal>
-      )}
+      <CreditCardAddDrawer
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        onAdd={handleAddCard}
+      />
     </div>
   );
 }

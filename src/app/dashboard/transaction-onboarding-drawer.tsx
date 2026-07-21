@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { apiClient } from "@/lib/api";
 import {
   X,
   Plus,
@@ -110,6 +111,47 @@ export default function TransactionOnboardingDrawer({
   // Connect integration loadings
   const [connectLoading, setConnectLoading] = React.useState(false);
 
+  // Poll / Sync states
+  const [syncStatus, setSyncStatus] = React.useState<string>("PROCESSING");
+  const [pollInterval, setPollInterval] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [pollInterval]);
+
+  const pollJobStatus = (jobId: string) => {
+    setStep(4); // Go to Polling Status step
+    setSyncStatus("PROCESSING");
+    
+    const interval = setInterval(async () => {
+      try {
+        const res = await apiClient.get(`/v1/imports/jobs/${jobId}/status`);
+        if (res.data && res.data.success) {
+          const job = res.data.data;
+          if (job.status !== "PENDING" && job.status !== "PROCESSING") {
+            clearInterval(interval);
+            setSyncStatus(job.status);
+            setSummaryMetrics({
+              imported: job.processedRecords,
+              skipped: job.failedRecords,
+              duplicates: 0,
+              failed: job.failedRecords,
+              confidence: 95
+            });
+            setStep(5); // Transition to summary metrics screen
+            onImport([]); // Refresh dashboard transactions
+          }
+        }
+      } catch (e) {
+        console.error("Failed to poll import job status", e);
+        clearInterval(interval);
+      }
+    }, 1500);
+    setPollInterval(interval);
+  };
+
   // Parsed Transactions state inside preview screen
   const [previewTransactions, setPreviewTransactions] = React.useState<any[]>([]);
 
@@ -204,6 +246,7 @@ export default function TransactionOnboardingDrawer({
 
   // Handle Close
   const handleClose = () => {
+    if (pollInterval) clearInterval(pollInterval);
     onClose();
   };
 
@@ -249,34 +292,65 @@ export default function TransactionOnboardingDrawer({
   };
 
   // Mock File Upload Parsing to Preview
-  const handleMapConfirm = () => {
+  const handleMapConfirm = async () => {
+    if (!selectedFile) return;
     setConnectLoading(true);
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      // Construct header-to-column mapper expected by backend
+      const mappedJson = {
+        [mappings.date]: "transactionDate",
+        [mappings.amount]: "amount",
+        [mappings.merchant]: "merchant",
+        [mappings.category]: "category",
+        [mappings.description]: "accountLast4"
+      };
+
+      formData.append("mapping", JSON.stringify(mappedJson));
+
+      const res = await apiClient.post("/v1/imports/csv", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      });
+
+      if (res.data && res.data.success) {
+        const jobId = res.data.data.id;
+        pollJobStatus(jobId);
+      }
+    } catch (e) {
+      console.error("CSV import upload failed", e);
+    } finally {
       setConnectLoading(false);
-      // Generate some mock transactions parsed from file
-      setPreviewTransactions([
-        { id: "file_1", date: "2026-07-09", amount: 154.00, merchant: "Walmart Supercenter", category: "Groceries", type: "expense", account: "Chase checking (*4829)", method: "Debit Card", confidence: 96 },
-        { id: "file_2", date: "2026-07-08", amount: 18.50, merchant: "Uber Ride", category: "Transportation", type: "expense", account: "Amex Gold (*1002)", method: "Credit Card", confidence: 98 },
-        { id: "file_3", date: "2026-07-08", amount: 1400.00, merchant: "ACME Corp Freelance", category: "Freelance", type: "income", account: "Chase checking (*4829)", method: "Net Banking", confidence: 91 },
-        { id: "file_4", date: "2026-07-06", amount: 154.00, merchant: "Walmart Supercenter", category: "Groceries", type: "expense", account: "Chase checking (*4829)", method: "Debit Card", confidence: 95, isDuplicate: true }, // duplicate detection
-        { id: "file_5", date: "2026-07-05", amount: 22.00, merchant: "Google Cloud", category: "Miscellaneous", type: "expense", account: "Chase Sapphire (*9930)", method: "Credit Card", confidence: 72, isUncategorized: true }
-      ]);
-      setStep(4); // Go to Preview
-    }, 1200);
+    }
   };
 
   // Connect SMS / Gmail flows
-  const handleConnectIntegration = (method: "sms" | "gmail") => {
+  const handleConnectIntegration = async (method: "sms" | "gmail") => {
+    if (method === "sms") {
+      setPreviewTransactions(getMockSMSAlerts());
+      setStep(4);
+      return;
+    }
+
     setConnectLoading(true);
-    setTimeout(() => {
-      setConnectLoading(false);
-      if (method === "sms") {
-        setPreviewTransactions(getMockSMSAlerts());
-      } else {
-        setPreviewTransactions(getMockGmailAlerts());
+    try {
+      await apiClient.post("/v1/imports/gmail/connect", {
+        refreshToken: "mock_gmail_oauth_refresh_token"
+      });
+
+      const res = await apiClient.post("/v1/imports/gmail/sync");
+      if (res.data && res.data.success) {
+        const jobId = res.data.data.id;
+        pollJobStatus(jobId);
       }
-      setStep(4); // Go to preview directly
-    }, 1500);
+    } catch (e) {
+      console.error("Gmail integration sync failed", e);
+    } finally {
+      setConnectLoading(false);
+    }
   };
 
   // Change Category Inline in Preview Table
@@ -391,14 +465,14 @@ export default function TransactionOnboardingDrawer({
       {/* Backdrop overlay */}
       <div
         onClick={handleClose}
-        className="absolute inset-0 bg-zinc-950/45 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
+        className="absolute inset-0 bg-zinc-950/40 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
       />
 
       {/* Drawer panel */}
-      <div className="relative flex flex-col h-screen w-full max-w-[560px] bg-white border-l border-zinc-200/80 shadow-2xl z-10 transition-transform duration-300 transform translate-x-0 animate-in slide-in-from-right overflow-hidden">
+      <div className="relative flex flex-col h-screen w-full max-w-[540px] bg-white border-l border-zinc-200 shadow-2xl z-10 transition-transform duration-300 transform translate-x-0 animate-in slide-in-from-right overflow-hidden">
         
         {/* Sticky Header */}
-        <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-zinc-100 bg-zinc-50/50">
+        <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-zinc-150/70 bg-zinc-50/50">
           <div className="flex items-center gap-2">
             {step > 1 && step < 5 && (
               <button
@@ -415,14 +489,14 @@ export default function TransactionOnboardingDrawer({
                 className="p-1 rounded-lg hover:bg-zinc-200/60 text-zinc-500 transition-colors mr-1"
                 title="Go back"
               >
-                <ChevronLeft className="h-4.5 w-4.5" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
             )}
             <div>
-              <h3 className="text-base font-extrabold text-zinc-900 tracking-tight">
+              <h3 className="text-sm font-black text-zinc-900 leading-none">
                 {step === 5 ? "Import Summary" : importMethod === "manual" ? "Add Transaction" : "Import Transactions"}
               </h3>
-              <p className="text-xs text-zinc-500 font-medium mt-0.5">
+              <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">
                 {step === 1 && "Choose how you'd like to import your cash flows"}
                 {step === 2 && importMethod === "manual" && "Record an income, expense, or asset transfer"}
                 {step === 2 && importMethod === "file" && "Select format: CSV, Excel, OFX, or QIF"}
@@ -436,7 +510,7 @@ export default function TransactionOnboardingDrawer({
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-650 transition-colors"
+            className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-650 transition-colors"
           >
             <X className="h-4.5 w-4.5" />
           </button>
@@ -879,19 +953,18 @@ export default function TransactionOnboardingDrawer({
                 </div>
               </div>
 
-              {/* Submit Buttons */}
-              <div className="flex gap-3 pt-4">
-                <Button
+              {/* Sticky Actions Footer */}
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => { setStep(1); setImportMethod(null); }}
-                  className="flex-1 rounded-xl h-10 border-zinc-250 font-semibold"
+                  className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
                 >
                   Cancel
-                </Button>
+                </button>
                 <Button
                   type="submit"
-                  className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98]"
                 >
                   Save Transaction
                 </Button>
@@ -1044,25 +1117,24 @@ export default function TransactionOnboardingDrawer({
                 </button>
               </div>
 
-              {/* Connect buttons */}
-              <div className="flex gap-3 pt-2">
-                <Button
+              {/* Sticky Actions Footer */}
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => { setStep(1); setImportMethod(null); }}
-                  className="flex-1 rounded-xl h-10 border-zinc-250 font-semibold"
+                  className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
                 >
                   Cancel
-                </Button>
+                </button>
                 <Button
                   type="button"
                   onClick={() => handleConnectIntegration("sms")}
-                  className="flex-1 rounded-xl h-10 bg-indigo-650 hover:bg-indigo-700 text-white font-semibold flex items-center justify-center gap-2"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
                   disabled={connectLoading}
                 >
                   {connectLoading ? (
                     <>
-                      <RefreshCw className="h-4.5 w-4.5 animate-spin" /> Connecting...
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Connecting...
                     </>
                   ) : (
                     <>Connect SMS Sync</>
@@ -1115,25 +1187,24 @@ export default function TransactionOnboardingDrawer({
                 </button>
               </div>
 
-              {/* Connect buttons */}
-              <div className="flex gap-3 pt-2">
-                <Button
+              {/* Sticky Actions Footer */}
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => { setStep(1); setImportMethod(null); }}
-                  className="flex-1 rounded-xl h-10 border-zinc-250 font-semibold"
+                  className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
                 >
                   Cancel
-                </Button>
+                </button>
                 <Button
                   type="button"
                   onClick={() => handleConnectIntegration("gmail")}
-                  className="flex-1 rounded-xl h-10 bg-rose-600 hover:bg-rose-700 text-white font-semibold flex items-center justify-center gap-2"
+                  className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
                   disabled={connectLoading}
                 >
                   {connectLoading ? (
                     <>
-                      <RefreshCw className="h-4.5 w-4.5 animate-spin" /> Connecting...
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Connecting...
                     </>
                   ) : (
                     <>Connect Secure Gmail</>
@@ -1182,20 +1253,19 @@ export default function TransactionOnboardingDrawer({
                 ))}
               </div>
 
-              {/* Submit Buttons */}
-              <div className="flex gap-3 pt-4">
-                <Button
+              {/* Sticky Actions Footer */}
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => setStep(2)}
-                  className="flex-1 rounded-xl h-10 border-zinc-250 font-semibold"
+                  className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
                 >
                   Back
-                </Button>
+                </button>
                 <Button
                   type="button"
                   onClick={handleMapConfirm}
-                  className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98]"
                 >
                   Parse and Preview
                 </Button>
@@ -1373,20 +1443,19 @@ export default function TransactionOnboardingDrawer({
                 )}
               </div>
 
-              {/* Submit Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-zinc-100">
-                <Button
+              {/* Sticky Actions Footer */}
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+                <button
                   type="button"
-                  variant="outline"
                   onClick={() => setStep(importMethod === "file" ? 3 : 2)}
-                  className="flex-1 rounded-xl h-10 border-zinc-250 font-semibold"
+                  className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
                 >
                   Back
-                </Button>
+                </button>
                 <Button
                   type="button"
                   onClick={handleConfirmImport}
-                  className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98]"
                   disabled={previewTransactions.filter(t => !t.skip).length === 0}
                 >
                   Confirm Import

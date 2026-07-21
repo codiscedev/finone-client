@@ -211,14 +211,126 @@ export default function SettingsView() {
   };
 
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setName(user.displayName || "FinOne User");
-        setEmail(user.email || "");
+    const fetchProfile = async () => {
+      if (!dbUser?.userId) return;
+      try {
+        const res = await apiClient.get(`/v1/profile/${dbUser.userId}`);
+        if (res.data?.success && res.data?.data) {
+          const profile = res.data.data;
+          setName(profile.name || "");
+          setEmail(profile.email || "");
+          
+          let uiCountry = "India";
+          if (profile.country === "US") uiCountry = "United States";
+          else if (profile.country === "DE") uiCountry = "Germany";
+          else if (profile.country === "GB") uiCountry = "United Kingdom";
+          setCountry(uiCountry);
+
+          let uiCurrency = "INR (₹)";
+          if (profile.currency === "USD") uiCurrency = "USD ($)";
+          else if (profile.currency === "EUR") uiCurrency = "EUR (€)";
+          else if (profile.currency === "GBP") uiCurrency = "GBP (£)";
+          setCurrency(uiCurrency);
+
+          setInflationRate(profile.inflationRate || 5.8);
+          
+          switch (uiCountry) {
+            case "India":
+              setTimezone("GMT +5:30");
+              setFinancialYear("April - March");
+              break;
+            case "United States":
+              setTimezone("GMT -5:00");
+              setFinancialYear("January - December");
+              break;
+            case "Germany":
+              setTimezone("GMT +1:00");
+              setFinancialYear("January - December");
+              break;
+            case "United Kingdom":
+              setTimezone("GMT +0:00");
+              setFinancialYear("April - March");
+              break;
+          }
+
+          setNotifs(prev => ({
+            ...prev,
+            email: profile.notificationEmail ?? true,
+            push: profile.notificationPush ?? true,
+            sms: profile.notificationSms ?? false,
+          }));
+        }
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
       }
-    });
-    return () => unsubscribe();
-  }, []);
+    };
+
+    fetchProfile();
+  }, [dbUser]);
+
+  const handleSaveProfile = async () => {
+    if (!dbUser?.userId) return;
+    try {
+      let isoCountry = "IN";
+      if (country === "United States") isoCountry = "US";
+      else if (country === "Germany") isoCountry = "DE";
+      else if (country === "United Kingdom") isoCountry = "GB";
+
+      let currencyCode = "INR";
+      if (currency === "USD ($)") currencyCode = "USD";
+      else if (currency === "EUR (€)") currencyCode = "EUR";
+      else if (currency === "GBP (£)") currencyCode = "GBP";
+
+      const res = await apiClient.put(`/v1/profile/${dbUser.userId}`, {
+        name,
+        currency: currencyCode,
+        inflationRate: Number(inflationRate) || 0,
+        country: isoCountry,
+        notificationEmail: notifs.email,
+        notificationPush: notifs.push,
+        notificationSms: notifs.sms,
+        theme: theme
+      });
+
+      if (res.data?.success) {
+        showSuccess("Success", "Profile updates saved successfully!");
+      }
+    } catch (err) {
+      console.error("Error saving profile settings:", err);
+    }
+  };
+
+  const handleSaveNotifications = async () => {
+    if (!dbUser?.userId) return;
+    try {
+      let isoCountry = "IN";
+      if (country === "United States") isoCountry = "US";
+      else if (country === "Germany") isoCountry = "DE";
+      else if (country === "United Kingdom") isoCountry = "GB";
+
+      let currencyCode = "INR";
+      if (currency === "USD ($)") currencyCode = "USD";
+      else if (currency === "EUR (€)") currencyCode = "EUR";
+      else if (currency === "GBP (£)") currencyCode = "GBP";
+
+      const res = await apiClient.put(`/v1/profile/${dbUser.userId}`, {
+        name,
+        currency: currencyCode,
+        inflationRate: Number(inflationRate) || 0,
+        country: isoCountry,
+        notificationEmail: notifs.email,
+        notificationPush: notifs.push,
+        notificationSms: notifs.sms,
+        theme: theme
+      });
+
+      if (res.data?.success) {
+        showSuccess("Success", "Notification rules saved successfully!");
+      }
+    } catch (err) {
+      console.error("Error saving notification preferences:", err);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -457,7 +569,7 @@ export default function SettingsView() {
           <div className="flex justify-between items-center pt-4 border-t border-zinc-100 text-xs">
             <span className="text-zinc-400 font-medium">Auto-populated based on selected country settings</span>
             <Button
-              onClick={() => showSuccess("Success", "Profile updates saved successfully!")}
+              onClick={handleSaveProfile}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold"
             >
               Save Changes
@@ -719,7 +831,7 @@ export default function SettingsView() {
 
           <div className="flex justify-end pt-4 border-t border-zinc-100">
             <Button
-              onClick={() => showSuccess("Success", "Notification rules saved successfully!")}
+              onClick={handleSaveNotifications}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
             >
               Save Notification Preferences
