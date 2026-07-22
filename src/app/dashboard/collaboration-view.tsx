@@ -11,36 +11,154 @@ import {
   UserPlus,
   Settings,
   Sparkles,
-  DollarSign,
-  TrendingUp,
-  FileText,
-  MessageSquare,
   AlertCircle,
-  Calendar,
   CheckCircle2,
-  Clock
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 interface CollaborationViewProps {
   onUpgradeClick?: () => void;
 }
 
-export default function CollaborationView({ onUpgradeClick }: CollaborationViewProps) {
-  // Couple Workspace interactive contributions
-  const [husbandCont, setHusbandCont] = React.useState(2500000);
-  const [wifeCont, setWifeCont] = React.useState(1500000);
-  const coupleTotalGoal = 4000000;
-  const coupleCurrentTotal = husbandCont + wifeCont;
-  const coupleProgress = Math.min(Math.round((coupleCurrentTotal / coupleTotalGoal) * 100), 100);
+interface WorkspaceMember {
+  userId: string;
+  name: string;
+  email: string;
+  contribution: number;
+  role: string;
+}
 
-  // Sibling Workspace interactive contributions
-  const [brotherA, setBrotherA] = React.useState(1500000);
-  const [brotherB, setBrotherB] = React.useState(1500000);
-  const [brotherC, setBrotherC] = React.useState(1200000);
-  const siblingTotalGoal = 5000000;
-  const siblingCurrentTotal = brotherA + brotherB + brotherC;
-  const siblingProgress = Math.min(Math.round((siblingCurrentTotal / siblingTotalGoal) * 100), 100);
+interface Workspace {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  targetAmount: number;
+  targetDate: string;
+  members: WorkspaceMember[];
+}
+
+export default function CollaborationView({ onUpgradeClick }: CollaborationViewProps) {
+  const { dbUser } = useAuth();
+  
+  const [workspaces, setWorkspaces] = React.useState<Workspace[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  // Modal/Form States for Create Workspace
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = React.useState("");
+  const [newWorkspaceDesc, setNewWorkspaceDesc] = React.useState("");
+  const [newWorkspaceType, setNewWorkspaceType] = React.useState("Couple");
+  const [newWorkspaceTarget, setNewWorkspaceTarget] = React.useState(100000);
+  const [newWorkspaceDate, setNewWorkspaceDate] = React.useState("");
+
+  // Modal States for Invite Member
+  const [inviteWorkspaceId, setInviteWorkspaceId] = React.useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = React.useState("");
+  const [inviteError, setInviteError] = React.useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = React.useState<string | null>(null);
+
+  const fetchWorkspaces = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get("/v1/collaboration/workspaces");
+      if (res.data?.success) {
+        setWorkspaces(res.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch workspaces", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchWorkspaces();
+  }, [fetchWorkspaces]);
+
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWorkspaceName.trim()) return;
+
+    try {
+      const res = await apiClient.post("/v1/collaboration/workspaces", {
+        name: newWorkspaceName,
+        description: newWorkspaceDesc,
+        type: newWorkspaceType,
+        targetAmount: newWorkspaceTarget,
+        targetDate: newWorkspaceDate
+      });
+
+      if (res.data?.success) {
+        setIsCreateOpen(false);
+        setNewWorkspaceName("");
+        setNewWorkspaceDesc("");
+        setNewWorkspaceType("Couple");
+        setNewWorkspaceTarget(100000);
+        setNewWorkspaceDate("");
+        fetchWorkspaces();
+      }
+    } catch (err) {
+      console.error("Failed to create workspace", err);
+    }
+  };
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteWorkspaceId || !inviteEmail.trim()) return;
+
+    setInviteError(null);
+    setInviteSuccess(null);
+
+    try {
+      const res = await apiClient.post(`/v1/collaboration/workspaces/${inviteWorkspaceId}/invite`, {
+        email: inviteEmail
+      });
+
+      if (res.data?.success) {
+        setInviteSuccess(`Successfully added ${inviteEmail} to the workspace!`);
+        setInviteEmail("");
+        fetchWorkspaces();
+        setTimeout(() => {
+          setInviteWorkspaceId(null);
+          setInviteSuccess(null);
+        }, 2000);
+      }
+    } catch (err: any) {
+      console.error("Failed to invite member", err);
+      const errMsg = err.response?.data?.message || "Failed to add member. Please check if the email is registered.";
+      setInviteError(errMsg);
+    }
+  };
+
+  const handleContributionChange = async (workspaceId: string, contribution: number) => {
+    // Optimistically update local UI state immediately to feel snappy
+    setWorkspaces(prev => prev.map(w => {
+      if (w.id === workspaceId) {
+        return {
+          ...w,
+          members: w.members.map(m => {
+            if (m.userId === dbUser?.userId) {
+              return { ...m, contribution };
+            }
+            return m;
+          })
+        };
+      }
+      return w;
+    }));
+
+    try {
+      await apiClient.put(`/v1/collaboration/workspaces/${workspaceId}/contribution`, {
+        contribution
+      });
+      fetchWorkspaces();
+    } catch (err) {
+      console.error("Failed to save contribution", err);
+    }
+  };
 
   const formatRupee = (val: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -48,6 +166,36 @@ export default function CollaborationView({ onUpgradeClick }: CollaborationViewP
       currency: "INR",
       maximumFractionDigits: 0
     }).format(val);
+  };
+
+  const getWorkspaceDetails = (type: string) => {
+    switch (type) {
+      case "Couple":
+        return {
+          icon: <Heart className="h-5 w-5 fill-red-500/10" />,
+          colorClass: "bg-red-50 text-red-500",
+          desc: "Designed for spouses or partners co-managing household investments"
+        };
+      case "Family":
+        return {
+          icon: <Users className="h-5 w-5" />,
+          colorClass: "bg-indigo-50 text-indigo-500",
+          desc: "Manage household insurance, medical assets, and budgets together"
+        };
+      case "Sibling":
+        return {
+          icon: <Building className="h-5 w-5" />,
+          colorClass: "bg-amber-50 text-amber-500",
+          desc: "Joint construction project & inherited asset oversight"
+        };
+      case "Trip":
+        default:
+        return {
+          icon: <Plane className="h-5 w-5" />,
+          colorClass: "bg-teal-50 text-teal-500",
+          desc: "Collaborative travel budgeting & split settlements tracker"
+        };
+    }
   };
 
   return (
@@ -58,7 +206,10 @@ export default function CollaborationView({ onUpgradeClick }: CollaborationViewP
           <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Collaboration</h2>
           <p className="text-sm text-zinc-500 mt-1">Manage shared finances, goals, and expenses with your family and friends.</p>
         </div>
-        <Button className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]">
+        <Button 
+          onClick={() => setIsCreateOpen(true)}
+          className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]"
+        >
           <Plus className="h-4 w-4 mr-1.5" />
           Create Workspace
         </Button>
@@ -73,7 +224,7 @@ export default function CollaborationView({ onUpgradeClick }: CollaborationViewP
           <div>
             <h4 className="text-sm font-bold">Collaborate with Spouses & Families</h4>
             <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed max-w-2xl">
-              You are currently viewing a basic sandbox preview. Upgrade to the **Family Plan** to add up to 6 members, set up joint net worth dashboards, and co-manage loans or travel splits.
+              Add up to 6 members, set up joint net worth dashboards, co-manage loans, and coordinate savings goals in real-time.
             </p>
           </div>
         </div>
@@ -85,411 +236,316 @@ export default function CollaborationView({ onUpgradeClick }: CollaborationViewP
         </button>
       </div>
 
-      {/* Grid Layout of Shared Workspaces (2 per row on desktop) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* ==========================================
-            1. Couple Workspace Card ❤️
-            ========================================== */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group flex flex-col justify-between">
-          <div>
-            {/* Card Header utilities */}
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-500">
-                <Heart className="h-5 w-5 fill-red-500/10" />
-              </div>
-              <div className="flex gap-2.5">
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <UserPlus className="h-3.5 w-3.5" /> Invite
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <Settings className="h-3.5 w-3.5" /> Manage
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 flex items-center">
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Title & description */}
-            <div className="mt-5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-zinc-900">Couple Workspace</h3>
-                <div className="flex -space-x-1.5">
-                  <div className="h-5 w-5 rounded-full bg-blue-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">H</div>
-                  <div className="h-5 w-5 rounded-full bg-purple-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">W</div>
-                </div>
-                <span className="text-[10px] text-zinc-400 font-bold">2 Participants</span>
-              </div>
-              <p className="text-xs text-zinc-500 mt-0.5">Designed for spouses or partners co-managing household investments</p>
-            </div>
-
-            {/* Example Goal Box: Home Purchase Goal */}
-            <div className="mt-5 rounded-xl border border-zinc-150 bg-zinc-50/50 p-4 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-zinc-800">Home Purchase Goal</span>
-                <span className="text-[10px] font-bold text-zinc-400">Target Date: Dec 2027</span>
-              </div>
-
-              {/* Progress bar */}
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Current: {formatRupee(coupleCurrentTotal)} / {formatRupee(coupleTotalGoal)}</span>
-                  <span className="text-blue-600 font-bold">{coupleProgress}% Progress</span>
-                </div>
-                <div className="h-2 w-full bg-zinc-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${coupleProgress}%` }} />
-                </div>
-                <p className="text-[10px] text-zinc-400 mt-1">Remaining to fund: {formatRupee(coupleTotalGoal - coupleCurrentTotal)}</p>
-              </div>
-
-              {/* Interactive sliders for Spouses' shares */}
-              <div className="space-y-3 pt-3 border-t border-zinc-200/50">
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-semibold text-zinc-600">
-                    <span>Husband Contribution share:</span>
-                    <span className="font-bold text-zinc-800">{formatRupee(husbandCont)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1000000"
-                    max="3000000"
-                    step="50000"
-                    value={husbandCont}
-                    onChange={(e) => setHusbandCont(Number(e.target.value))}
-                    className="w-full h-1.2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-semibold text-zinc-600">
-                    <span>Wife Contribution share:</span>
-                    <span className="font-bold text-zinc-800">{formatRupee(wifeCont)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1000000"
-                    max="2000000"
-                    step="50000"
-                    value={wifeCont}
-                    onChange={(e) => setWifeCont(Number(e.target.value))}
-                    className="w-full h-1.2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-              </div>
-            </div>
+      {loading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <p className="text-sm text-zinc-500 animate-pulse">Loading collaboration workspaces...</p>
+        </div>
+      ) : workspaces.length === 0 ? (
+        <div className="flex flex-col items-center justify-center min-h-[300px] rounded-2xl border-2 border-dashed border-zinc-200 bg-white p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 mb-4">
+            <Users className="h-6 w-6" />
           </div>
+          <h3 className="text-base font-bold text-zinc-900">No workspaces yet</h3>
+          <p className="text-xs text-zinc-500 max-w-xs mt-1">Create your first shared workspace to start co-tracking targets and contributions with partners.</p>
+          <Button 
+            onClick={() => setIsCreateOpen(true)}
+            className="mt-4 h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
+          >
+            Create Workspace
+          </Button>
+        </div>
+      ) : (
+        /* Grid Layout of Shared Workspaces */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {workspaces.map((workspace) => {
+            const { icon, colorClass, desc } = getWorkspaceDetails(workspace.type);
+            const totalContributions = workspace.members.reduce((sum, m) => sum + m.contribution, 0);
+            const progress = workspace.targetAmount > 0 
+              ? Math.min(Math.round((totalContributions / workspace.targetAmount) * 100), 100) 
+              : 0;
 
-          {/* AI Tip and action */}
-          <div className="mt-5 pt-4 border-t border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div className="flex items-start gap-2 max-w-sm">
-              <Sparkles className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-zinc-500 leading-normal">
-                AI Suggestion: Increasing monthly mutual SIP contributions by 10% reaches your target 3 months early.
-              </p>
-            </div>
-            <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">+ Add Shared Goal</button>
+            const myMemberRecord = workspace.members.find(m => m.userId === dbUser?.userId);
+
+            return (
+              <div key={workspace.id} className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group flex flex-col justify-between">
+                <div>
+                  {/* Card Header utilities */}
+                  <div className="flex justify-between items-start">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${colorClass}`}>
+                      {icon}
+                    </div>
+                    <div className="flex gap-2.5">
+                      <button 
+                        onClick={() => {
+                          setInviteWorkspaceId(workspace.id);
+                          setInviteEmail("");
+                          setInviteError(null);
+                          setInviteSuccess(null);
+                        }}
+                        className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1 cursor-pointer"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> Invite
+                      </button>
+                      <span className="text-zinc-200">|</span>
+                      <span className="text-xs text-zinc-400 font-medium capitalize">{workspace.type} Target</span>
+                    </div>
+                  </div>
+
+                  {/* Title & description */}
+                  <div className="mt-5">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-zinc-900">{workspace.name}</h3>
+                      <div className="flex -space-x-1.5">
+                        {workspace.members.map((m, idx) => (
+                          <div 
+                            key={m.userId}
+                            className={`h-5 w-5 rounded-full border border-white flex items-center justify-center text-[9px] text-white font-bold ${
+                              idx % 3 === 0 ? "bg-blue-500" : idx % 3 === 1 ? "bg-purple-500" : "bg-teal-500"
+                            }`}
+                          >
+                            {m.name.charAt(0).toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-zinc-400 font-bold">{workspace.members.length} {workspace.members.length === 1 ? "Participant" : "Participants"}</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-0.5">{workspace.description || desc}</p>
+                  </div>
+
+                  {/* Goal Box */}
+                  <div className="mt-5 rounded-xl border border-zinc-150 bg-zinc-50/50 p-4 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-zinc-800">Workspace Savings Target</span>
+                      {workspace.targetDate && (
+                        <span className="text-[10px] font-bold text-zinc-400">Target Date: {workspace.targetDate}</span>
+                      )}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div>
+                      <div className="flex justify-between text-xs font-semibold mb-1">
+                        <span>Current: {formatRupee(totalContributions)} / {formatRupee(workspace.targetAmount)}</span>
+                        <span className="text-blue-600 font-bold">{progress}% Progress</span>
+                      </div>
+                      <div className="h-2 w-full bg-zinc-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-pulse" style={{ width: `${progress}%` }} />
+                      </div>
+                      {workspace.targetAmount > totalContributions && (
+                        <p className="text-[10px] text-zinc-400 mt-1">Remaining to fund: {formatRupee(workspace.targetAmount - totalContributions)}</p>
+                      )}
+                    </div>
+
+                    {/* Member contributions */}
+                    <div className="space-y-3 pt-3 border-t border-zinc-200/50">
+                      {workspace.members.map((m) => {
+                        const isMe = m.userId === dbUser?.userId;
+                        return (
+                          <div key={m.userId} className="space-y-1">
+                            <div className="flex justify-between text-[11px] font-semibold text-zinc-600">
+                              <span>{m.name} {isMe && "(You)"}:</span>
+                              <span className="font-bold text-zinc-800">{formatRupee(m.contribution)}</span>
+                            </div>
+                            {isMe ? (
+                              <input
+                                type="range"
+                                min="0"
+                                max={workspace.targetAmount || 1000000}
+                                step={Math.round((workspace.targetAmount || 1000000) / 100)}
+                                value={m.contribution}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setWorkspaces(prev => prev.map(w => {
+                                    if (w.id === workspace.id) {
+                                      return {
+                                        ...w,
+                                        members: w.members.map(mem => mem.userId === dbUser?.userId ? { ...mem, contribution: val } : mem)
+                                      };
+                                    }
+                                    return w;
+                                  }));
+                                }}
+                                onMouseUp={(e) => handleContributionChange(workspace.id, Number(e.currentTarget.value))}
+                                onTouchEnd={(e) => handleContributionChange(workspace.id, Number(e.currentTarget.value))}
+                                className="w-full h-1.2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                              />
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Tip and action */}
+                <div className="mt-5 pt-4 border-t border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div className="flex items-start gap-2 max-w-sm">
+                    <Sparkles className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-zinc-500 leading-normal">
+                      AI Suggestion: Standardize targets and coordinate periodic updates to reach your target of {formatRupee(workspace.targetAmount)} early.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setInviteWorkspaceId(workspace.id);
+                      setInviteEmail("");
+                      setInviteError(null);
+                      setInviteSuccess(null);
+                    }}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0 cursor-pointer"
+                  >
+                    + Add Collaborator
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Overlay Modal for Create Workspace */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl relative border border-zinc-200 text-zinc-900">
+            <button 
+              onClick={() => setIsCreateOpen(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-zinc-900 mb-2">Create Collaborative Workspace</h3>
+            <p className="text-xs text-zinc-500 mb-4">Set up a target and track financial progress together with others.</p>
+
+            <form onSubmit={handleCreateWorkspace} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700">Workspace Type</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {["Couple", "Family", "Sibling", "Trip"].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setNewWorkspaceType(type)}
+                      className={`h-9 rounded-xl text-xs font-bold transition-all border ${
+                        newWorkspaceType === type 
+                          ? "bg-blue-600 border-transparent text-white shadow-sm" 
+                          : "border-zinc-250 hover:border-zinc-350 text-zinc-600 bg-zinc-50"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700">Workspace Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Wedding Savings, Hawaii Trip"
+                  value={newWorkspaceName}
+                  onChange={(e) => setNewWorkspaceName(e.target.value)}
+                  className="w-full h-10 px-3 border border-zinc-250 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-zinc-50"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700">Description</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Spouses co-managing home downpayment"
+                  value={newWorkspaceDesc}
+                  onChange={(e) => setNewWorkspaceDesc(e.target.value)}
+                  className="w-full h-10 px-3 border border-zinc-250 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-zinc-50"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-zinc-700">Target Goal (INR)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newWorkspaceTarget}
+                    onChange={(e) => setNewWorkspaceTarget(Number(e.target.value))}
+                    className="w-full h-10 px-3 border border-zinc-250 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-zinc-50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-zinc-700">Target Date</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dec 2027"
+                    value={newWorkspaceDate}
+                    onChange={(e) => setNewWorkspaceDate(e.target.value)}
+                    className="w-full h-10 px-3 border border-zinc-250 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-zinc-50"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition-all active:scale-[0.99] mt-2"
+              >
+                Create Workspace
+              </Button>
+            </form>
           </div>
         </div>
+      )}
 
-        {/* ==========================================
-            2. Family Workspace Card 👨👩👧👦
-            ========================================== */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group flex flex-col justify-between">
-          <div>
-            {/* Card Header utilities */}
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
-                <Users className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2.5">
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <UserPlus className="h-3.5 w-3.5" /> Invite
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <Settings className="h-3.5 w-3.5" /> Manage
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 flex items-center">
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
+      {/* Overlay Modal for Invite Member */}
+      {inviteWorkspaceId && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl relative border border-zinc-200 text-zinc-900">
+            <button 
+              onClick={() => setInviteWorkspaceId(null)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
 
-            {/* Title & description */}
-            <div className="mt-5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-zinc-900">Family Workspace</h3>
-                <div className="flex -space-x-1.5">
-                  <div className="h-5 w-5 rounded-full bg-blue-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">F</div>
-                  <div className="h-5 w-5 rounded-full bg-pink-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">M</div>
-                  <div className="h-5 w-5 rounded-full bg-green-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">S</div>
-                  <div className="h-5 w-5 rounded-full bg-yellow-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">D</div>
+            <h3 className="text-lg font-bold text-zinc-900 mb-1">Add Workspace Partner</h3>
+            <p className="text-xs text-zinc-500 mb-4">Invite another registered user to collaborate in this workspace.</p>
+
+            <form onSubmit={handleInviteMember} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700">Registered Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="partner@finone.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="w-full h-10 px-3 border border-zinc-250 rounded-xl focus:outline-none focus:border-blue-500 text-sm bg-zinc-50"
+                />
+              </div>
+
+              {inviteError && (
+                <div className="rounded-xl bg-red-55 text-red-700 border border-red-200/50 p-3 text-[11px] font-semibold flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{inviteError}</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 font-bold">4 Participants</span>
-              </div>
-              <p className="text-xs text-zinc-500 mt-0.5">Manage household insurance, medical assets, and budgets together</p>
-            </div>
+              )}
 
-            {/* Shared Family Modules Overview */}
-            <div className="mt-5 grid grid-cols-2 gap-4 text-xs">
-              <div className="p-3 rounded-xl border border-zinc-100 bg-zinc-50/50">
-                <span className="text-[10px] text-zinc-400 font-bold uppercase block">Family Net Worth</span>
-                <p className="text-base font-bold text-zinc-800 mt-0.5">{formatRupee(18000000)}</p>
-                <span className="text-[9px] text-emerald-600 font-semibold mt-1 inline-block">Includes properties</span>
-              </div>
-              <div className="p-3 rounded-xl border border-zinc-100 bg-zinc-50/50">
-                <span className="text-[10px] text-zinc-400 font-bold uppercase block">Medical Expenses YTD</span>
-                <p className="text-base font-bold text-zinc-800 mt-0.5">{formatRupee(45000)}</p>
-                <span className="text-[9px] text-zinc-450 font-semibold mt-1 inline-block">Renewals pending</span>
-              </div>
-            </div>
+              {inviteSuccess && (
+                <div className="rounded-xl bg-emerald-55 text-emerald-700 border border-emerald-255 p-3 text-[11px] font-semibold flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{inviteSuccess}</span>
+                </div>
+              )}
 
-            {/* Insurance Check table */}
-            <div className="mt-4 space-y-2 text-xs">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Household Protection Status</p>
-              
-              <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                <span className="text-zinc-600">Parents' Life Coverage:</span>
-                <span className="font-bold text-emerald-600">Active</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                <span className="text-zinc-600">Family Health Cover:</span>
-                <span className="font-bold text-emerald-600">Active</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-                <span className="text-zinc-600">Property Home Shield:</span>
-                <span className="font-bold text-red-500">Expired</span>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Tip and action */}
-          <div className="mt-5 pt-4 border-t border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div className="flex items-start gap-2 max-w-sm">
-              <AlertCircle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-zinc-500 leading-normal">
-                AI Alert: Parents' Health Premium payment of ₹12,000 is due in 12 days. Complete renewal to avoid policy lapses.
-              </p>
-            </div>
-            <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">+ Add Family Asset</button>
+              <Button
+                type="submit"
+                disabled={!!inviteSuccess}
+                className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition-all active:scale-[0.99] mt-2 disabled:opacity-50"
+              >
+                Add Partner
+              </Button>
+            </form>
           </div>
         </div>
-
-        {/* ==========================================
-            3. Sibling Workspace Card 👥
-            ========================================== */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group flex flex-col justify-between">
-          <div>
-            {/* Card Header utilities */}
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
-                <Building className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2.5">
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <UserPlus className="h-3.5 w-3.5" /> Invite
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <Settings className="h-3.5 w-3.5" /> Manage
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 flex items-center">
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Title & description */}
-            <div className="mt-5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-zinc-900">Sibling Workspace</h3>
-                <div className="flex -space-x-1.5">
-                  <div className="h-5 w-5 rounded-full bg-blue-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">A</div>
-                  <div className="h-5 w-5 rounded-full bg-indigo-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">B</div>
-                  <div className="h-5 w-5 rounded-full bg-purple-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">C</div>
-                </div>
-                <span className="text-[10px] text-zinc-400 font-bold">3 Participants</span>
-              </div>
-              <p className="text-xs text-zinc-500 mt-0.5">Joint construction project & inherited asset oversight</p>
-            </div>
-
-            {/* House Construction detail box */}
-            <div className="mt-5 rounded-xl border border-zinc-150 bg-zinc-50/50 p-4 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-zinc-800">Project: House Construction</span>
-                <span className="text-[10px] font-bold text-zinc-400">Milestone: Foundations complete</span>
-              </div>
-
-              {/* Progress metrics */}
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Spent: {formatRupee(siblingCurrentTotal)} / {formatRupee(siblingTotalGoal)}</span>
-                  <span className="text-blue-600 font-bold">{siblingProgress}% Progress</span>
-                </div>
-                <div className="h-2 w-full bg-zinc-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${siblingProgress}%` }} />
-                </div>
-                <div className="flex justify-between text-[9px] text-zinc-400 mt-1.5 font-bold">
-                  <span>Remaining: {formatRupee(siblingTotalGoal - siblingCurrentTotal)}</span>
-                  <span>Approved: 14 Expenses</span>
-                </div>
-              </div>
-
-              {/* Interactive Sibling Sliders */}
-              <div className="space-y-3 pt-3 border-t border-zinc-200/50">
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-semibold text-zinc-600">
-                    <span>Brother A Share:</span>
-                    <span className="font-bold text-zinc-800">{formatRupee(brotherA)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1000000"
-                    max="2000000"
-                    step="50000"
-                    value={brotherA}
-                    onChange={(e) => setBrotherA(Number(e.target.value))}
-                    className="w-full h-1.2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-semibold text-zinc-600">
-                    <span>Brother B Share:</span>
-                    <span className="font-bold text-zinc-800">{formatRupee(brotherB)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1000000"
-                    max="2000000"
-                    step="50000"
-                    value={brotherB}
-                    onChange={(e) => setBrotherB(Number(e.target.value))}
-                    className="w-full h-1.2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-semibold text-zinc-600">
-                    <span>Brother C Share:</span>
-                    <span className="font-bold text-zinc-800">{formatRupee(brotherC)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="500000"
-                    max="1500000"
-                    step="50000"
-                    value={brotherC}
-                    onChange={(e) => setBrotherC(Number(e.target.value))}
-                    className="w-full h-1.2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Tip and action */}
-          <div className="mt-5 pt-4 border-t border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div className="flex items-start gap-2 max-w-sm">
-              <Sparkles className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-zinc-500 leading-normal">
-                AI Estimate: Rising concrete raw material indexes may overshoot construction budget by 5.2% in Q3.
-              </p>
-            </div>
-            <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">+ Add Expense</button>
-          </div>
-        </div>
-
-        {/* ==========================================
-            4. Trip Workspace Card ✈️
-            ========================================== */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow group flex flex-col justify-between">
-          <div>
-            {/* Card Header utilities */}
-            <div className="flex justify-between items-start">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
-                <Plane className="h-5 w-5" />
-              </div>
-              <div className="flex gap-2.5">
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <UserPlus className="h-3.5 w-3.5" /> Invite
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-zinc-500 font-semibold hover:text-zinc-700 flex items-center gap-1">
-                  <Settings className="h-3.5 w-3.5" /> Manage
-                </button>
-                <span className="text-zinc-200">|</span>
-                <button className="text-xs text-blue-600 font-semibold hover:text-blue-700 flex items-center">
-                  Details <ChevronRight className="h-3 w-3 ml-0.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Title & description */}
-            <div className="mt-5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-zinc-900">Thailand Trip</h3>
-                <div className="flex -space-x-1.5">
-                  <div className="h-5 w-5 rounded-full bg-blue-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">A</div>
-                  <div className="h-5 w-5 rounded-full bg-emerald-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">K</div>
-                  <div className="h-5 w-5 rounded-full bg-pink-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">S</div>
-                  <div className="h-5 w-5 rounded-full bg-yellow-500 border border-white flex items-center justify-center text-[9px] text-white font-bold">P</div>
-                </div>
-                <span className="text-[10px] text-zinc-400 font-bold">4 Participants</span>
-              </div>
-              <p className="text-xs text-zinc-500 mt-0.5">Collaborative travel budgeting & split settlements tracker</p>
-            </div>
-
-            {/* Trip details overview */}
-            <div className="mt-5 space-y-4">
-              <div>
-                <div className="flex justify-between items-center text-xs font-semibold text-zinc-800 mb-1.5">
-                  <span>Savings Target: {formatRupee(200000)}</span>
-                  <span>75% Funded</span>
-                </div>
-                <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500" style={{ width: "75%" }} />
-                </div>
-                <div className="flex justify-between text-[10px] text-zinc-400 mt-1 font-semibold">
-                  <span>Saved: {formatRupee(150000)}</span>
-                  <span>Remaining: {formatRupee(50000)}</span>
-                </div>
-              </div>
-
-              {/* Individual tracker log */}
-              <div className="space-y-2 text-xs pt-3 border-t border-zinc-100">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Contribution Standings</p>
-                <div className="flex items-center justify-between bg-zinc-50 p-2 rounded-lg border border-zinc-100">
-                  <span className="text-zinc-700">Anandha (Host):</span>
-                  <span className="font-bold text-emerald-600">{formatRupee(50000)} (Paid)</span>
-                </div>
-                <div className="flex items-center justify-between bg-zinc-50 p-2 rounded-lg border border-zinc-100">
-                  <span className="text-zinc-700">Karan:</span>
-                  <span className="font-bold text-emerald-600">{formatRupee(50000)} (Paid)</span>
-                </div>
-                <div className="flex items-center justify-between bg-zinc-50 p-2 rounded-lg border border-zinc-100">
-                  <span className="text-zinc-700">Sarah:</span>
-                  <span className="font-bold text-orange-600">{formatRupee(50000)} (Pending)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Tip and action */}
-          <div className="mt-5 pt-4 border-t border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div className="flex items-start gap-2 max-w-sm">
-              <Clock className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-zinc-500 leading-normal">
-                Trip Countdown: <span className="font-bold text-zinc-800">24 Days remaining</span> until departure. AI estimated total flight split: ₹45,000.
-              </p>
-            </div>
-            <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">+ Add Expense</button>
-          </div>
-        </div>
-
-      </div>
+      )}
     </div>
   );
 }

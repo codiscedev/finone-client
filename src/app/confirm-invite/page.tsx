@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
+import { auth } from "@/lib/firebase";
+import { sendEmailVerification } from "firebase/auth";
 import { Mail, RefreshCw, LogOut, ArrowRight, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -62,6 +64,9 @@ export default function ConfirmInvitePage() {
     try {
       const response = await apiClient.post("/v1/invite/resend");
       if (response.data?.success) {
+        if (auth.currentUser) {
+          await sendEmailVerification(auth.currentUser);
+        }
         setFeedback({
           type: "success",
           message: "A fresh verification link has been sent to your email address."

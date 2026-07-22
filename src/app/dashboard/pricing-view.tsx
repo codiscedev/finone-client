@@ -1,12 +1,147 @@
 "use client";
 
 import * as React from "react";
-import { Check, X, Star, CreditCard, ChevronDown, ChevronUp, Sparkles, HelpCircle } from "lucide-react";
+import { Check, X, Star, CreditCard, ChevronDown, ChevronUp, Sparkles, HelpCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api";
 
 export default function PricingView() {
+  const { dbUser, refreshUserStatus } = useAuth();
+  
   const [billingCycle, setBillingCycle] = React.useState<"monthly" | "yearly">("yearly");
   const [openFaq, setOpenFaq] = React.useState<number | null>(null);
+
+  const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleUpgrade = async (planName: "PRO" | "FAMILY") => {
+    setLoadingPlan(planName);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const isINR = dbUser?.currency === "INR";
+
+    if (isINR) {
+      try {
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded) {
+          throw new Error("Failed to load Razorpay SDK");
+        }
+
+        const res = await apiClient.post("/v1/billing/razorpay/order", {
+          planName,
+          billingCycle
+        });
+
+        if (res.data?.success && res.data?.data) {
+          const order = res.data.data;
+          
+          if (order.isMock) {
+            await apiClient.post("/v1/billing/razorpay/verify", {
+              razorpayOrderId: order.orderId,
+              razorpayPaymentId: "pay_mock_" + Math.random().toString(36).substring(7),
+              razorpaySignature: "mock_signature",
+              planName,
+              billingCycle
+            });
+            await refreshUserStatus();
+            setSuccessMsg(`Simulated Sandbox Upgrade: Welcome to Finance-One ${planName}!`);
+            setLoadingPlan(null);
+            return;
+          }
+
+          const options = {
+            key: order.keyId,
+            amount: order.amount,
+            currency: order.currency,
+            name: "Finance-One",
+            description: `${planName} Subscription (${billingCycle})`,
+            order_id: order.orderId,
+            handler: async function (response: any) {
+              try {
+                setLoadingPlan(planName);
+                await apiClient.post("/v1/billing/razorpay/verify", {
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  planName,
+                  billingCycle
+                });
+                await refreshUserStatus();
+                setSuccessMsg(`Payment successful! Welcome to Finance-One ${planName}.`);
+              } catch (err: any) {
+                setErrorMsg(err.response?.data?.message || "Verification failed");
+              } finally {
+                setLoadingPlan(null);
+              }
+            },
+            modal: {
+              ondismiss: () => {
+                setLoadingPlan(null);
+              }
+            },
+            prefill: {
+              name: dbUser?.name || "",
+              email: dbUser?.email || ""
+            },
+            theme: {
+              color: "#2563EB"
+            }
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        }
+      } catch (err: any) {
+        console.error("Razorpay error", err);
+        setErrorMsg(err.message || "Razorpay integration failed");
+        setLoadingPlan(null);
+      }
+    } else {
+      try {
+        const res = await apiClient.post("/v1/billing/dodo/session", {
+          planName,
+          billingCycle
+        });
+
+        if (res.data?.success && res.data?.data) {
+          const session = res.data.data;
+          
+          if (session.isMock) {
+            await apiClient.post("/v1/billing/dodo/callback", {
+              planName,
+              billingCycle
+            });
+            await refreshUserStatus();
+            setSuccessMsg(`Simulated Dodo Upgrade: Welcome to Finance-One ${planName}!`);
+          } else {
+            window.location.href = session.checkoutUrl;
+          }
+        }
+      } catch (err: any) {
+        console.error("Dodo payments error", err);
+        setErrorMsg(err.message || "Dodo Payments integration failed");
+      } finally {
+        setLoadingPlan(null);
+      }
+    }
+  };
 
   const toggleFaq = (idx: number) => {
     setOpenFaq(openFaq === idx ? null : idx);
@@ -93,152 +228,214 @@ export default function PricingView() {
         </div>
       </div>
 
+      {/* Success/Error Alerts */}
+      {successMsg && (
+        <div className="max-w-3xl mx-auto rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200/50 p-4 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
+          <Check className="h-5 w-5 shrink-0 text-emerald-600" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="max-w-3xl mx-auto rounded-2xl bg-red-50 text-red-800 border border-red-200/50 p-4 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
+          <X className="h-5 w-5 shrink-0 text-red-600" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
       {/* Pricing Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-4">
-        
-        {/* FREE PLAN */}
-        <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-shadow relative">
-          <div className="space-y-4">
-            <div>
-              <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wide block">Starter</span>
-              <h3 className="text-xl font-black text-zinc-900 mt-1">FREE</h3>
-            </div>
+      {(() => {
+        const isINR = dbUser?.currency === "INR";
+        const isProActive = dbUser?.subscriptionTier === "PRO" && dbUser?.subscriptionStatus === "ACTIVE";
+        const isFamilyActive = dbUser?.subscriptionTier === "FAMILY" && dbUser?.subscriptionStatus === "ACTIVE";
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-4">
             
-            <div className="py-2">
-              <span className="text-3xl font-extrabold text-zinc-950">₹0</span>
-              <span className="text-zinc-400 text-xs font-semibold"> / month</span>
-            </div>
+            {/* FREE PLAN */}
+            <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-shadow relative">
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wide block">Starter</span>
+                  <h3 className="text-xl font-black text-zinc-900 mt-1">FREE</h3>
+                </div>
+                
+                <div className="py-2">
+                  <span className="text-3xl font-extrabold text-zinc-950">{isINR ? "₹0" : "$0"}</span>
+                  <span className="text-zinc-450 text-xs font-semibold"> / month</span>
+                </div>
 
-            <p className="text-[11px] text-zinc-500 leading-normal">
-              Get started with core personal finance tracking and essential balance ledgers.
-            </p>
+                <p className="text-[11px] text-zinc-500 leading-normal">
+                  Get started with core personal finance tracking and essential balance ledgers.
+                </p>
 
-            <div className="border-t border-zinc-100 pt-4 space-y-2.5">
-              <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Features Included</span>
-              <div className="space-y-2">
-                {["Dashboard", "Expense Tracking", "Income Tracking", "Budget Management", "Assets", "Debts", "Net Worth", "Goals", "Basic Reports"].map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700">
-                    <span className="h-4 w-4 bg-zinc-100 text-zinc-650 flex items-center justify-center rounded-full text-[9px] shrink-0">✓</span>
-                    <span>{f}</span>
+                <div className="border-t border-zinc-100 pt-4 space-y-2.5">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Features Included</span>
+                  <div className="space-y-2">
+                    {["Dashboard", "Expense Tracking", "Income Tracking", "Budget Management", "Assets", "Debts", "Net Worth", "Goals", "Basic Reports"].map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700">
+                        <span className="h-4 w-4 bg-zinc-100 text-zinc-650 flex items-center justify-center rounded-full text-[9px] shrink-0">✓</span>
+                        <span>{f}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              </div>
+
+              <div className="pt-8">
+                <Button 
+                  disabled
+                  className="w-full h-10 bg-zinc-150 text-zinc-400 rounded-xl text-xs font-bold cursor-not-allowed outline-none shadow-sm"
+                >
+                  {dbUser?.subscriptionTier && dbUser?.subscriptionTier !== "FREE" ? "Standard Plan" : "Current Plan"}
+                </Button>
               </div>
             </div>
-          </div>
 
-          <div className="pt-8">
-            <Button className="w-full h-10 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-sm active:scale-[0.98]">
-              Get Started
-            </Button>
-          </div>
-        </div>
-
-        {/* PRO PLAN - MOST POPULAR */}
-        <div className="bg-white border-2 border-blue-600 rounded-3xl p-6 shadow-[0_4px_20px_rgba(59,130,246,0.12)] flex flex-col justify-between hover:shadow-lg transition-shadow relative">
-          <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
-            <Star className="h-3 w-3 fill-current text-white" /> Most Popular
-          </span>
-
-          <div className="space-y-4">
-            <div className="mt-2">
-              <span className="text-[10px] font-black uppercase text-blue-600 tracking-wide block">Premium Single</span>
-              <h3 className="text-xl font-black text-zinc-900 mt-1">PRO</h3>
-            </div>
-            
-            <div className="py-2">
-              <span className="text-3xl font-extrabold text-zinc-950">
-                {billingCycle === "monthly" ? "₹299" : "₹250"}
+            {/* PRO PLAN - MOST POPULAR */}
+            <div className="bg-white border-2 border-blue-600 rounded-3xl p-6 shadow-[0_4px_20px_rgba(59,130,246,0.12)] flex flex-col justify-between hover:shadow-lg transition-shadow relative">
+              <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                <Star className="h-3 w-3 fill-current text-white" /> Most Popular
               </span>
-              <span className="text-zinc-450 text-xs font-semibold"> / month</span>
-              {billingCycle === "yearly" && (
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">₹2,999 / year (Save ₹589)</p>
-              )}
-            </div>
 
-            <p className="text-[11px] text-zinc-500 leading-normal">
-              Unlock AI assistance, portfolio CAGR calculators, automated trackers, and custom loan/premium planners.
-            </p>
+              <div className="space-y-4">
+                <div className="mt-2">
+                  <span className="text-[10px] font-black uppercase text-blue-600 tracking-wide block">Premium Single</span>
+                  <h3 className="text-xl font-black text-zinc-900 mt-1">PRO</h3>
+                </div>
+                
+                <div className="py-2">
+                  <span className="text-3xl font-extrabold text-zinc-950">
+                    {isINR 
+                      ? (billingCycle === "monthly" ? "₹299" : "₹250") 
+                      : (billingCycle === "monthly" ? "$9" : "$8")}
+                  </span>
+                  <span className="text-zinc-450 text-xs font-semibold"> / month</span>
+                  {billingCycle === "yearly" && (
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                      {isINR ? "₹2,999 / year (Save ₹589)" : "$89 / year (Save $19)"}
+                    </p>
+                  )}
+                </div>
 
-            <div className="border-t border-zinc-100 pt-4 space-y-2.5">
-              <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Everything in Free, plus:</span>
-              <div className="space-y-2">
-                {[
-                  "Unlimited Accounts & Assets",
-                  "Investment Portfolio Tracker",
-                  "Insurance & Policy Vault",
-                  "Loan Closure Planner",
-                  "Financial Health Score Analysis",
-                  "AI Financial Mentor chat",
-                  "EMI & Premium Reminders",
-                  "Priority Email Support"
-                ].map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700">
-                    <span className="h-4 w-4 bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center rounded-full text-[9px] shrink-0 font-bold">✓</span>
-                    <span>{f}</span>
+                <p className="text-[11px] text-zinc-500 leading-normal">
+                  Unlock AI assistance, portfolio CAGR calculators, automated trackers, and custom loan/premium planners.
+                </p>
+
+                <div className="border-t border-zinc-100 pt-4 space-y-2.5">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Everything in Free, plus:</span>
+                  <div className="space-y-2">
+                    {[
+                      "Unlimited Accounts & Assets",
+                      "Investment Portfolio Tracker",
+                      "Insurance & Policy Vault",
+                      "Loan Closure Planner",
+                      "Financial Health Score Analysis",
+                      "AI Financial Mentor chat",
+                      "EMI & Premium Reminders",
+                      "Priority Email Support"
+                    ].map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700">
+                        <span className="h-4 w-4 bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center rounded-full text-[9px] shrink-0 font-bold">✓</span>
+                        <span>{f}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              </div>
+
+              <div className="pt-8">
+                <Button 
+                  onClick={() => handleUpgrade("PRO")}
+                  disabled={loadingPlan !== null || isProActive}
+                  className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-md active:scale-[0.98] ${
+                    isProActive 
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-default" 
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
+                >
+                  {loadingPlan === "PRO" ? (
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto text-white" />
+                  ) : isProActive ? (
+                    "Active Subscription"
+                  ) : (
+                    "Upgrade to Pro"
+                  )}
+                </Button>
               </div>
             </div>
-          </div>
 
-          <div className="pt-8">
-            <Button className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer outline-none shadow-md active:scale-[0.98]">
-              Upgrade to Pro
-            </Button>
-          </div>
-        </div>
+            {/* FAMILY PLAN */}
+            <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-shadow relative">
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wide block">Co-Managed Workspace</span>
+                  <h3 className="text-xl font-black text-zinc-900 mt-1">FAMILY</h3>
+                </div>
+                
+                <div className="py-2">
+                  <span className="text-3xl font-extrabold text-zinc-950">
+                    {isINR 
+                      ? (billingCycle === "monthly" ? "₹499" : "₹417") 
+                      : (billingCycle === "monthly" ? "$15" : "$12")}
+                  </span>
+                  <span className="text-zinc-450 text-xs font-semibold"> / month</span>
+                  {billingCycle === "yearly" && (
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                      {isINR ? "₹4,999 / year (Save ₹989)" : "$149 / year (Save $31)"}
+                    </p>
+                  )}
+                </div>
 
-        {/* FAMILY PLAN */}
-        <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col justify-between hover:shadow-md transition-shadow relative">
-          <div className="space-y-4">
-            <div>
-              <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wide block">Co-Managed Workspace</span>
-              <h3 className="text-xl font-black text-zinc-900 mt-1">FAMILY</h3>
-            </div>
-            
-            <div className="py-2">
-              <span className="text-3xl font-extrabold text-zinc-950">
-                {billingCycle === "monthly" ? "₹499" : "₹417"}
-              </span>
-              <span className="text-zinc-450 text-xs font-semibold"> / month</span>
-              {billingCycle === "yearly" && (
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">₹4,999 / year (Save ₹989)</p>
-              )}
-            </div>
+                <p className="text-[11px] text-zinc-500 leading-normal">
+                  Designed for couples and families to collaborate on wealth tracking, shared loans, travel trips, and investments.
+                </p>
 
-            <p className="text-[11px] text-zinc-500 leading-normal">
-              Designed for couples and families to collaborate on wealth tracking, shared loans, travel trips, and investments.
-            </p>
-
-            <div className="border-t border-zinc-100 pt-4 space-y-2.5">
-              <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Everything in Pro, plus:</span>
-              <div className="space-y-2">
-                {[
-                  "Up to 6 Member Accounts",
-                  "Shared Joint Wealth Dashboard",
-                  "Shared Goals & Milestones",
-                  "Trip & House planning splits",
-                  "Shared Loan Management",
-                  "AI Family Financial Advisor",
-                  "Shared Notifications & Alerts"
-                ].map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700">
-                    <span className="h-4 w-4 bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center rounded-full text-[9px] shrink-0 font-bold">✓</span>
-                    <span>{f}</span>
+                <div className="border-t border-zinc-100 pt-4 space-y-2.5">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Everything in Pro, plus:</span>
+                  <div className="space-y-2">
+                    {[
+                      "Up to 6 Member Accounts",
+                      "Shared Joint Wealth Dashboard",
+                      "Shared Goals & Milestones",
+                      "Trip & House planning splits",
+                      "Shared Loan Management",
+                      "AI Family Financial Advisor",
+                      "Shared Notifications & Alerts"
+                    ].map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700">
+                        <span className="h-4 w-4 bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center rounded-full text-[9px] shrink-0 font-bold">✓</span>
+                        <span>{f}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              </div>
+
+              <div className="pt-8">
+                <Button 
+                  onClick={() => handleUpgrade("FAMILY")}
+                  disabled={loadingPlan !== null || isFamilyActive}
+                  className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-sm active:scale-[0.98] ${
+                    isFamilyActive 
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-default" 
+                      : "bg-zinc-950 hover:bg-zinc-850 text-white"
+                  }`}
+                >
+                  {loadingPlan === "FAMILY" ? (
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto text-white" />
+                  ) : isFamilyActive ? (
+                    "Active Subscription"
+                  ) : (
+                    "Start Family Plan"
+                  )}
+                </Button>
               </div>
             </div>
-          </div>
 
-          <div className="pt-8">
-            <Button className="w-full h-10 bg-zinc-950 hover:bg-zinc-850 text-white rounded-xl text-xs font-bold cursor-pointer outline-none shadow-sm active:scale-[0.98]">
-              Start Family Plan
-            </Button>
           </div>
-        </div>
-
-      </div>
+        );
+      })()}
 
       {/* Feature Comparison Matrix */}
       <div className="bg-white border border-zinc-200/80 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-5 space-y-4">

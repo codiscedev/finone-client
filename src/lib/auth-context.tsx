@@ -13,6 +13,9 @@ export interface DbUser {
   currency: string;
   newUser: boolean;
   inviteConfirmed: boolean;
+  subscriptionTier?: string;
+  subscriptionStatus?: string;
+  subscriptionExpiry?: string;
 }
 
 interface AuthContextType {
@@ -163,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentUser = auth.currentUser;
     if (currentUser) {
       try {
+        await currentUser.reload();
         const idToken = await currentUser.getIdToken(true);
         const response = await apiClient.post("/auth/login", { idToken });
         if (response.data?.success && response.data?.data) {

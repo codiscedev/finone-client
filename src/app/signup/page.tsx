@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, sendEmailVerification } from "firebase/auth";
 import { auth, googleProvider, appleProvider } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { Eye, EyeOff, Lock, Mail, User, ArrowRight, Sparkles, TrendingUp, ShieldCheck, Check, X } from "lucide-react";
@@ -95,7 +95,10 @@ export default function SignUpPage() {
       // 2. Set display name in Firebase profile
       await updateProfile(userCredential.user, { displayName: name });
 
-      // 3. Force token refresh to populate display name in ID token claim immediately
+      // 3. Send email verification natively via Firebase Auth
+      await sendEmailVerification(userCredential.user);
+
+      // 4. Force token refresh to populate display name and latest claims in ID token
       await userCredential.user.getIdToken(true);
 
       // AuthProvider will automatically capture state change, sync with backend, and redirect to /dashboard

@@ -11,7 +11,7 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase client app (singleton pattern for Next.js SSR/client)
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

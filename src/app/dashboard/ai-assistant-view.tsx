@@ -21,13 +21,35 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
+import { apiClient } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { app } from "@/lib/firebase";
+import { getAI, getGenerativeModel } from "firebase/ai";
 
 interface AIAssistantViewProps {
   onUpgradeClick?: () => void;
 }
 
 export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps) {
+  const { dbUser } = useAuth();
   const { showSuccess } = useCustomAlert();
+  
+  // Dynamic metrics state
+  const [summary, setSummary] = React.useState<any>(null);
+  const [healthScore, setHealthScore] = React.useState<any>(null);
+  const [messages, setMessages] = React.useState<any[]>([
+    {
+      sender: "bot",
+      text: "Hello! I am FinOne AI, your personal finance strategist. Ask me anything about budgeting, investments, retirement, or tax saving.",
+      time: "10:00 AM"
+    }
+  ]);
+
+  const [inputText, setInputText] = React.useState("");
+  const [isTyping, setIsTyping] = React.useState(false);
+  const [copiedId, setCopiedId] = React.useState<number | null>(null);
+  const [pinnedMsgs, setPinnedMsgs] = React.useState<number[]>([]);
+
   // Suggested Prompts list
   const suggestedPrompts = [
     "Analyze my portfolio",
@@ -38,41 +60,40 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
     "Predict my future net worth"
   ];
 
-  // Chat message state
-  const [messages, setMessages] = React.useState([
-    {
-      sender: "bot",
-      text: "Hello Anandha. I have compiled your current financial profile (Health Score: 78, Net Worth: ₹1.24 Cr). Ask me anything about budgeting, retirement, tax-saving strategies, or portfolio rebalancing.",
-      time: "10:15 AM"
-    }
-  ]);
-  const [inputText, setInputText] = React.useState("");
-  const [isTyping, setIsTyping] = React.useState(false);
-  const [copiedId, setCopiedId] = React.useState<number | null>(null);
-  const [pinnedMsgs, setPinnedMsgs] = React.useState<number[]>([]);
+  // Fetch API metrics and history on mount
+  React.useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [sumRes, healthRes, historyRes] = await Promise.all([
+          apiClient.get("/v1/dashboard/summary").catch(() => null),
+          apiClient.get("/v1/wealth/health-score").catch(() => null),
+          apiClient.get("/ai/history").catch(() => null)
+        ]);
 
-  // Simulation prompt responses
-  const getSimulatedResponse = (query: string): string => {
-    const q = query.toLowerCase();
-    if (q.includes("portfolio") || q.includes("analyze")) {
-      return "Your portfolio currently has a 65% large-cap equity allocation. This represents a high concentration risk. I recommend rebalancing 15% of your equity holding into International Funds and Debt ETFs to hedge against local corrections.";
-    }
-    if (q.includes("health") || q.includes("score")) {
-      return "Your Financial Health Score is 78/100 (Grade B). To cross into Grade A (80+), consider: 1) Increasing your emergency fund coverage from 2.5 months to 6 months (+8 pts), and 2) capping your entertainment/dining out variance below 80% (+5 pts).";
-    }
-    if (q.includes("retire") || q.includes("retirement")) {
-      return "To retire at age 60 with a corpus of ₹2.5 Crore (adjusted for 6% inflation), you need a monthly SIP of ₹12,500. Currently, your retirement SIP stands at ₹1,500. Incrementing this by ₹5,000 monthly will accelerate your goal timeline by 3 years.";
-    }
-    if (q.includes("tax") || q.includes("regime")) {
-      return "Based on your income of ₹24 Lakhs and deductions, the New Tax Regime is projected to save you ₹64,200 compared to the Old Tax Regime. I recommend opting for the New Regime during your tax declaration.";
-    }
-    if (q.includes("net worth") || q.includes("predict")) {
-      return "At your current monthly savings rate of ₹25,000 and 8% returns, your net worth is projected to compound from ₹1.24 Cr to ₹2.18 Cr in 10 years. Boosting the yield rate to 12% via equity index funds yields ₹2.65 Cr.";
-    }
-    return "That's a great question about managing your capital. I suggest looking at your Net Worth trend projection inside the Wealth card simulator to visualize long-term compounding effects.";
-  };
+        if (sumRes?.data?.success) {
+          setSummary(sumRes.data.data);
+        }
+        if (healthRes?.data?.success) {
+          setHealthScore(healthRes.data.data);
+        }
+        if (historyRes?.data?.success && historyRes.data.data) {
+          const formatted = historyRes.data.data.map((msg: any) => ({
+            sender: msg.role === "USER" ? "user" : "bot",
+            text: msg.message,
+            time: new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }));
+          if (formatted.length > 0) {
+            setMessages(formatted);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load AI Assistant initial details", err);
+      }
+    };
+    loadData();
+  }, []);
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const text = textToSend || inputText;
     if (!text.trim()) return;
 
@@ -86,17 +107,53 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
     setMessages((prev) => [...prev, userMsg]);
     if (!textToSend) setInputText("");
     
-    // Simulate bot typing
     setIsTyping(true);
-    setTimeout(() => {
-      const botResponse = {
-        sender: "bot",
-        text: getSimulatedResponse(text),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages((prev) => [...prev, botResponse]);
-      setIsTyping(false);
-    }, 850);
+    let reply = "";
+    let useFallback = false;
+
+    // 1. Try Firebase AI SDK Client-Side
+    try {
+      const ai = getAI(app);
+      const model = getGenerativeModel(ai, { 
+        model: "gemini-1.5-flash",
+        systemInstruction: "You are FinOne AI, a personal finance assistant. Help with budgeting, investments, tax saving, and financial planning. Be concise, practical, and India-specific (INR, Indian tax laws)."
+      });
+      const result = await model.generateContent(text);
+      const responseText = result.response.text();
+      if (responseText) {
+        reply = responseText;
+        // Save user conversation in history on backend asynchronously
+        await apiClient.post("/ai/chat", { message: text }).catch(() => null);
+      } else {
+        useFallback = true;
+      }
+    } catch (err) {
+      console.warn("Client-side Firebase Vertex AI failed, falling back to server-side Gemini integration:", err);
+      useFallback = true;
+    }
+
+    // 2. Fallback to Server-Side API Chat endpoint
+    if (useFallback) {
+      try {
+        const response = await apiClient.post("/ai/chat", { message: text });
+        if (response.data?.success && response.data?.data) {
+          reply = response.data.data.reply;
+        } else {
+          reply = "I'm having trouble connecting to the AI model right now. Please try again later.";
+        }
+      } catch (err: any) {
+        console.error("Failed to get response from fallback server-side model", err);
+        reply = "I'm having trouble connecting to the AI model right now. Please try again later.";
+      }
+    }
+
+    const botResponse = {
+      sender: "bot",
+      text: reply,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages((prev) => [...prev, botResponse]);
+    setIsTyping(false);
   };
 
   const handleCopy = (text: string, idx: number) => {
@@ -115,6 +172,16 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
 
   const handleExport = () => {
     showSuccess("Success", "Exporting chat transcript as PDF document... Download started.");
+  };
+
+  const formatCurrency = (val: number | null | undefined) => {
+    if (val === undefined || val === null) return "₹0";
+    const isINR = dbUser?.currency === "INR";
+    return new Intl.NumberFormat(isINR ? "en-IN" : "en-US", {
+      style: "currency",
+      currency: isINR ? "INR" : "USD",
+      maximumFractionDigits: 0
+    }).format(val);
   };
 
   return (
@@ -173,15 +240,21 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-150">
               <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider block">Health Score</span>
-              <span className="text-sm font-extrabold text-zinc-800 block mt-1">78 / 100</span>
+              <span className="text-sm font-extrabold text-zinc-800 block mt-1">
+                {healthScore ? `${healthScore.score} / 100` : "Calculating..."}
+              </span>
             </div>
             <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-150">
               <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider block">Net Worth</span>
-              <span className="text-sm font-extrabold text-zinc-800 block mt-1">₹1.24 Crore</span>
+              <span className="text-sm font-extrabold text-zinc-800 block mt-1">
+                {summary ? formatCurrency(summary.netWorth) : "Calculating..."}
+              </span>
             </div>
             <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-150">
-              <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider block">Risk Rating</span>
-              <span className="text-sm font-extrabold text-zinc-800 block mt-1">Moderate</span>
+              <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider block">Savings Rate</span>
+              <span className="text-sm font-extrabold text-zinc-800 block mt-1">
+                {healthScore ? `${(healthScore.savingsRate * 100).toFixed(0)}%` : "Calculating..."}
+              </span>
             </div>
           </div>
 
@@ -194,20 +267,26 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
                 <span className="text-[10px] text-zinc-400 font-semibold">Active Profile</span>
               </h4>
               <p className="text-zinc-600 mt-1 leading-relaxed text-[11px]">
-                Your equity exposure is 65%, concentrated heavily in large-cap Indian indices. Rebalance 15% to gold or debt funds to safeguard portfolio values.
+                {healthScore ? healthScore.recommendation : "Load your profile assets to see asset allocation rebalancing strategies."}
               </p>
               <div className="flex gap-2 pt-2">
-                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[9px]">Equity: 65%</span>
-                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[9px]">Debt: 20%</span>
-                <span className="px-2 py-0.5 rounded bg-yellow-50 text-yellow-700 font-bold text-[9px]">Gold: 10%</span>
+                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[9px]">
+                  Savings Rate: {healthScore ? `${(healthScore.savingsRate * 100).toFixed(0)}%` : "N/A"}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[9px]">
+                  Emergency Fund: {healthScore ? `${healthScore.monthsEmergencyFund} months` : "N/A"}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-yellow-50 text-yellow-700 font-bold text-[9px]">
+                  Debt Ratio: {healthScore ? `${(healthScore.debtToIncomeRatio * 100).toFixed(0)}%` : "N/A"}
+                </span>
               </div>
             </div>
 
-            {/* Wealth Growth & NPS suggestion */}
+            {/* Tax optimizations */}
             <div className="space-y-1.5 p-4 rounded-xl border border-zinc-100 bg-zinc-50/50">
-              <h4 className="font-bold text-zinc-950">Wealth Growth & Taxes</h4>
+              <h4 className="font-bold text-zinc-950">Tax Optimizations</h4>
               <p className="text-zinc-600 mt-1 leading-relaxed text-[11px]">
-                Contributing an extra ₹50,000 under Section 80CCD(1B) to NPS saves ₹15,600 in tax. Set up automatic monthly SIP allocations.
+                Contributing via standard Section 80C and Section 80D options is highly recommended. Complete the tax planner onboarding checklist to calculate and optimize your regime.
               </p>
             </div>
 
@@ -216,12 +295,14 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
               <h4 className="font-bold text-zinc-950">Retirement Forecasting</h4>
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <div>
-                  <span className="text-zinc-400 block text-[10px] font-bold">Target Corpus:</span>
-                  <span className="font-bold text-zinc-800">₹2.5 Crore</span>
+                  <span className="text-zinc-400 block text-[10px] font-bold">Grade Rating:</span>
+                  <span className="font-bold text-zinc-800">{healthScore ? `Grade ${healthScore.grade}` : "N/A"}</span>
                 </div>
                 <div>
-                  <span className="text-zinc-400 block text-[10px] font-bold">Years Remaining:</span>
-                  <span className="font-bold text-zinc-800">30 Years</span>
+                  <span className="text-zinc-400 block text-[10px] font-bold">Investment Rate:</span>
+                  <span className="font-bold text-zinc-800">
+                    {healthScore ? `${(healthScore.investmentRate * 100).toFixed(0)}%` : "N/A"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -231,25 +312,23 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
           <div className="space-y-3">
             <h4 className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">AI Insights Feed</h4>
             
-            <div className="flex items-start justify-between p-3 border border-zinc-150 rounded-xl text-xs bg-white">
-              <div>
-                <p className="font-bold text-zinc-900">Emergency Buffer Adequacy</p>
-                <p className="text-[11px] text-zinc-500 mt-0.5">Your safety buffer covers 2.5 months expenses. Build 6 months capacity.</p>
+            {healthScore?.missingEssentials && healthScore.missingEssentials.length > 0 ? (
+              healthScore.missingEssentials.map((item: string, idx: number) => (
+                <div key={idx} className="flex items-start justify-between p-3 border border-zinc-150 rounded-xl text-xs bg-white">
+                  <div>
+                    <p className="font-bold text-zinc-900">{item}</p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">Identified missing essential recommendation based on safety checklist audits.</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[9px] font-bold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">High Priority</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center p-6 border border-dashed border-zinc-200 rounded-xl text-xs text-zinc-400">
+                All safety checklist items look correct! No missing essentials detected.
               </div>
-              <div className="text-right shrink-0">
-                <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">High Priority</span>
-              </div>
-            </div>
-
-            <div className="flex items-start justify-between p-3 border border-zinc-150 rounded-xl text-xs bg-white">
-              <div>
-                <p className="font-bold text-zinc-900">Tax Saving Optimization</p>
-                <p className="text-[11px] text-zinc-500 mt-0.5">Automated checks indicate underutilization of Section 80D limits.</p>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="text-[9px] font-bold text-zinc-500 bg-zinc-50 px-1.5 py-0.5 rounded">Med Priority</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
