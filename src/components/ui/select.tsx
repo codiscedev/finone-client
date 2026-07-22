@@ -72,7 +72,15 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
     }
 
     return (
-      <div className="relative w-full" ref={containerRef}>
+      <div
+        className={cn(
+          "relative",
+          className && className.split(" ").some(c => c.startsWith("w-"))
+            ? className.split(" ").filter(c => c.startsWith("w-")).join(" ")
+            : "w-full"
+        )}
+        ref={containerRef}
+      >
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}

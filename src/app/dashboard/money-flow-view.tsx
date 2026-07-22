@@ -854,7 +854,7 @@ function SpendingTab({
                 <th className="p-3.5">Payment Method</th>
                 <th className="p-3.5">Comments</th>
                 {showRefId && <th className="p-3.5">Reference ID</th>}
-                <th className="p-3.5 w-12 text-center">⚠</th>
+                <th className="p-3.5 w-16 text-center">Status</th>
                 <th className="p-3.5 w-12 text-center">Del</th>
               </tr>
             </thead>

@@ -49,11 +49,19 @@ export default function DashboardPage() {
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
   const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
 
-  const [profileName, setProfileName] = React.useState("User");
+  const [profileName, setProfileName] = React.useState(dbUser?.name || firebaseUser?.displayName || "User");
   const [summary, setSummary] = React.useState<any>(null);
   const [trends, setTrends] = React.useState<any[]>([]);
   const [recentTransactions, setRecentTransactions] = React.useState<any[]>([]);
   const [dashboardLoading, setDashboardLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (dbUser?.name) {
+      setProfileName(dbUser.name);
+    } else if (firebaseUser?.displayName) {
+      setProfileName(firebaseUser.displayName);
+    }
+  }, [dbUser, firebaseUser]);
 
   const fetchDashboardData = React.useCallback(async () => {
     if (!dbUser?.userId) return;
@@ -490,14 +498,6 @@ function DashboardView({ userName, summary, trends, recentTransactions, loading 
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-zinc-950">Welcome back, {userName}</h2>
           <p className="text-sm text-zinc-500 mt-1">Here is a quick breakdown of your portfolios and wealth indicators today.</p>
-        </div>
-        
-        {/* Quick Utilities */}
-        <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 h-10 text-sm font-semibold text-zinc-750 shadow-sm hover:bg-zinc-50 transition-all outline-none active:scale-[0.98]">
-            <Calendar className="h-4 w-4 text-zinc-500" />
-            Last 30 Days
-          </button>
         </div>
       </div>
 
