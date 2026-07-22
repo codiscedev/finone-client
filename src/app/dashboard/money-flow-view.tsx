@@ -739,14 +739,7 @@ function SpendingTab({
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Add Manually
           </Button>
-          <Button
-            onClick={() => setShowAddCategory(true)}
-            variant="outline"
-            className="h-9 px-3 rounded-xl border-zinc-200 font-semibold text-xs transition-all active:scale-[0.98]"
-          >
-            <Tag className="h-3.5 w-3.5 mr-1.5 text-zinc-500" />
-            Add Category
-          </Button>
+
           <button
             onClick={() => onOpenDrawer("import")}
             className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all"

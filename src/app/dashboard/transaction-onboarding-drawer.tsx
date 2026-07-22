@@ -987,7 +987,7 @@ export default function TransactionOnboardingDrawer({
               </div>
 
               {/* Sticky Actions Footer */}
-              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 px-6 py-4 -mx-6 -mb-6 pb-6 flex justify-end gap-3 mt-8 z-10">
                 <button
                   type="button"
                   onClick={() => { setStep(1); setImportMethod(null); }}
@@ -1151,7 +1151,7 @@ export default function TransactionOnboardingDrawer({
               </div>
 
               {/* Sticky Actions Footer */}
-              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 px-6 py-4 -mx-6 -mb-6 pb-6 flex justify-end gap-3 mt-8 z-10">
                 <button
                   type="button"
                   onClick={() => { setStep(1); setImportMethod(null); }}
@@ -1221,7 +1221,7 @@ export default function TransactionOnboardingDrawer({
               </div>
 
               {/* Sticky Actions Footer */}
-              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 px-6 py-4 -mx-6 -mb-6 pb-6 flex justify-end gap-3 mt-8 z-10">
                 <button
                   type="button"
                   onClick={() => { setStep(1); setImportMethod(null); }}
@@ -1287,7 +1287,7 @@ export default function TransactionOnboardingDrawer({
               </div>
 
               {/* Sticky Actions Footer */}
-              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 px-6 py-4 -mx-6 -mb-6 pb-6 flex justify-end gap-3 mt-8 z-10">
                 <button
                   type="button"
                   onClick={() => setStep(2)}
@@ -1310,7 +1310,14 @@ export default function TransactionOnboardingDrawer({
               STEP 4: IMPORT PREVIEW
               ========================================== */}
           {step === 4 && (
-            <div className="space-y-5">
+            syncStatus === "PROCESSING" || syncStatus === "PENDING" ? (
+              <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                <RefreshCw className="h-8 w-8 text-blue-600 animate-spin" />
+                <p className="text-sm font-bold text-zinc-700">Processing cash flows...</p>
+                <p className="text-[10px] text-zinc-400">Parsing and auto-categorizing transaction rows</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
               {/* Preview metrics summary */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-zinc-50 border border-zinc-100 p-3 rounded-xl">
                 <div className="text-center p-1.5 border-r border-zinc-150/70">
@@ -1477,7 +1484,7 @@ export default function TransactionOnboardingDrawer({
               </div>
 
               {/* Sticky Actions Footer */}
-              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 p-4 -mx-6 -mb-6 flex justify-end gap-3 mt-8 z-10">
+              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 px-6 py-4 -mx-6 -mb-6 pb-6 flex justify-end gap-3 mt-8 z-10">
                 <button
                   type="button"
                   onClick={() => setStep(importMethod === "file" ? 3 : 2)}
@@ -1495,7 +1502,8 @@ export default function TransactionOnboardingDrawer({
                 </Button>
               </div>
             </div>
-          )}
+          )
+        )}
 
           {/* ==========================================
               STEP 5: IMPORT SUMMARY
