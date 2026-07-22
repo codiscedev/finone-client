@@ -12,6 +12,7 @@ export interface DbUser {
   name: string;
   currency: string;
   newUser: boolean;
+  inviteConfirmed: boolean;
 }
 
 interface AuthContextType {
@@ -22,6 +23,7 @@ interface AuthContextType {
   clearAuthError: () => void;
   logout: () => Promise<void>;
   completeOnboarding: (updatedUser: DbUser) => void;
+  refreshUserStatus: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextType>({
@@ -32,6 +34,7 @@ const AuthContext = React.createContext<AuthContextType>({
   clearAuthError: () => { },
   logout: async () => { },
   completeOnboarding: () => { },
+  refreshUserStatus: async () => { }
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -100,19 +103,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isAuthRoute = pathname === "/login" || pathname === "/signup";
     const isProtectedRoute = pathname.startsWith("/dashboard") || pathname === "/onboarding";
+    const isConfirmInviteRoute = pathname === "/confirm-invite";
 
-    if (!firebaseUser && isProtectedRoute) {
+    if (!firebaseUser && (isProtectedRoute || isConfirmInviteRoute)) {
       router.push("/login");
     } else if (firebaseUser) {
-      if (dbUser?.newUser && pathname !== "/onboarding") {
-        router.push("/onboarding");
-      } else if (!dbUser?.newUser && pathname === "/onboarding") {
-        router.push("/dashboard");
-      } else if (isAuthRoute) {
-        if (dbUser?.newUser) {
-          router.push("/onboarding");
+      if (dbUser) {
+        if (!dbUser.inviteConfirmed) {
+          if (pathname !== "/confirm-invite") {
+            router.push("/confirm-invite");
+          }
         } else {
-          router.push("/dashboard");
+          // Invite confirmed!
+          if (pathname === "/confirm-invite") {
+            if (dbUser.newUser) {
+              router.push("/onboarding");
+            } else {
+              router.push("/dashboard");
+            }
+          } else if (dbUser.newUser && pathname !== "/onboarding") {
+            router.push("/onboarding");
+          } else if (!dbUser.newUser && pathname === "/onboarding") {
+            router.push("/dashboard");
+          } else if (isAuthRoute) {
+            if (dbUser.newUser) {
+              router.push("/onboarding");
+            } else {
+              router.push("/dashboard");
+            }
+          }
         }
       }
     }
@@ -140,8 +159,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem("finone_db_user", JSON.stringify(updatedUser));
   };
 
+  const refreshUserStatus = async () => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken(true);
+        const response = await apiClient.post("/auth/login", { idToken });
+        if (response.data?.success && response.data?.data) {
+          const serverUser: DbUser = response.data.data;
+          setDbUser(serverUser);
+          sessionStorage.setItem("finone_db_user", JSON.stringify(serverUser));
+        }
+      } catch (err) {
+        console.error("Failed to refresh user status:", err);
+      }
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ firebaseUser, dbUser, loading, authError, clearAuthError, logout, completeOnboarding }}>
+    <AuthContext.Provider value={{ firebaseUser, dbUser, loading, authError, clearAuthError, logout, completeOnboarding, refreshUserStatus }}>
       {children}
     </AuthContext.Provider>
   );
