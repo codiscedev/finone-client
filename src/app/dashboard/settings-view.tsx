@@ -980,14 +980,14 @@ export default function SettingsView() {
                     <label className="font-semibold text-zinc-500">
                       {categoryType === "asset" ? "Asset Type *" : categoryType === "investment" ? "Investment Type *" : "Essential Type *"}
                     </label>
-                    <select
+                    <Select
                       value={catIsAppreciation ? "true" : "false"}
                       onChange={(e) => setCatIsAppreciation(e.target.value === "true")}
-                      className="w-full h-9 rounded-lg border border-zinc-200 px-2 bg-white outline-none text-zinc-900 focus:border-blue-500 focus:bg-white cursor-pointer"
+                      className="w-full"
                     >
                       <option value="true">APPRECIATION</option>
                       <option value="false">DEPRECIATION</option>
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="space-y-1.5">

@@ -19,9 +19,11 @@ import {
   ChevronDown,
   ThumbsUp,
   Check,
-  X
+  X,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api";
 
 export default function TaxPlannerView() {
   // 1. Tax Regime Comparison states
@@ -48,35 +50,154 @@ export default function TaxPlannerView() {
   const [hraIsMetro, setHraIsMetro] = React.useState(true); // Metro/Non-metro
 
   // Auto Tax Detection state
-  const [autoDetections, setAutoDetections] = React.useState([
-    { id: 1, desc: "LIC Premium payment", amount: 25000, category: "80C", confidence: 99, status: "pending" },
-    { id: 2, desc: "ELSS Monthly Mutual Fund SIP", amount: 10000, category: "80C", confidence: 98, status: "pending" },
-    { id: 3, desc: "Star Health Insurance Premium", amount: 18000, category: "80D", confidence: 95, status: "pending" },
-    { id: 4, desc: "Donation to PM Relief Fund", amount: 5000, category: "80G", confidence: 92, status: "pending" },
-  ]);
+  const [autoDetections, setAutoDetections] = React.useState<any[]>([]);
 
   // Document Vault files
-  const [uploadedFiles, setUploadedFiles] = React.useState([
-    { name: "Form_16_FY25-26.pdf", size: "2.4 MB", type: "Form 16", date: "Jun 15, 2026" },
-    { name: "Rent_Receipts_Q4.zip", size: "4.8 MB", type: "Rent Receipts", date: "May 28, 2026" },
-    { name: "PPF_Statement_FY25-26.pdf", size: "1.1 MB", type: "Investment Proof", date: "Apr 12, 2026" },
-  ]);
+  const [uploadedFiles, setUploadedFiles] = React.useState<any[]>([]);
 
   const [newFileName, setNewFileName] = React.useState("");
 
-  const handleFileUpload = (e: React.FormEvent) => {
+  const fetchTaxProfile = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get("/v1/tax/profile");
+      if (res.data?.success) {
+        const p = res.data.data;
+        setSalary(p.salaryIncome);
+        setFreelance(p.freelanceIncome);
+        setRental(p.rentalIncome);
+        setCapitalGains(p.capitalGains);
+        setOtherIncome(p.otherIncome);
+        setDed80C(p.deduction80c);
+        setDed80D(p.deduction80d);
+        setDed80CCD(p.deduction80ccd);
+        setDed24b(p.deduction24b);
+        setDed80G(p.deduction80g);
+        setHraBasic(p.hraBasic);
+        setHraReceived(p.hraReceived);
+        setHraRentPaid(p.hraRentPaid);
+        setHraIsMetro(p.hraIsMetro);
+        setSelectedRegime(p.selectedRegime === "OLD" ? "Old" : "New");
+      }
+    } catch (err) {
+      console.error("Failed to fetch tax profile", err);
+    }
+  }, []);
+
+  const saveTaxProfile = async (updates: any) => {
+    try {
+      const payload = {
+        salaryIncome: updates.salary ?? salary,
+        freelanceIncome: updates.freelance ?? freelance,
+        rentalIncome: updates.rental ?? rental,
+        capitalGains: updates.capitalGains ?? capitalGains,
+        otherIncome: updates.otherIncome ?? otherIncome,
+        deduction80c: updates.ded80C ?? ded80C,
+        deduction80d: updates.ded80D ?? ded80D,
+        deduction80ccd: updates.ded80CCD ?? ded80CCD,
+        deduction24b: updates.ded24b ?? ded24b,
+        deduction80g: updates.ded80G ?? ded80G,
+        hraBasic: updates.hraBasic ?? hraBasic,
+        hraReceived: updates.hraReceived ?? hraReceived,
+        hraRentPaid: updates.hraRentPaid ?? hraRentPaid,
+        hraIsMetro: updates.hraIsMetro !== undefined ? updates.hraIsMetro : hraIsMetro,
+        selectedRegime: (updates.selectedRegime ?? selectedRegime) === "Old" ? "OLD" : "NEW",
+        financialYear: "2026-2027"
+      };
+      await apiClient.put("/v1/tax/profile", payload);
+    } catch (err) {
+      console.error("Failed to save tax profile", err);
+    }
+  };
+
+  const fetchAutoDetections = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get("/v1/tax/auto-detect");
+      if (res.data?.success) {
+        setAutoDetections(res.data.data.map((d: any) => ({
+          id: d.transactionId,
+          desc: d.description,
+          amount: d.amount,
+          category: d.category,
+          confidence: d.confidence,
+          status: "pending"
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to fetch auto-detect suggestions", err);
+    }
+  }, []);
+
+  const fetchDocuments = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get("/v1/tax/documents");
+      if (res.data?.success) {
+        setUploadedFiles(res.data.data.map((doc: any) => ({
+          id: doc.id,
+          name: doc.fileName,
+          size: doc.fileSize,
+          type: doc.fileType,
+          date: new Date(doc.uploadedAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric"
+          })
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to fetch tax documents", err);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchTaxProfile();
+    fetchAutoDetections();
+    fetchDocuments();
+  }, [fetchTaxProfile, fetchAutoDetections, fetchDocuments]);
+
+  const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFileName.trim()) return;
-    setUploadedFiles([
-      ...uploadedFiles,
-      {
-        name: newFileName.endsWith(".pdf") ? newFileName : `${newFileName}.pdf`,
-        size: "1.2 MB",
-        type: "Investment Proof",
-        date: "Today"
+    const finalName = newFileName.endsWith(".pdf") ? newFileName : `${newFileName}.pdf`;
+    try {
+      const res = await apiClient.post("/v1/tax/documents", {
+        fileName: finalName,
+        fileType: "Investment Proof"
+      });
+      if (res.data?.success) {
+        setNewFileName("");
+        fetchDocuments();
       }
-    ]);
-    setNewFileName("");
+    } catch (err) {
+      console.error("Failed to upload document", err);
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    try {
+      const response = await apiClient.get("/v1/tax/report/download", {
+        responseType: "blob"
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "Tax_Planner_Report.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("Failed to download tax report", err);
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string) => {
+    try {
+      const res = await apiClient.delete(`/v1/tax/documents/${docId}`);
+      if (res.data?.success) {
+        fetchDocuments();
+      }
+    } catch (err) {
+      console.error("Failed to delete document", err);
+    }
   };
 
   // Calculations
@@ -173,16 +294,46 @@ export default function TaxPlannerView() {
     }).format(val);
   };
 
-  const handleAcceptDetection = (id: number, amount: number, category: string) => {
+  const handleAcceptDetection = (id: any, amount: number, category: string) => {
     setAutoDetections(autoDetections.map(d => d.id === id ? { ...d, status: "accepted" } : d));
-    if (category === "80C") setDed80C(prev => Math.min(prev + amount, 150000));
-    if (category === "80D") setDed80D(prev => prev + amount);
-    if (category === "80CCD(1B)") setDed80CCD(prev => Math.min(prev + amount, 50000));
-    if (category === "24(b)") setDed24b(prev => Math.min(prev + amount, 200000));
-    if (category === "80G") setDed80G(prev => prev + amount);
+    
+    let updatedDed80C = ded80C;
+    let updatedDed80D = ded80D;
+    let updatedDed80CCD = ded80CCD;
+    let updatedDed24b = ded24b;
+    let updatedDed80G = ded80G;
+
+    if (category === "80C") {
+      updatedDed80C = Math.min(ded80C + amount, 150000);
+      setDed80C(updatedDed80C);
+    }
+    if (category === "80D") {
+      updatedDed80D = ded80D + amount;
+      setDed80D(updatedDed80D);
+    }
+    if (category === "80CCD(1B)" || category === "80CCD") {
+      updatedDed80CCD = Math.min(ded80CCD + amount, 50000);
+      setDed80CCD(updatedDed80CCD);
+    }
+    if (category === "24(b)" || category === "24b") {
+      updatedDed24b = Math.min(ded24b + amount, 200000);
+      setDed24b(updatedDed24b);
+    }
+    if (category === "80G") {
+      updatedDed80G = ded80G + amount;
+      setDed80G(updatedDed80G);
+    }
+
+    saveTaxProfile({
+      ded80C: updatedDed80C,
+      ded80D: updatedDed80D,
+      ded80CCD: updatedDed80CCD,
+      ded24b: updatedDed24b,
+      ded80G: updatedDed80G
+    });
   };
 
-  const handleRejectDetection = (id: number) => {
+  const handleRejectDetection = (id: any) => {
     setAutoDetections(autoDetections.map(d => d.id === id ? { ...d, status: "rejected" } : d));
   };
 
@@ -194,9 +345,9 @@ export default function TaxPlannerView() {
           <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Tax Planner & Filing</h2>
           <p className="text-sm text-zinc-500 mt-1">Optimize your taxable yield assumptions, verify auto tax sections, and file Indian ITR returns.</p>
         </div>
-        <Button className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]">
-          <Plus className="h-4 w-4 mr-1.5" />
-          Add Tax Investment
+        <Button onClick={handleDownloadReport} className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]">
+          <Download className="h-4 w-4 mr-1.5" />
+          Download Tax Report PDF
         </Button>
       </div>
 
@@ -220,7 +371,7 @@ export default function TaxPlannerView() {
             {/* Toggle controls */}
             <div className="flex items-center gap-1.5 bg-zinc-100 p-1 rounded-xl">
               <button
-                onClick={() => setSelectedRegime("Old")}
+                onClick={() => { setSelectedRegime("Old"); saveTaxProfile({ selectedRegime: "Old" }); }}
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
                   selectedRegime === "Old" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
                 }`}
@@ -228,7 +379,7 @@ export default function TaxPlannerView() {
                 Old Regime
               </button>
               <button
-                onClick={() => setSelectedRegime("New")}
+                onClick={() => { setSelectedRegime("New"); saveTaxProfile({ selectedRegime: "New" }); }}
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
                   selectedRegime === "New" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-900"
                 }`}
@@ -361,6 +512,7 @@ export default function TaxPlannerView() {
                 value={salary}
                 step="50000"
                 onChange={(e) => setSalary(Number(e.target.value))}
+                onBlur={() => saveTaxProfile({ salary })}
                 className="w-32 h-7 text-right rounded border border-zinc-200 bg-transparent px-2 font-bold text-zinc-900"
               />
             </div>
@@ -371,6 +523,7 @@ export default function TaxPlannerView() {
                 value={freelance}
                 step="10000"
                 onChange={(e) => setFreelance(Number(e.target.value))}
+                onBlur={() => saveTaxProfile({ freelance })}
                 className="w-32 h-7 text-right rounded border border-zinc-200 bg-transparent px-2 font-bold text-zinc-900"
               />
             </div>
@@ -381,6 +534,7 @@ export default function TaxPlannerView() {
                 value={rental}
                 step="5000"
                 onChange={(e) => setRental(Number(e.target.value))}
+                onBlur={() => saveTaxProfile({ rental })}
                 className="w-32 h-7 text-right rounded border border-zinc-200 bg-transparent px-2 font-bold text-zinc-900"
               />
             </div>
@@ -391,6 +545,7 @@ export default function TaxPlannerView() {
                 value={capitalGains}
                 step="5000"
                 onChange={(e) => setCapitalGains(Number(e.target.value))}
+                onBlur={() => saveTaxProfile({ capitalGains })}
                 className="w-32 h-7 text-right rounded border border-zinc-200 bg-transparent px-2 font-bold text-zinc-900"
               />
             </div>
@@ -473,6 +628,7 @@ export default function TaxPlannerView() {
                     type="number"
                     value={hraBasic}
                     onChange={(e) => setHraBasic(Number(e.target.value))}
+                    onBlur={() => saveTaxProfile({ hraBasic })}
                     className="w-full h-7 rounded border border-zinc-200 bg-white px-2 text-zinc-900"
                   />
                 </div>
@@ -482,6 +638,7 @@ export default function TaxPlannerView() {
                     type="number"
                     value={hraReceived}
                     onChange={(e) => setHraReceived(Number(e.target.value))}
+                    onBlur={() => saveTaxProfile({ hraReceived })}
                     className="w-full h-7 rounded border border-zinc-200 bg-white px-2 text-zinc-900"
                   />
                 </div>
@@ -491,6 +648,7 @@ export default function TaxPlannerView() {
                     type="number"
                     value={hraRentPaid}
                     onChange={(e) => setHraRentPaid(Number(e.target.value))}
+                    onBlur={() => saveTaxProfile({ hraRentPaid })}
                     className="w-full h-7 rounded border border-zinc-200 bg-white px-2 text-zinc-900"
                   />
                 </div>
@@ -499,7 +657,7 @@ export default function TaxPlannerView() {
                     <input
                       type="checkbox"
                       checked={hraIsMetro}
-                      onChange={(e) => setHraIsMetro(e.target.checked)}
+                      onChange={(e) => { setHraIsMetro(e.target.checked); saveTaxProfile({ hraIsMetro: e.target.checked }); }}
                       className="rounded border-zinc-200 text-blue-600 h-3.5 w-3.5"
                     />
                     <span>Lives in Metro City</span>
@@ -715,7 +873,7 @@ export default function TaxPlannerView() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
               <FolderLock className="h-5 w-5" />
             </div>
-            <button className="text-xs text-blue-600 font-bold hover:underline">Share with CA</button>
+            <button onClick={handleDownloadReport} className="text-xs text-blue-600 font-bold hover:underline">Download Report</button>
           </div>
 
           <div>
@@ -743,13 +901,13 @@ export default function TaxPlannerView() {
           {/* Files List */}
           <div className="space-y-2 text-xs">
             {uploadedFiles.map((file, idx) => (
-              <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
+              <div key={file.id || idx} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 border border-zinc-100">
                 <div className="min-w-0">
                   <p className="font-bold text-zinc-900 truncate">{file.name}</p>
                   <span className="text-[9px] text-zinc-400">{file.type} • {file.size}</span>
                 </div>
-                <button className="text-zinc-400 hover:text-zinc-600">
-                  <Download className="h-4 w-4" />
+                <button onClick={() => handleDeleteDocument(file.id)} className="text-zinc-400 hover:text-red-500 transition-colors" title="Delete file">
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             ))}

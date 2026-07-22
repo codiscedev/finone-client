@@ -797,22 +797,22 @@ function SpendingTab({
               className="w-full h-8.5 rounded-lg border border-zinc-200 px-3 pl-8 bg-white text-xs font-medium focus:border-blue-500 focus:outline-none"
             />
           </div>
-          <select
+          <Select
             value={categoryFilter}
             onChange={e => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
-            className="h-8.5 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-semibold focus:outline-none"
+            className="h-8.5 text-xs font-semibold w-40"
           >
             <option value="all">All Categories</option>
             {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select
+          </Select>
+          <Select
             value={paymentFilter}
             onChange={e => { setPaymentFilter(e.target.value); setCurrentPage(1); }}
-            className="h-8.5 rounded-lg border border-zinc-200 bg-white px-2 text-xs font-semibold focus:outline-none"
+            className="h-8.5 text-xs font-semibold w-40"
           >
             <option value="all">All Payment Methods</option>
             {uniquePayments.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          </Select>
 
           {/* Column toggle dropdown */}
           <div className="relative">
@@ -957,11 +957,11 @@ function SpendingTab({
                 <input className={inputCls} value={newCat.subcatName} onChange={e => setNewCat(p => ({ ...p, subcatName: e.target.value }))} placeholder="e.g. Restaurants" />
               </FormField>
               <FormField label="Sub-category Priority">
-                <select className={selectCls} value={newCat.subcatPriority} onChange={e => setNewCat(p => ({ ...p, subcatPriority: e.target.value as any }))}>
-                  <option>High</option>
-                  <option>Medium</option>
-                  <option>Low</option>
-                </select>
+                <Select value={newCat.subcatPriority} onChange={e => setNewCat(p => ({ ...p, subcatPriority: e.target.value as any }))}>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </Select>
               </FormField>
               <FormField label="Max Cap (Monthly)">
                 <input className={inputCls} type="number" min="0" value={newCat.maxCap} onChange={e => setNewCat(p => ({ ...p, maxCap: e.target.value }))} placeholder="e.g. 5000" />

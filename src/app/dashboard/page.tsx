@@ -38,6 +38,7 @@ import AIAssistantView from "./ai-assistant-view";
 import PricingView from "./pricing-view";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { apiClient } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -47,6 +48,48 @@ export default function DashboardPage() {
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
   const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
+
+  const [profileName, setProfileName] = React.useState("User");
+  const [summary, setSummary] = React.useState<any>(null);
+  const [trends, setTrends] = React.useState<any[]>([]);
+  const [recentTransactions, setRecentTransactions] = React.useState<any[]>([]);
+  const [dashboardLoading, setDashboardLoading] = React.useState(true);
+
+  const fetchDashboardData = React.useCallback(async () => {
+    if (!dbUser?.userId) return;
+    setDashboardLoading(true);
+    try {
+      const [profileRes, summaryRes, trendsRes, txRes] = await Promise.all([
+        apiClient.get(`/v1/profile/${dbUser.userId}`),
+        apiClient.get(`/v1/dashboard/summary`),
+        apiClient.get(`/v1/dashboard/trends?months=6`),
+        apiClient.get(`/v1/transaction/users/${dbUser.userId}`)
+      ]);
+
+      if (profileRes.data?.success) {
+        setProfileName(profileRes.data.data.name || "User");
+      }
+      if (summaryRes.data?.success) {
+        setSummary(summaryRes.data.data);
+      }
+      if (trendsRes.data?.success) {
+        setTrends(trendsRes.data.data);
+      }
+      if (txRes.data?.success) {
+        setRecentTransactions(txRes.data.data.slice(0, 5));
+      }
+    } catch (err) {
+      console.error("Failed to fetch dashboard data", err);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [dbUser?.userId]);
+
+  React.useEffect(() => {
+    if (activeMenu === "Dashboard" && dbUser?.userId) {
+      fetchDashboardData();
+    }
+  }, [activeMenu, dbUser?.userId, fetchDashboardData]);
 
   const profileRef = React.useRef<HTMLDivElement>(null);
 
@@ -84,10 +127,17 @@ export default function DashboardPage() {
 
   // Helper component to render active menu screen
   const renderContent = () => {
-    const userName = dbUser?.name?.split(" ")[0] || firebaseUser?.displayName?.split(" ")[0] || "User";
     switch (activeMenu) {
       case "Dashboard":
-        return <DashboardView userName={userName} />;
+        return (
+          <DashboardView
+            userName={profileName}
+            summary={summary}
+            trends={trends}
+            recentTransactions={recentTransactions}
+            loading={dashboardLoading}
+          />
+        );
       case "Wealth":
         return <WealthView onAddClick={() => setIsAddDrawerOpen(true)} onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Money Flow":
@@ -103,7 +153,15 @@ export default function DashboardPage() {
       case "Pricing":
         return <PricingView />;
       default:
-        return <DashboardView userName={userName} />;
+        return (
+          <DashboardView
+            userName={profileName}
+            summary={summary}
+            trends={trends}
+            recentTransactions={recentTransactions}
+            loading={dashboardLoading}
+          />
+        );
     }
   };
 
@@ -352,9 +410,79 @@ export default function DashboardPage() {
 // ==========================================
 interface DashboardViewProps {
   userName: string;
+  summary: any;
+  trends: any[];
+  recentTransactions: any[];
+  loading: boolean;
 }
 
-function DashboardView({ userName }: DashboardViewProps) {
+const formatRupee = (value: number | undefined) => {
+  if (value === undefined || value === null) return "₹0";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+};
+
+function DashboardView({ userName, summary, trends, recentTransactions, loading }: DashboardViewProps) {
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-8 animate-pulse">
+        {/* Welcome Header Skeleton */}
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-7 w-64 bg-zinc-200/80 rounded-lg" />
+            <div className="h-4 w-96 bg-zinc-200/80 rounded-lg" />
+          </div>
+          <div className="h-10 w-32 bg-zinc-200/80 rounded-lg" />
+        </div>
+        
+        {/* Metric Cards Skeleton */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map(n => (
+            <div key={n} className="h-28 bg-white border border-zinc-200/80 rounded-2xl p-5 space-y-3">
+              <div className="flex justify-between">
+                <div className="h-4 w-24 bg-zinc-150 rounded" />
+                <div className="h-8 w-8 bg-zinc-150 rounded-lg" />
+              </div>
+              <div className="h-6 w-32 bg-zinc-150 rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Main Grid Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-8">
+            <div className="h-80 bg-white border border-zinc-200/80 rounded-2xl p-6" />
+            <div className="h-64 bg-white border border-zinc-200/80 rounded-2xl p-6" />
+          </div>
+          <div className="lg:col-span-4 space-y-8">
+            <div className="h-48 bg-white border border-zinc-200/80 rounded-2xl p-5" />
+            <div className="h-48 bg-blue-50/50 border border-blue-100 rounded-2xl p-5" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Process SVG Trend Chart curve points
+  const savingsValues = trends.map(t => t.savings);
+  const maxSavings = Math.max(...savingsValues, 1);
+  const minSavings = Math.min(...savingsValues, 0);
+  const range = maxSavings - minSavings;
+
+  const points = trends.map((t, index) => {
+    const x = 10 + (index * 480) / (trends.length - 1 || 1);
+    const pct = range > 0 ? (t.savings - minSavings) / range : 0.5;
+    const y = 160 - pct * 130;
+    return { x, y, ...t };
+  });
+
+  let lineD = "";
+  let areaD = "";
+  if (points.length > 0) {
+    lineD = `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(" ");
+    areaD = `${lineD} L ${points[points.length - 1].x} 200 L ${points[0].x} 200 Z`;
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Welcome Header */}
@@ -370,14 +498,6 @@ function DashboardView({ userName }: DashboardViewProps) {
             <Calendar className="h-4 w-4 text-zinc-500" />
             Last 30 Days
           </button>
-          <button className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 h-10 text-sm font-semibold text-zinc-750 shadow-sm hover:bg-zinc-50 transition-all outline-none active:scale-[0.98]">
-            <Download className="h-4 w-4 text-zinc-500" />
-            Export Statement
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 h-10 text-sm font-semibold text-white shadow-sm transition-all outline-none active:scale-[0.98]">
-            <Plus className="h-4 w-4" />
-            Add Account
-          </button>
         </div>
       </div>
 
@@ -392,13 +512,13 @@ function DashboardView({ userName }: DashboardViewProps) {
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">₹1,24,83,904.40</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">{formatRupee(summary?.netWorth)}</h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs">
               <span className="inline-flex items-center gap-0.5 font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
                 <TrendingUp className="h-3 w-3" />
-                +4.2%
+                Live
               </span>
-              <span className="text-zinc-400 font-medium">from last month</span>
+              <span className="text-zinc-400 font-medium">from connected assets</span>
             </p>
           </div>
         </div>
@@ -406,19 +526,15 @@ function DashboardView({ userName }: DashboardViewProps) {
         {/* Card 2 */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between text-zinc-500">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Monthly Net Flow</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Monthly Income</span>
             <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <ArrowUpDown className="h-4.5 w-4.5" />
+              <TrendingUp className="h-4.5 w-4.5" />
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">+₹1,24,800.00</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">{formatRupee(summary?.totalIncome)}</h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs">
-              <span className="inline-flex items-center gap-0.5 font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                <TrendingUp className="h-3 w-3" />
-                +12.8%
-              </span>
-              <span className="text-zinc-400 font-medium">savings index</span>
+              <span className="text-zinc-400 font-medium">inward cash flow</span>
             </p>
           </div>
         </div>
@@ -426,18 +542,15 @@ function DashboardView({ userName }: DashboardViewProps) {
         {/* Card 3 */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between text-zinc-500">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Quarterly Taxes Est.</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Monthly Expenses</span>
             <div className="h-8 w-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
-              <CalendarCheck className="h-4.5 w-4.5" />
+              <TrendingDown className="h-4.5 w-4.5" />
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">₹84,500.00</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-rose-600">{formatRupee(summary?.totalExpense)}</h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs">
-              <span className="inline-flex items-center gap-0.5 font-bold text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded-md">
-                15 Jun
-              </span>
-              <span className="text-zinc-400 font-medium">next payment deadline</span>
+              <span className="text-zinc-400 font-medium">outward spending</span>
             </p>
           </div>
         </div>
@@ -445,19 +558,21 @@ function DashboardView({ userName }: DashboardViewProps) {
         {/* Card 4 */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between text-zinc-500">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">AI Asset Insights</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Monthly Net Savings</span>
             <div className="h-8 w-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <BrainCircuit className="h-4.5 w-4.5" />
+              <ArrowUpDown className="h-4.5 w-4.5" />
             </div>
           </div>
           <div className="mt-3">
-            <h3 className="text-2xl font-bold tracking-tight text-zinc-900">4 Suggestions</h3>
+            <h3 className={`text-2xl font-bold tracking-tight ${summary?.savings >= 0 ? "text-emerald-605" : "text-rose-605"}`}>
+              {summary?.savings >= 0 ? "+" : ""}{formatRupee(summary?.savings)}
+            </h3>
             <p className="mt-1 flex items-center gap-1.5 text-xs">
               <span className="inline-flex items-center gap-0.5 font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-md">
                 <Sparkles className="h-3 w-3" />
-                Optimized
+                {(summary?.savingsRate || 0).toFixed(1)}%
               </span>
-              <span className="text-zinc-400 font-medium">risk profile rebalanced</span>
+              <span className="text-zinc-400 font-medium">savings rate</span>
             </p>
           </div>
         </div>
@@ -472,63 +587,72 @@ function DashboardView({ userName }: DashboardViewProps) {
           <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-bold text-zinc-900">Wealth Accumulation Trend</h3>
+                <h3 className="text-sm font-bold text-zinc-900">Savings Accumulation Trend</h3>
                 <p className="text-xs text-zinc-500 mt-0.5">Historical growth across connected portfolios</p>
               </div>
-              <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-lg">
-                <button className="text-[10px] font-semibold px-2 py-1 rounded bg-white text-zinc-900 shadow-sm">1Y</button>
-                <button className="text-[10px] font-semibold px-2 py-1 rounded text-zinc-500 hover:text-zinc-900">3Y</button>
-                <button className="text-[10px] font-semibold px-2 py-1 rounded text-zinc-500 hover:text-zinc-900">ALL</button>
-              </div>
             </div>
-            {/* SVG Visualizing Stripe-like minimalist gradient curve */}
+            {/* SVG Visualizing minimalist gradient curve */}
             <div className="relative h-64 w-full">
-              <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563eb" stopOpacity="0.12" />
-                    <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                {/* Grid Lines */}
-                <line x1="0" y1="40" x2="500" y2="40" stroke="#f4f4f5" strokeWidth="1" />
-                <line x1="0" y1="90" x2="500" y2="90" stroke="#f4f4f5" strokeWidth="1" />
-                <line x1="0" y1="140" x2="500" y2="140" stroke="#f4f4f5" strokeWidth="1" />
-                
-                {/* Area Gradient */}
-                <path
-                  d="M 0 160 C 80 130, 120 170, 200 110 C 280 50, 360 80, 500 30 L 500 200 L 0 200 Z"
-                  fill="url(#chartGradient)"
-                />
-                
-                {/* Line Curve */}
-                <path
-                  d="M 0 160 C 80 130, 120 170, 200 110 C 280 50, 360 80, 500 30"
-                  fill="none"
-                  stroke="#2563eb"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
+              {trends.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-zinc-400 text-xs">
+                  No historical trend data available.
+                </div>
+              ) : (
+                <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.12" />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  {/* Grid Lines */}
+                  <line x1="0" y1="40" x2="500" y2="40" stroke="#f4f4f5" strokeWidth="1" />
+                  <line x1="0" y1="90" x2="500" y2="90" stroke="#f4f4f5" strokeWidth="1" />
+                  <line x1="0" y1="140" x2="500" y2="140" stroke="#f4f4f5" strokeWidth="1" />
+                  
+                  {/* Area Gradient */}
+                  {areaD && <path d={areaD} fill="url(#chartGradient)" />}
+                  
+                  {/* Line Curve */}
+                  {lineD && (
+                    <path
+                      d={lineD}
+                      fill="none"
+                      stroke="#2563eb"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
+                  )}
 
-                {/* Data Points */}
-                <circle cx="200" cy="110" r="4.5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-                <circle cx="500" cy="30" r="4.5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-              </svg>
-              {/* Tooltip Overlay */}
-              <div className="absolute top-16 left-[36%] rounded-lg bg-zinc-950 px-2.5 py-1.5 text-[10px] text-white font-medium shadow-md">
-                <span className="text-zinc-400">Oct:</span> ₹1,19,23,000
-              </div>
+                  {/* Data Points */}
+                  {points.map((p, idx) => (
+                    <circle
+                      key={idx}
+                      cx={p.x}
+                      cy={p.y}
+                      r="4.5"
+                      fill="#2563eb"
+                      stroke="#ffffff"
+                      strokeWidth="2"
+                      className="cursor-pointer"
+                    >
+                      <title>{`${p.month}: ${formatRupee(p.savings)}`}</title>
+                    </circle>
+                  ))}
+                </svg>
+              )}
             </div>
             
             {/* Chart Month Labels */}
-            <div className="flex justify-between items-center text-[10px] text-zinc-400 font-semibold mt-4 px-1">
-              <span>May</span>
-              <span>Jul</span>
-              <span>Sep</span>
-              <span>Nov</span>
-              <span>Jan</span>
-              <span>Mar</span>
-            </div>
+            {trends.length > 0 && (
+              <div className="flex justify-between items-center text-[10px] text-zinc-400 font-semibold mt-4 px-2.5">
+                {trends.map((t, idx) => {
+                  const date = new Date(t.month + "-01");
+                  const label = date.toLocaleString("en-US", { month: "short" });
+                  return <span key={idx}>{label}</span>;
+                })}
+              </div>
+            )}
           </div>
 
           {/* Recent Activity Table */}
@@ -538,10 +662,6 @@ function DashboardView({ userName }: DashboardViewProps) {
                 <h3 className="text-sm font-bold text-zinc-900">Recent Transactions</h3>
                 <p className="text-xs text-zinc-500 mt-0.5">Real-time asset deposits and advisory settlements</p>
               </div>
-              <button className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-50 transition-colors">
-                <Filter className="h-3 w-3 text-zinc-500" />
-                Filter
-              </button>
             </div>
             
             {/* Table */}
@@ -557,42 +677,39 @@ function DashboardView({ userName }: DashboardViewProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-xs">
-                  <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Fixed Deposit Maturity Interest</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Security Investment</td>
-                    <td className="px-6 py-3.5 font-semibold text-emerald-600">+₹42,000.00</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Jun 26, 2026</td>
-                    <td className="px-6 py-3.5">
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Wealth Advisor Fee Settlement</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Professional Fees</td>
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">-₹2,500.00</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Jun 25, 2026</td>
-                    <td className="px-6 py-3.5">
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Self-Assessment Tax Est Q2</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Taxes</td>
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">-₹21,000.00</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Jun 15, 2026</td>
-                    <td className="px-6 py-3.5">
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Completed</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-3.5 font-semibold text-zinc-900">Savings Bank Interest Transfer</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Interest Accrued</td>
-                    <td className="px-6 py-3.5 font-semibold text-emerald-600">+₹15,000.00</td>
-                    <td className="px-6 py-3.5 text-zinc-500">Jun 12, 2026</td>
-                    <td className="px-6 py-3.5">
-                      <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-0.5 text-[10px] font-semibold text-yellow-700">Pending</span>
-                    </td>
-                  </tr>
+                  {recentTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-zinc-400">
+                        No transactions logged yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    recentTransactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-zinc-50/50 transition-colors">
+                        <td className="px-6 py-3.5 font-semibold text-zinc-900">{tx.merchant || tx.note || "Untitled Transaction"}</td>
+                        <td className="px-6 py-3.5 text-zinc-500">{tx.categoryName || "Uncategorized"}</td>
+                        <td className={`px-6 py-3.5 font-semibold ${tx.type === "INCOME" ? "text-emerald-600" : "text-zinc-900"}`}>
+                          {tx.type === "INCOME" ? "+" : "-"}{formatRupee(tx.amount)}
+                        </td>
+                        <td className="px-6 py-3.5 text-zinc-500">
+                          {new Date(tx.transactionDate).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric"
+                          })}
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            tx.reviewRequired 
+                              ? "bg-amber-55 text-amber-705" 
+                              : "bg-emerald-55 text-emerald-705"
+                          }`}>
+                            {tx.reviewRequired ? "Under Review" : "Completed"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -613,7 +730,7 @@ function DashboardView({ userName }: DashboardViewProps) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-zinc-900">Transfer & Move Wealth</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">Fund portfolios or adjust cash reserves</p>
+                    <p className="text-[10px] text-zinc-505 mt-0.5">Fund portfolios or adjust cash reserves</p>
                   </div>
                 </div>
                 <ArrowUpRight className="h-4 w-4 text-zinc-400" />
@@ -626,7 +743,7 @@ function DashboardView({ userName }: DashboardViewProps) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-zinc-900">Schedule Tax Projections</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">Optimize long-term capital tax offsets</p>
+                    <p className="text-[10px] text-zinc-505 mt-0.5">Optimize long-term capital tax offsets</p>
                   </div>
                 </div>
                 <ArrowUpRight className="h-4 w-4 text-zinc-400" />
@@ -639,7 +756,7 @@ function DashboardView({ userName }: DashboardViewProps) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-zinc-900">Request Consultant Call</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">Collaborate directly with certified CPAs</p>
+                    <p className="text-[10px] text-zinc-505 mt-0.5">Collaborate directly with certified CPAs</p>
                   </div>
                 </div>
                 <ArrowUpRight className="h-4 w-4 text-zinc-400" />
@@ -657,7 +774,7 @@ function DashboardView({ userName }: DashboardViewProps) {
               <h3 className="text-xs font-bold uppercase tracking-wider">AI Asset Suggestion</h3>
             </div>
             <p className="text-xs font-bold text-zinc-900">Optimize Growth Portfolio allocations</p>
-            <p className="text-xs text-zinc-600 leading-relaxed mt-1">
+            <p className="text-xs text-zinc-650 leading-relaxed mt-1">
               Your growth portfolio risk profile is currently 14.2% higher than your set baseline. Reallocating $15,000 from high-volatility crypto indexes to treasury indexes can preserve yield while capping downside risk.
             </p>
             
@@ -694,7 +811,7 @@ function PlaceholderView({ title, description, icon: Icon }: PlaceholderProps) {
       </div>
       <div className="space-y-2">
         <h2 className="text-xl font-bold text-zinc-900">{title}</h2>
-        <p className="text-sm text-zinc-500 max-w-md mx-auto">{description}</p>
+        <p className="text-sm text-zinc-505 max-w-md mx-auto">{description}</p>
       </div>
       <button className="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 px-4 text-xs font-semibold text-white shadow-sm transition-colors">
         Configure Module
