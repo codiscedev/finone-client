@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
@@ -9,7 +10,7 @@ import { sendEmailVerification } from "firebase/auth";
 import { Mail, RefreshCw, LogOut, ArrowRight, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function ConfirmInvitePage() {
+function ConfirmInviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { dbUser, logout, refreshUserStatus } = useAuth();
@@ -185,5 +186,22 @@ export default function ConfirmInvitePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ConfirmInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="relative flex min-h-screen items-center justify-center bg-zinc-950 px-4 sm:px-6 overflow-hidden">
+          <div className="flex flex-col items-center justify-center gap-3 text-zinc-400">
+            <RefreshCw className="h-6 w-6 animate-spin text-emerald-400" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        </div>
+      }
+    >
+      <ConfirmInviteContent />
+    </Suspense>
   );
 }
