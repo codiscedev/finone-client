@@ -61,16 +61,16 @@ export default function PricingView() {
               billingCycle
             });
             await refreshUserStatus();
-            setSuccessMsg(`Simulated Sandbox Upgrade: Welcome to Finance-One ${planName}!`);
+            setSuccessMsg(`Simulated Sandbox Upgrade: Welcome to FinDisce ${planName}!`);
             setLoadingPlan(null);
             return;
           }
-
+ 
           const options = {
             key: order.keyId,
             amount: order.amount,
             currency: order.currency,
-            name: "Finance-One",
+            name: "FinDisce",
             description: `${planName} Subscription (${billingCycle})`,
             order_id: order.orderId,
             handler: async function (response: any) {
@@ -84,7 +84,7 @@ export default function PricingView() {
                   billingCycle
                 });
                 await refreshUserStatus();
-                setSuccessMsg(`Payment successful! Welcome to Finance-One ${planName}.`);
+                setSuccessMsg(`Payment successful! Welcome to FinDisce ${planName}.`);
               } catch (err: any) {
                 setErrorMsg(err.response?.data?.message || "Verification failed");
               } finally {
@@ -129,7 +129,7 @@ export default function PricingView() {
               billingCycle
             });
             await refreshUserStatus();
-            setSuccessMsg(`Simulated Dodo Upgrade: Welcome to Finance-One ${planName}!`);
+            setSuccessMsg(`Simulated Dodo Upgrade: Welcome to FinDisce ${planName}!`);
           } else {
             window.location.href = session.checkoutUrl;
           }
@@ -149,7 +149,7 @@ export default function PricingView() {
 
   const faqs = [
     {
-      q: "Can I use Finance-One for free?",
+      q: "Can I use FinDisce for free?",
       a: "Yes. The Free plan includes all the essentials for tracking your personal finances, such as income, expenses, assets, liabilities, and goals."
     },
     {
@@ -179,6 +179,8 @@ export default function PricingView() {
     { name: "AI Assistant", free: "❌", pro: "✅", family: "✅" },
     { name: "Smart Insights", free: "❌", pro: "✅", family: "✅" },
     { name: "Loan Planner", free: "❌", pro: "✅", family: "✅" },
+    { name: "Tax Planner", free: "Basic", pro: "Advanced", family: "Advanced" },
+    { name: "Bank Imports (SMS & Gmail)", free: "❌", pro: "✅", family: "✅" },
     { name: "Notifications", free: "Basic", pro: "Smart", family: "Smart" },
     { name: "Collaboration", free: "❌", pro: "1 Partner", family: "Up to 6 Members" },
     { name: "Shared Goals", free: "❌", pro: "❌", family: "✅" },
@@ -350,7 +352,7 @@ export default function PricingView() {
                   disabled={loadingPlan !== null || isProActive}
                   className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-md active:scale-[0.98] ${
                     isProActive 
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-default" 
+                      ? "bg-blue-500/10 border border-blue-500/30 text-blue-600 cursor-default" 
                       : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
                 >
@@ -418,8 +420,8 @@ export default function PricingView() {
                   disabled={loadingPlan !== null || isFamilyActive}
                   className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-sm active:scale-[0.98] ${
                     isFamilyActive 
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-default" 
-                      : "bg-zinc-950 hover:bg-zinc-850 text-white"
+                      ? "bg-blue-500/10 border border-blue-500/30 text-blue-600 cursor-default" 
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
                 >
                   {loadingPlan === "FAMILY" ? (
@@ -471,7 +473,7 @@ export default function PricingView() {
       <div className="space-y-6">
         <div className="text-center space-y-2">
           <h3 className="text-lg font-black text-zinc-950 uppercase tracking-wide">Frequently Asked Questions</h3>
-          <p className="text-[11px] text-zinc-500 font-semibold">Everything you need to know about Finance-One plans</p>
+          <p className="text-[11px] text-zinc-500 font-semibold">Everything you need to know about FinDisce plans</p>
         </div>
 
         <div className="max-w-3xl mx-auto space-y-3">

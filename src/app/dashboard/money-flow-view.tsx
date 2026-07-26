@@ -474,8 +474,8 @@ export default function MoneyFlowView() {
                 onClick={() => setActiveTab(tab.key)}
                 className={`flex items-center gap-1.5 h-9 px-3.5 text-xs font-bold rounded-lg transition-all ${
                   activeTab === tab.key
-                    ? "bg-zinc-950 text-white shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100"
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-500/10"
+                    : "text-zinc-500 hover:text-blue-600 hover:bg-blue-50/30"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />

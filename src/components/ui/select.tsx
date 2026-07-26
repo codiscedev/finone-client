@@ -85,7 +85,7 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "flex items-center justify-between w-full h-9 rounded-lg border px-3 bg-zinc-50/50 text-zinc-900 text-sm font-medium focus:outline-none transition-all cursor-pointer text-left",
+            "font-sans flex items-center justify-between w-full h-9 rounded-lg border px-3 bg-zinc-50/50 text-zinc-900 text-sm font-medium focus:outline-none transition-all cursor-pointer text-left",
             isOpen
               ? "border-blue-500 bg-white ring-4 ring-blue-500/10 shadow-sm"
               : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/20",
@@ -115,7 +115,7 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
                     key={opt.value}
                     onClick={() => handleSelect(opt.value)}
                     className={cn(
-                      "flex items-center justify-between px-3.5 py-2 text-sm cursor-pointer transition-colors font-medium",
+                      "font-sans flex items-center justify-between px-3.5 py-2 text-sm cursor-pointer transition-colors font-medium",
                       isSelected
                         ? "bg-blue-50/50 text-blue-600 font-semibold"
                         : "text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900"

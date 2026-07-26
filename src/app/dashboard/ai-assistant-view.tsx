@@ -40,7 +40,7 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
   const [messages, setMessages] = React.useState<any[]>([
     {
       sender: "bot",
-      text: "Hello! I am FinOne AI, your personal finance strategist. Ask me anything about budgeting, investments, retirement, or tax saving.",
+      text: "Hello! I am FinDisce AI, your personal finance strategist. Ask me anything about budgeting, investments, retirement, or tax saving.",
       time: "10:00 AM"
     }
   ]);
@@ -116,7 +116,7 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
       const ai = getAI(app);
       const model = getGenerativeModel(ai, { 
         model: "gemini-1.5-flash",
-        systemInstruction: "You are FinOne AI, a personal finance assistant. Help with budgeting, investments, tax saving, and financial planning. Be concise, practical, and India-specific (INR, Indian tax laws)."
+        systemInstruction: "You are FinDisce AI, a personal finance assistant. Help with budgeting, investments, tax saving, and financial planning. Be concise, practical, and India-specific (INR, Indian tax laws)."
       });
       const result = await model.generateContent(text);
       const responseText = result.response.text();
@@ -342,7 +342,7 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
             <div className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-indigo-600" />
               <div>
-                <h3 className="text-xs font-bold text-zinc-900 leading-none">FinOne Advisor</h3>
+                <h3 className="text-xs font-bold text-zinc-900 leading-none">FinDisce Advisor</h3>
                 <span className="text-[9px] text-zinc-400 font-semibold block mt-0.5">Reasoning Engine Online</span>
               </div>
             </div>

@@ -39,6 +39,7 @@ import PricingView from "./pricing-view";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -64,14 +65,15 @@ export default function DashboardPage() {
   }, [dbUser, firebaseUser]);
 
   const fetchDashboardData = React.useCallback(async () => {
-    if (!dbUser?.userId) return;
+    const userId = dbUser?.userId;
+    if (!userId) return;
     setDashboardLoading(true);
     try {
       const [profileRes, summaryRes, trendsRes, txRes] = await Promise.all([
-        apiClient.get(`/v1/profile/${dbUser.userId}`),
+        apiClient.get(`/v1/profile/${userId}`),
         apiClient.get(`/v1/dashboard/summary`),
         apiClient.get(`/v1/dashboard/trends?months=6`),
-        apiClient.get(`/v1/transaction/users/${dbUser.userId}`)
+        apiClient.get(`/v1/transaction/users/${userId}`)
       ]);
 
       if (profileRes.data?.success) {
@@ -196,13 +198,10 @@ export default function DashboardPage() {
           <div className={`flex items-center gap-2.5 overflow-hidden w-full ${
             isSidebarExpanded ? "justify-start pl-1.5 animate-in fade-in duration-200" : "justify-center"
           }`}>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
-              <TrendingUp className="h-4.5 w-4.5" />
-            </div>
-            {isSidebarExpanded && (
-              <span className="text-base font-bold tracking-tight bg-gradient-to-r from-zinc-950 to-zinc-700 bg-clip-text text-transparent whitespace-nowrap">
-                FinOne
-              </span>
+            {isSidebarExpanded ? (
+              <BrandLogo className="text-base" />
+            ) : (
+              <span className="text-sm font-black select-none tracking-tighter"><span className="text-[#0047AB]">F</span><span className="text-[#FFB347]">D</span></span>
             )}
           </div>
         </div>

@@ -455,7 +455,7 @@ export default function SettingsView() {
         {/* ==========================================
             1. Profile Card
             ========================================== */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6">
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6 lg:col-span-2">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
               <User className="h-5 w-5" />
@@ -576,97 +576,6 @@ export default function SettingsView() {
             </Button>
           </div>
         </div>
-
-        {firebaseUser?.providerData.some(p => p.providerId === "password") && (
-          /* ==========================================
-              2. Change Password Card
-              ========================================== */
-          <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <Lock className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-zinc-900">Change Password</h3>
-                <p className="text-xs text-zinc-500">Configure secure credentials and multi-factor logins</p>
-              </div>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-semibold text-zinc-500">Current Password</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-semibold text-zinc-500">New Password</label>
-                <div className="relative flex items-center">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-zinc-200 pl-3 pr-10 bg-zinc-50/50 outline-none text-zinc-900 focus:border-blue-500 focus:bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-zinc-400 hover:text-zinc-600 outline-none"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-
-                {/* Password strength visual */}
-                {newPassword && (
-                  <div className="mt-2.5 space-y-1.5 rounded-lg border border-zinc-150 bg-zinc-50 p-2">
-                    <div className="flex justify-between items-center text-[10px]">
-                      <span className="text-zinc-500 font-semibold">Security Level:</span>
-                      <span className={`font-bold ${strength.text ? 'text-zinc-800' : 'text-zinc-400'}`}>{strength.text}</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[1, 2, 3, 4].map((index) => (
-                        <div
-                          key={index}
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            index <= passwordStrengthCount ? strength.color : "bg-zinc-200"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-semibold text-zinc-500">Confirm New Password</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-zinc-200 px-3 bg-zinc-50/50 outline-none text-zinc-900 focus-visible:border-blue-500 focus:bg-white"
-                />
-              </div>
-
-            </div>
-
-            <div className="flex justify-end pt-4 border-t border-zinc-100">
-              <Button
-                onClick={() => showSuccess("Success", "Password modified successfully!")}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
-              >
-                Update Password
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* ==========================================
             3. Notification Preferences Card
@@ -1028,7 +937,7 @@ export default function SettingsView() {
         {/* ==========================================
             4. Theme Personalization Card
             ========================================== */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6">
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6 lg:col-span-2">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
               <Paintbrush className="h-5 w-5" />
@@ -1119,55 +1028,6 @@ export default function SettingsView() {
           </div>
         </div>
 
-        {/* ==========================================
-            5 & 6. Terms & Conditions and Privacy Policy (Mobile Only)
-            ========================================== */}
-        <div className="rounded-2xl border border-zinc-250 bg-zinc-50 p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-6 relative overflow-hidden">
-          {/* Mobile Only overlay indicators */}
-          <div className="absolute top-4 right-4 bg-zinc-200 text-zinc-600 rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm border border-zinc-300">
-            <Smartphone className="h-3 w-3" />
-            Mobile App Only
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-200 text-zinc-500">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-zinc-500">Legal Documents</h3>
-              <p className="text-xs text-zinc-400">Read-only platform agreements for mobile native clients</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 text-xs text-zinc-400">
-            {/* T&C */}
-            <div className="rounded-xl border border-zinc-200 bg-white/70 p-3.5 space-y-2">
-              <div className="flex justify-between items-center text-[10px] font-bold uppercase text-zinc-400">
-                <span>Terms & Conditions</span>
-                <span>v2.4.0 • Updated Jun 2026</span>
-              </div>
-              <div className="h-16 overflow-y-auto pr-1 text-[11px] leading-relaxed text-zinc-400 scrollbar-thin">
-                Welcome to FinOne. By utilizing our mobile application dashboard services, you agree to secure data collection logs and capital analytics forecasts. Data is localized on-device where possible.
-              </div>
-            </div>
-
-            {/* Privacy Policy */}
-            <div className="rounded-xl border border-zinc-200 bg-white/70 p-3.5 space-y-2">
-              <div className="flex justify-between items-center text-[10px] font-bold uppercase text-zinc-400">
-                <span>Privacy Policy Overview</span>
-                <span>Permissions Checklist</span>
-              </div>
-              <div className="h-16 overflow-y-auto pr-1 text-[11px] leading-relaxed text-zinc-400 scrollbar-thin">
-                FinOne values user confidentiality. Device permission requests (such as local notifications, file imports, biometrics/faceID) are processed securely. Your credentials and assets data are fully encrypted.
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-zinc-400 bg-zinc-150 p-2.5 rounded-lg text-[10px] leading-relaxed">
-            <Info className="h-4 w-4 shrink-0" />
-            <span>These documents are synchronized automatically when updating native iOS or Android wrapper clients.</span>
-          </div>
-        </div>
 
         {/* ==========================================
             7. Sign Out Card
