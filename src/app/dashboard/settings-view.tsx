@@ -18,7 +18,13 @@ import {
   Sparkles,
   Folders,
   Trash2,
-  Edit3
+  Edit3,
+  Plus,
+  Calendar,
+  Send,
+  Clock,
+  Mail,
+  BellRing
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "../../components/ui/select";
@@ -425,6 +431,137 @@ export default function SettingsView() {
     setNotifs({ ...notifs, [key]: !notifs[key] });
   };
 
+  // Reminders & db-scheduler State
+  const [reminders, setReminders] = React.useState<any[]>([]);
+  const [loadingReminders, setLoadingReminders] = React.useState(false);
+  const [showReminderModal, setShowReminderModal] = React.useState(false);
+  const [editingReminder, setEditingReminder] = React.useState<any | null>(null);
+
+  // Form fields for Custom Reminder
+  const [remTitle, setRemTitle] = React.useState("");
+  const [remDescription, setRemDescription] = React.useState("");
+  const [remCategory, setRemCategory] = React.useState("CUSTOM");
+  const [remChannel, setRemChannel] = React.useState("BOTH");
+  const [remDayOfMonth, setRemDayOfMonth] = React.useState(1);
+  const [remTimeOfDay, setRemTimeOfDay] = React.useState("09:00");
+  const [remCustomMessage, setRemCustomMessage] = React.useState("");
+
+  const fetchReminders = async () => {
+    if (!dbUser?.userId) return;
+    setLoadingReminders(true);
+    try {
+      const res = await apiClient.get("/v1/reminders");
+      if (res.data?.success && res.data?.data) {
+        setReminders(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching reminders:", err);
+    } finally {
+      setLoadingReminders(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchReminders();
+  }, [dbUser]);
+
+  const handleToggleReminder = async (id: string, currentEnabled: boolean) => {
+    try {
+      await apiClient.put(`/v1/reminders/${id}/toggle?enabled=${!currentEnabled}`);
+      showSuccess("Success", `Reminder ${!currentEnabled ? "enabled" : "disabled"}`);
+      fetchReminders();
+    } catch (err) {
+      console.error("Error toggling reminder:", err);
+    }
+  };
+
+  const handleChannelChange = async (id: string, channel: string) => {
+    try {
+      await apiClient.put(`/v1/reminders/${id}`, { channel });
+      showSuccess("Success", `Notification channel updated to ${channel}`);
+      fetchReminders();
+    } catch (err) {
+      console.error("Error updating channel:", err);
+    }
+  };
+
+  const handleTestTrigger = async (id: string) => {
+    try {
+      await apiClient.post(`/v1/reminders/${id}/test`);
+      showSuccess("Test Notification Dispatched", "Test alert dispatched using NotificationSenderFactory & HTML Mail Template!");
+    } catch (err) {
+      console.error("Error testing reminder:", err);
+    }
+  };
+
+  const openCreateReminderModal = () => {
+    setEditingReminder(null);
+    setRemTitle("");
+    setRemDescription("");
+    setRemCategory("CUSTOM");
+    setRemChannel("BOTH");
+    setRemDayOfMonth(1);
+    setRemTimeOfDay("09:00");
+    setRemCustomMessage("");
+    setShowReminderModal(true);
+  };
+
+  const openEditReminderModal = (rem: any) => {
+    setEditingReminder(rem);
+    setRemTitle(rem.title || "");
+    setRemDescription(rem.description || "");
+    setRemCategory(rem.category || "CUSTOM");
+    setRemChannel(rem.channel || "BOTH");
+    setRemDayOfMonth(rem.dayOfMonth || 1);
+    setRemTimeOfDay(rem.timeOfDay || "09:00");
+    setRemCustomMessage(rem.customMessage || "");
+    setShowReminderModal(true);
+  };
+
+  const handleSaveReminder = async () => {
+    if (!remTitle.trim()) return;
+    try {
+      const payload = {
+        title: remTitle,
+        description: remDescription,
+        category: remCategory,
+        channel: remChannel,
+        dayOfMonth: Number(remDayOfMonth) || 1,
+        timeOfDay: remTimeOfDay,
+        customMessage: remCustomMessage
+      };
+
+      if (editingReminder) {
+        await apiClient.put(`/v1/reminders/${editingReminder.id}`, payload);
+        showSuccess("Success", "Reminder updated successfully!");
+      } else {
+        await apiClient.post("/v1/reminders", payload);
+        showSuccess("Success", "Custom reminder created successfully!");
+      }
+
+      setShowReminderModal(false);
+      fetchReminders();
+    } catch (err) {
+      console.error("Error saving reminder:", err);
+    }
+  };
+
+  const handleDeleteReminder = (id: string) => {
+    showDelete(
+      "Delete Custom Reminder",
+      "Are you sure you want to delete this custom reminder? db-scheduler will stop executing this task.",
+      async () => {
+        try {
+          await apiClient.delete(`/v1/reminders/${id}`);
+          showSuccess("Success", "Custom reminder deleted");
+          fetchReminders();
+        } catch (err) {
+          console.error("Error deleting reminder:", err);
+        }
+      }
+    );
+  };
+
   // Theme personalization state
   const { theme, setTheme, accentColor, setAccentColor } = useTheme();
   const [themeMode, setThemeMode] = React.useState<"light" | "dark" | "system">("light");
@@ -669,175 +806,325 @@ export default function SettingsView() {
         )}
 
         {/* ==========================================
-            3. Notification Preferences Card
+            3. Reminders & db-scheduler Notification Service Card
             ========================================== */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all group space-y-6 lg:col-span-2">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Bell className="h-5 w-5" />
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <BellRing className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-zinc-900">Reminders & Notification Scheduler</h3>
+                <p className="text-xs text-zinc-500">Configure built-in system reminders or create custom scheduled alerts backed by db-scheduler & Notification Factory</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base font-bold text-zinc-900">Configure Notifications</h3>
-              <p className="text-xs text-zinc-500">Pick which channels and summaries send you alerts</p>
-            </div>
+            <Button
+              onClick={openCreateReminderModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 h-9 shadow-sm transition-all font-bold text-xs flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              Add Custom Reminder
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
-            {/* Event categories */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-xs">
+            {/* Left Column: Built-in System Reminders */}
             <div className="space-y-4">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Trigger Alerts</p>
-              
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">Goal Reminders</p>
-                  <p className="text-[10px] text-zinc-500">Weekly targets and retirement projection shifts</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("goals")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.goals ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.goals ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Built-in System Reminders</p>
+                <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full border border-blue-100">
+                  db-scheduler Active
+                </span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">Bill & Subscription Renewals</p>
-                  <p className="text-[10px] text-zinc-500">Notice 3 days before renewal transactions occur</p>
+              {loadingReminders ? (
+                <div className="py-8 flex justify-center items-center text-zinc-400">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600 mr-2" />
+                  Loading Reminders...
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("bills")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.bills ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.bills ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">Credit Card Due Dates</p>
-                  <p className="text-[10px] text-zinc-500">Reminders before statement deadlines</p>
+              ) : (
+                <div className="space-y-3">
+                  {reminders.filter(r => r.reminderType === "BUILT_IN").map((rem) => (
+                    <div key={rem.id} className="rounded-xl border border-zinc-200/80 bg-zinc-50/40 p-3.5 space-y-2 hover:bg-white transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-zinc-800 text-xs">{rem.title}</span>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                            {rem.category}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleTestTrigger(rem.id)}
+                            className="text-[10px] text-blue-600 hover:text-blue-700 font-bold hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                            title="Trigger instant test notification via Factory Pattern"
+                          >
+                            <Send className="h-3 w-3" /> Test
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReminder(rem.id, rem.enabled)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              rem.enabled ? "bg-blue-600" : "bg-zinc-200"
+                            }`}
+                          >
+                            <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${rem.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-zinc-500">{rem.description}</p>
+                      
+                      <div className="flex items-center justify-between pt-1 border-t border-zinc-150/60 text-[10px] text-zinc-400">
+                        <div className="flex items-center gap-1.5">
+                          <span>Delivery Channel:</span>
+                          <Select
+                            value={rem.channel || "BOTH"}
+                            onChange={(e) => handleChannelChange(rem.id, e.target.value)}
+                            className="h-6 text-[10px] px-1 py-0 rounded border-zinc-200 bg-white font-semibold text-zinc-700"
+                          >
+                            <option value="BOTH">Email + Push + In-App</option>
+                            <option value="EMAIL">Email Only</option>
+                            <option value="PUSH">Push Alert Only</option>
+                            <option value="IN_APP">In-App Drawer Only</option>
+                          </Select>
+                        </div>
+                        {rem.dayOfMonth && <span>Day {rem.dayOfMonth} @ {rem.timeOfDay}</span>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("credit")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.credit ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.credit ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">Insurance Renewals</p>
-                  <p className="text-[10px] text-zinc-500">Health or home asset policy updates</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("insurance")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.insurance ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.insurance ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">Budget Limit Notifications</p>
-                  <p className="text-[10px] text-zinc-500">Triggers immediately when budget reaches 85% cap</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("budgets")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.budgets ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.budgets ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-              </div>
+              )}
             </div>
 
-            {/* Channels & AI recommendations */}
+            {/* Right Column: Custom User Reminders */}
             <div className="space-y-4">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Delivery Channels</p>
-              
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">Email Notifications</p>
-                  <p className="text-[10px] text-zinc-500">Receive comprehensive weekly summaries</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("email")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.email ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.email ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">User Custom Reminders</p>
+                <span className="text-[10px] text-zinc-400">
+                  {reminders.filter(r => r.reminderType === "CUSTOM").length} Created
+                </span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">Push App Alerts</p>
-                  <p className="text-[10px] text-zinc-500">Live indicators inside your desktop dashboard client</p>
+              {loadingReminders ? (
+                <div className="py-8 flex justify-center items-center text-zinc-400">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600 mr-2" />
+                  Loading Custom Reminders...
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("push")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.push ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.push ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {reminders.filter(r => r.reminderType === "CUSTOM").map((rem) => (
+                    <div key={rem.id} className="rounded-xl border border-zinc-200/80 bg-zinc-50/40 p-3.5 space-y-2 hover:bg-white transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-zinc-800 text-xs">{rem.title}</span>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100">
+                            Custom
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleTestTrigger(rem.id)}
+                            className="text-[10px] text-blue-600 hover:text-blue-700 font-bold hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                            title="Trigger instant test notification via Factory Pattern"
+                          >
+                            <Send className="h-3 w-3" /> Test
+                          </button>
+                          <button
+                            onClick={() => openEditReminderModal(rem)}
+                            className="p-1 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReminder(rem.id)}
+                            className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReminder(rem.id, rem.enabled)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              rem.enabled ? "bg-blue-600" : "bg-zinc-200"
+                            }`}
+                          >
+                            <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${rem.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                          </button>
+                        </div>
+                      </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-800">SMS Text Messages</p>
-                  <p className="text-[10px] text-zinc-500">Urgent payment reminders via text carrier</p>
+                      {rem.description && <p className="text-[10px] text-zinc-500">{rem.description}</p>}
+
+                      <div className="flex items-center justify-between pt-1 border-t border-zinc-150/60 text-[10px] text-zinc-400">
+                        <div className="flex items-center gap-1.5">
+                          <span>Channel:</span>
+                          <span className="font-semibold text-zinc-700">{rem.channel}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-zinc-400" />
+                          <span>Day {rem.dayOfMonth || 1} @ {rem.timeOfDay || "09:00"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {reminders.filter(r => r.reminderType === "CUSTOM").length === 0 && (
+                    <div className="p-8 text-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 space-y-2">
+                      <Clock className="h-6 w-6 text-zinc-300 mx-auto" />
+                      <p className="text-xs font-semibold text-zinc-600">No custom reminders yet</p>
+                      <p className="text-[10px] text-zinc-400">Create recurring personalized alerts for rent, subscription checks, or savings goals.</p>
+                      <button
+                        onClick={openCreateReminderModal}
+                        className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-700 underline"
+                      >
+                        + Create Your First Custom Reminder
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleNotif("sms")}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    notifs.sms ? "bg-blue-600" : "bg-zinc-200"
-                  }`}
-                >
-                  <span className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifs.sms ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-              </div>
+              )}
 
               <div className="rounded-xl bg-blue-50/50 p-3.5 border border-blue-100/50 flex items-start gap-2.5">
                 <Sparkles className="h-4.5 w-4.5 text-blue-600 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-zinc-600 leading-normal">
-                  Our AI Asset suggestions are configured to run automatically. Keep **AI Recommendations** active to receive continuous wealth rebalancing suggestions.
+                  All active reminders are persistently queued in PostgreSQL and executed by **db-scheduler-spring-boot**. Mail delivery uses responsive HTML mail templates and factory-routed channels.
                 </p>
               </div>
             </div>
           </div>
-
-          <div className="flex justify-end pt-4 border-t border-zinc-100">
-            <Button
-              onClick={handleSaveNotifications}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 h-8 shadow-sm transition-all active:scale-[0.98] font-bold text-xs"
-            >
-              Save Notification Preferences
-            </Button>
-          </div>
         </div>
+
+        {/* ==========================================
+            Custom Reminder Modal Dialog
+            ========================================== */}
+        {showReminderModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 backdrop-blur-sm p-4">
+            <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl space-y-5">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+                <h4 className="text-base font-bold text-zinc-900">
+                  {editingReminder ? "Edit Custom Reminder" : "Create Custom Reminder"}
+                </h4>
+                <button
+                  onClick={() => setShowReminderModal(false)}
+                  className="text-zinc-400 hover:text-zinc-600 text-sm font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-zinc-700">Reminder Title *</label>
+                  <input
+                    type="text"
+                    placeholder="E.g. Pay Apartment Rent, Review Subscriptions"
+                    value={remTitle}
+                    onChange={(e) => setRemTitle(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-zinc-200 px-3 outline-none focus:border-blue-500 text-zinc-900"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-zinc-700">Description / Note</label>
+                  <input
+                    type="text"
+                    placeholder="E.g. Transfer ₹25,000 to landlord bank account"
+                    value={remDescription}
+                    onChange={(e) => setRemDescription(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-zinc-200 px-3 outline-none focus:border-blue-500 text-zinc-900"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-zinc-700">Category</label>
+                    <Select
+                      value={remCategory}
+                      onChange={(e) => setRemCategory(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-zinc-200 px-2 outline-none"
+                    >
+                      <option value="CUSTOM">Custom General</option>
+                      <option value="BILL">Bill / Rent</option>
+                      <option value="SIP">SIP / Investment</option>
+                      <option value="BUDGET">Budget Check</option>
+                      <option value="CREDIT_CARD">Credit Card</option>
+                      <option value="TAX">Tax Planning</option>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-zinc-700">Notification Channel</label>
+                    <Select
+                      value={remChannel}
+                      onChange={(e) => setRemChannel(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-zinc-200 px-2 outline-none"
+                    >
+                      <option value="BOTH">Email + Push + In-App</option>
+                      <option value="EMAIL">Email Only</option>
+                      <option value="PUSH">Push Alert Only</option>
+                      <option value="IN_APP">In-App Drawer Only</option>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-zinc-700">Day of Month (1 - 31)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={remDayOfMonth}
+                      onChange={(e) => setRemDayOfMonth(Number(e.target.value))}
+                      className="w-full h-9 rounded-lg border border-zinc-200 px-3 outline-none focus:border-blue-500 text-zinc-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-zinc-700">Execution Time</label>
+                    <input
+                      type="time"
+                      value={remTimeOfDay}
+                      onChange={(e) => setRemTimeOfDay(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-zinc-200 px-3 outline-none focus:border-blue-500 text-zinc-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-zinc-700">Custom Mail / Alert Body Message</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Custom text body included in HTML mail or push alert..."
+                    value={remCustomMessage}
+                    onChange={(e) => setRemCustomMessage(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-zinc-200 outline-none focus:border-blue-500 text-zinc-900 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setShowReminderModal(false)}
+                  className="rounded-lg border border-zinc-200 px-4 py-2 font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <Button
+                  onClick={handleSaveReminder}
+                  disabled={!remTitle.trim()}
+                  className="rounded-lg bg-blue-600 hover:bg-blue-700 px-5 py-2 font-bold text-white transition-colors"
+                >
+                  {editingReminder ? "Save Changes" : "Create Reminder"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ==========================================
             Category Manager Card
