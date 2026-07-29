@@ -345,20 +345,20 @@ export default function TaxPlannerView() {
 
   if (taxOnboardingCompleted === false) {
     return (
-      <div className="relative flex min-h-[600px] items-center justify-center bg-zinc-950 px-4 sm:px-6 overflow-hidden rounded-2xl border border-zinc-800">
+      <div className="relative flex min-h-[600px] items-center justify-center bg-zinc-50 dark:bg-zinc-950/20 px-4 sm:px-6 overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 transition-all">
         {/* Decorative Gradients */}
         <div className="absolute top-[-10%] right-[-10%] h-[300px] w-[300px] rounded-full bg-emerald-500/5 blur-[80px]" />
         <div className="absolute bottom-[-10%] left-[-10%] h-[300px] w-[300px] rounded-full bg-blue-500/5 blur-[80px]" />
 
-        <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8 shadow-2xl relative z-10 backdrop-blur-md text-white my-8">
+        <div className="w-full max-w-2xl rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-xl relative z-10 text-zinc-900 dark:text-zinc-150 my-8">
           
           {/* Progress Header */}
           <div className="mb-8">
-            <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+            <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
               <span>Tax Planner Setup</span>
               <span>Step {onboardingStep} of 3</span>
             </div>
-            <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
                 style={{ width: `${(onboardingStep / 3) * 100}%` }}
@@ -370,54 +370,54 @@ export default function TaxPlannerView() {
           {onboardingStep === 1 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-xl font-bold">Step 1: Your Annual Incomes</h3>
-                <p className="text-xs text-zinc-400 mt-1">Please enter your estimated annual incomes for the financial year.</p>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Step 1: Your Annual Incomes</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Please enter your estimated annual incomes for the financial year.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Salary Income (Per Annum)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Salary Income (Per Annum)</label>
                   <input
                     type="number"
                     value={salary}
                     onChange={(e) => setSalary(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Freelance / Business Income</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Freelance / Business Income</label>
                   <input
                     type="number"
                     value={freelance}
                     onChange={(e) => setFreelance(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Rental Income Received</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Rental Income Received</label>
                   <input
                     type="number"
                     value={rental}
                     onChange={(e) => setRental(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Capital Gains</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Capital Gains</label>
                   <input
                     type="number"
                     value={capitalGains}
                     onChange={(e) => setCapitalGains(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-semibold text-zinc-300">Other Income (Interest, Dividends, etc.)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Other Income (Interest, Dividends, etc.)</label>
                   <input
                     type="number"
                     value={otherIncome}
                     onChange={(e) => setOtherIncome(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
               </div>
@@ -428,54 +428,54 @@ export default function TaxPlannerView() {
           {onboardingStep === 2 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-xl font-bold">Step 2: Tax Deductions (Section 80)</h3>
-                <p className="text-xs text-zinc-400 mt-1">Provide any investments or premiums eligible for tax deductions under the Old Regime.</p>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Step 2: Tax Deductions (Section 80)</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Provide any investments or premiums eligible for tax deductions under the Old Regime.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Section 80C (PPF, LIC, ELSS, EPF - Max ₹1.5L)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80C (PPF, LIC, ELSS, EPF - Max ₹1.5L)</label>
                   <input
                     type="number"
                     value={ded80C}
                     onChange={(e) => setDed80C(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Section 80D (Health Insurance self+parents)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80D (Health Insurance self+parents)</label>
                   <input
                     type="number"
                     value={ded80D}
                     onChange={(e) => setDed80D(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Section 80CCD (NPS - Max ₹50k)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80CCD (NPS - Max ₹50k)</label>
                   <input
                     type="number"
                     value={ded80CCD}
                     onChange={(e) => setDed80CCD(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Section 24b (Home Loan Interest - Max ₹2L)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 24b (Home Loan Interest - Max ₹2L)</label>
                   <input
                     type="number"
                     value={ded24b}
                     onChange={(e) => setDed24b(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-semibold text-zinc-300">Section 80G (Charitable Donations)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80G (Charitable Donations)</label>
                   <input
                     type="number"
                     value={ded80G}
                     onChange={(e) => setDed80G(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
               </div>
@@ -486,49 +486,49 @@ export default function TaxPlannerView() {
           {onboardingStep === 3 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-xl font-bold">Step 3: HRA & Preferred Regime</h3>
-                <p className="text-xs text-zinc-400 mt-1">Configure your rent details for HRA exemption and select your preferred tax regime.</p>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Step 3: HRA & Preferred Regime</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Configure your rent details for HRA exemption and select your preferred tax regime.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">HRA Basic Salary (Per Annum)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">HRA Basic Salary (Per Annum)</label>
                   <input
                     type="number"
                     value={hraBasic}
                     onChange={(e) => setHraBasic(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">HRA Allowance Received</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">HRA Allowance Received</label>
                   <input
                     type="number"
                     value={hraReceived}
                     onChange={(e) => setHraReceived(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300">Actual Rent Paid (Per Annum)</label>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Actual Rent Paid (Per Annum)</label>
                   <input
                     type="number"
                     value={hraRentPaid}
                     onChange={(e) => setHraRentPaid(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
 
                 <div className="flex flex-col justify-center space-y-1.5">
-                  <span className="text-xs font-semibold text-zinc-300 mb-1">Rented Location Type</span>
+                  <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Rented Location Type</span>
                   <div className="flex items-center gap-4">
                     <button
                       type="button"
                       onClick={() => setHraIsMetro(true)}
-                      className={`flex-1 h-10 rounded-xl text-xs font-bold transition-all border ${
+                      className={`flex-1 h-10 rounded-xl text-xs font-bold transition-all border bg-white dark:bg-zinc-900 ${
                         hraIsMetro 
-                          ? "bg-emerald-500/10 border-emerald-500 text-emerald-400"
-                          : "border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                          ? "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400"
+                          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-500 dark:text-zinc-400"
                       }`}
                     >
                       Metro City
@@ -536,10 +536,10 @@ export default function TaxPlannerView() {
                     <button
                       type="button"
                       onClick={() => setHraIsMetro(false)}
-                      className={`flex-1 h-10 rounded-xl text-xs font-bold transition-all border ${
+                      className={`flex-1 h-10 rounded-xl text-xs font-bold transition-all border bg-white dark:bg-zinc-900 ${
                         !hraIsMetro 
-                          ? "bg-emerald-500/10 border-emerald-500 text-emerald-400"
-                          : "border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                          ? "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400"
+                          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-500 dark:text-zinc-400"
                       }`}
                     >
                       Non-Metro City
@@ -548,15 +548,15 @@ export default function TaxPlannerView() {
                 </div>
 
                 <div className="space-y-1.5 md:col-span-2">
-                  <span className="text-xs font-semibold text-zinc-300 mb-1 block">Preferred Regime Choice</span>
+                  <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 block">Preferred Regime Choice</span>
                   <div className="flex items-center gap-4">
                     <button
                       type="button"
                       onClick={() => setSelectedRegime("Old")}
-                      className={`flex-1 h-11 rounded-xl text-xs font-black tracking-wide transition-all border ${
+                      className={`flex-1 h-11 rounded-xl text-xs font-black tracking-wide transition-all border bg-white dark:bg-zinc-900 ${
                         selectedRegime === "Old"
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-lg shadow-emerald-500/10"
-                          : "border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                          ? "bg-blue-600 text-white border-transparent shadow-lg shadow-blue-500/10"
+                          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-500 dark:text-zinc-400"
                       }`}
                     >
                       Old Tax Regime
@@ -564,10 +564,10 @@ export default function TaxPlannerView() {
                     <button
                       type="button"
                       onClick={() => setSelectedRegime("New")}
-                      className={`flex-1 h-11 rounded-xl text-xs font-black tracking-wide transition-all border ${
+                      className={`flex-1 h-11 rounded-xl text-xs font-black tracking-wide transition-all border bg-white dark:bg-zinc-900 ${
                         selectedRegime === "New"
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-lg shadow-emerald-500/10"
-                          : "border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                          ? "bg-blue-600 text-white border-transparent shadow-lg shadow-blue-500/10"
+                          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-500 dark:text-zinc-400"
                       }`}
                     >
                       New Tax Regime
@@ -579,13 +579,13 @@ export default function TaxPlannerView() {
           )}
 
           {/* Navigation Controls */}
-          <div className="flex justify-between items-center border-t border-zinc-800/80 mt-8 pt-6">
+          <div className="flex justify-between items-center border-t border-zinc-150 dark:border-zinc-800 mt-8 pt-6">
             <Button
               type="button"
               disabled={onboardingStep === 1}
               onClick={() => setOnboardingStep((prev) => prev - 1)}
               variant="outline"
-              className="h-10 px-5 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800/50 rounded-xl transition-all font-bold disabled:opacity-40"
+              className="h-10 px-5 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl transition-all font-bold disabled:opacity-40 bg-white dark:bg-zinc-900"
             >
               Back
             </Button>
@@ -594,7 +594,7 @@ export default function TaxPlannerView() {
               <Button
                 type="button"
                 onClick={() => setOnboardingStep((prev) => prev + 1)}
-                className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all"
+                className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all"
               >
                 Next
               </Button>
@@ -605,7 +605,7 @@ export default function TaxPlannerView() {
                   await saveTaxProfile({ taxOnboardingCompleted: true });
                   setTaxOnboardingCompleted(true);
                 }}
-                className="h-10 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-black shadow-lg shadow-emerald-500/10 active:scale-[0.99] flex items-center gap-1.5"
+                className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black shadow-lg shadow-blue-500/10 active:scale-[0.99] flex items-center gap-1.5"
               >
                 <CheckCircle2 className="h-4.5 w-4.5" />
                 Save & Finish

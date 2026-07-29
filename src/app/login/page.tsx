@@ -10,6 +10,7 @@ import { Eye, EyeOff, Lock, Mail, ArrowRight, Sparkles, TrendingUp, ShieldCheck 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -145,14 +146,7 @@ export default function LoginPage() {
 
         {/* Top Branding */}
         <div className="relative z-10 flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-400 to-indigo-500 p-0.5 shadow-lg shadow-emerald-500/10">
-            <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-zinc-950">
-              <TrendingUp className="h-5 w-5 text-emerald-400" />
-            </div>
-          </div>
-          <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-            FinOne
-          </span>
+          <BrandLogo className="text-xl" />
         </div>
 
         {/* Premium Dashboard Visualization */}
@@ -202,7 +196,7 @@ export default function LoginPage() {
 
         {/* Footer info */}
         <div className="relative z-10 text-sm text-zinc-500">
-          &copy; {new Date().getFullYear()} FinOne Technologies. All rights reserved.
+          &copy; {new Date().getFullYear()} FinDisce Technologies. All rights reserved.
         </div>
       </div>
 
@@ -212,14 +206,7 @@ export default function LoginPage() {
           {/* Header Mobile Brand */}
           <div className="flex flex-col items-center lg:items-start space-y-2">
             <div className="flex lg:hidden items-center gap-2 mb-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-400 to-indigo-500 p-0.5">
-                <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-zinc-950">
-                  <TrendingUp className="h-4 w-4 text-emerald-400" />
-                </div>
-              </div>
-              <span className="text-lg font-bold tracking-tight text-foreground">
-                FinOne
-              </span>
+              <BrandLogo className="text-lg" />
             </div>
             <h2 className="text-3xl font-bold tracking-tight text-foreground text-center lg:text-left">
               {view === "login" ? "Welcome back" : "Reset your password"}

@@ -7,6 +7,7 @@ import { useTheme } from "@/lib/theme-context";
 import { apiClient } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { BrandLogo } from "@/components/brand-logo";
 import {
   Coins,
   Paintbrush,
@@ -154,11 +155,9 @@ export default function OnboardingPage() {
       <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-xl relative z-10 transition-colors">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md mb-3">
-            <TrendingUp className="h-5.5 w-5.5" />
-          </div>
+          <BrandLogo className="text-2xl mb-3" />
           <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">
-            Welcome to FinOne
+            Welcome to FinDisce
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm">
             Let's configure your profile options to customize your dashboards, currency tracking, and alerts.
