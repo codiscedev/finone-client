@@ -35,6 +35,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import TransactionOnboardingDrawer from "./transaction-onboarding-drawer";
+import TransactionImportWizard from "./transaction-import-wizard";
 import CreditCardAddDrawer from "./credit-card-add-drawer";
 import BudgetAddDrawer from "./budget-add-drawer";
 import RecurringBillAddDrawer from "./recurring-bill-add-drawer";
@@ -289,6 +290,7 @@ export default function MoneyFlowView() {
   // ---- Drawer ----
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   const [drawerMode, setDrawerMode] = React.useState<"manual" | "import" | null>(null);
+  const [isWizardOpen, setIsWizardOpen] = React.useState(false);
 
   // ---- Review Queue ----
   const [reviewCount, setReviewCount] = React.useState(0);
@@ -504,7 +506,14 @@ export default function MoneyFlowView() {
           budgets={budgets}
           fmt={fmt}
           currency={currency}
-          onOpenDrawer={(mode) => { setDrawerMode(mode); setIsDrawerOpen(true); }}
+          onOpenDrawer={(mode) => {
+            if (mode === "import") {
+              setIsWizardOpen(true);
+            } else {
+              setDrawerMode(mode);
+              setIsDrawerOpen(true);
+            }
+          }}
         />
       )}
 
@@ -577,6 +586,14 @@ export default function MoneyFlowView() {
         onClose={() => setIsDrawerOpen(false)}
         onImport={handleImport}
         initialMode={drawerMode}
+        onOpenWizard={() => setIsWizardOpen(true)}
+      />
+
+      {/* 4-Step Import Wizard */}
+      <TransactionImportWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onSuccess={fetchData}
       />
 
       {/* Review Queue Drawer */}

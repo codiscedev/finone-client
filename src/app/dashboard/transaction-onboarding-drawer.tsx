@@ -39,6 +39,7 @@ interface TransactionOnboardingDrawerProps {
   onClose: () => void;
   onImport: (newTransactions: any[]) => void;
   initialMode: "manual" | "import" | null;
+  onOpenWizard?: () => void;
 }
 
 // Transaction Category Lists
@@ -83,7 +84,8 @@ export default function TransactionOnboardingDrawer({
   isOpen,
   onClose,
   onImport,
-  initialMode
+  initialMode,
+  onOpenWizard
 }: TransactionOnboardingDrawerProps) {
   const { dbUser } = useAuth();
   const [backendCategories, setBackendCategories] = React.useState<any[]>([]);
@@ -598,7 +600,15 @@ export default function TransactionOnboardingDrawer({
 
                 {/* Import File card */}
                 <div
-                  onClick={() => { setImportMethod("file"); setStep(2); }}
+                  onClick={() => {
+                    if (onOpenWizard) {
+                      onClose();
+                      onOpenWizard();
+                    } else {
+                      setImportMethod("file");
+                      setStep(2);
+                    }
+                  }}
                   className="group relative flex items-start gap-4 p-4 rounded-xl border border-zinc-200/80 bg-white hover:border-blue-500 hover:shadow-md cursor-pointer transition-all duration-200 active:scale-[0.99]"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-200">
