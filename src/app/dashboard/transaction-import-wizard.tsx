@@ -6,7 +6,6 @@ import { format, parse, isValid } from "date-fns";
 import {
   Upload,
   FileSpreadsheet,
-  FileText,
   Lock,
   Eye,
   EyeOff,
@@ -24,7 +23,12 @@ import {
   Info,
   Layers,
   Settings2,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Filter,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -42,9 +46,23 @@ export interface TransactionImportWizardProps {
   onSuccess: () => void;
 }
 
+export type DuplicateType = "EXACT" | "SOFT" | null;
+
+export interface ExistingTransaction {
+  id: string;
+  transactionDate: string;
+  description: string;
+  debitAmount: number | null;
+  creditAmount: number | null;
+  source: "import" | "manual" | "sms" | string;
+  importedAt: string;
+}
+
 export interface ParsedRow {
   _rawId: string;
   _original: Record<string, any>;
+  rowIndex: number;
+  selected: boolean;
   transactionDate: string; // YYYY-MM-DD format
   rawDate: string;
   valueDate?: string;
@@ -55,11 +73,22 @@ export interface ParsedRow {
   balance?: number | null;
   category: string;
   subcategory: string;
+
+  // Duplicate fields
+  duplicateType: DuplicateType;
+  confidence: number | null;
+  duplicateReason: string | null;
+  matchedTxn: ExistingTransaction | null;
+
+  // Validation & UI State
   isValidDate: boolean;
   isValidAmount: boolean;
   isDuplicate: boolean;
   isDeleted: boolean;
+  isExpanded: boolean;
 }
+
+export type FilterMode = "ALL" | "SELECTED" | "DUPLICATES" | "ERRORS" | "SKIPPED";
 
 export const CATEGORY_MAP: Record<string, string[]> = {
   "Food & Dining": ["Restaurants", "Swiggy / Zomato", "Cafes & Bakery", "Fast Food", "Bars & Pubs"],
@@ -187,12 +216,18 @@ export default function TransactionImportWizard({
     value_date: "",
   });
 
-  // Step 3 State (Preview & Editing)
+  // Step 3 State (Preview, Duplicate Detection & Editing)
   const [rows, setRows] = React.useState<ParsedRow[]>([]);
-  const [editingRowId, setEditingRowId] = React.useState<string | null>(null);
+  const [checkingDuplicatesLoading, setCheckingDuplicatesLoading] = React.useState(false);
+  const [filterMode, setFilterMode] = React.useState<FilterMode>("ALL");
+  const [searchTerm, setSearchTerm] = React.useState("");
   const [showAllRows, setShowAllRows] = React.useState(false);
   const [recentlyDeletedRow, setRecentlyDeletedRow] = React.useState<ParsedRow | null>(null);
   const [importingLoading, setImportingLoading] = React.useState(false);
+  const [viewingExistingTxn, setViewingExistingTxn] = React.useState<ExistingTransaction | null>(null);
+
+  // Toggle for sync credit amounts to Income tab (default: false)
+  const [syncToIncomeTab, setSyncToIncomeTab] = React.useState(false);
 
   // Step 4 State (Import Result)
   const [importResult, setImportResult] = React.useState<{
@@ -229,8 +264,12 @@ export default function TransactionImportWizard({
         value_date: "",
       });
       setRows([]);
+      setFilterMode("ALL");
+      setSearchTerm("");
       setImportResult(null);
       setRecentlyDeletedRow(null);
+      setViewingExistingTxn(null);
+      setSyncToIncomeTab(false);
     }
   }, [isOpen]);
 
@@ -268,7 +307,6 @@ export default function TransactionImportWizard({
 
     try {
       if (ext === "pdf") {
-        // Parse PDF statement via Backend API
         const formData = new FormData();
         formData.append("file", file);
         if (filePassword) {
@@ -297,15 +335,12 @@ export default function TransactionImportWizard({
           setSheets(["PDF Statement"]);
           setSelectedSheet("PDF Statement");
 
-          // Auto suggest mappings
           autoSuggestMappings(headers);
-
           setStep(2);
         } else {
-          throw new Error(res.data?.message || "Failed to parse PDF file.");
+          throw new Error(res.data?.message || "Incorrect password or protected file. Please enter the file password.");
         }
       } else if (ext === "xlsx" || ext === "xls" || ext === "csv") {
-        // Try parsing Excel / CSV in Browser via SheetJS
         try {
           const arrayBuffer = await file.arrayBuffer();
           const options: XLSX.ParsingOptions = { type: "array" };
@@ -323,13 +358,11 @@ export default function TransactionImportWizard({
           const defaultSheet = sheetNames[0];
           setSelectedSheet(defaultSheet);
 
-          // Parse default sheet with smart auto header detection
           processExcelSheet(workbook, defaultSheet, headerRowIndex);
           setStep(2);
         } catch (browserErr: any) {
           console.warn("Browser SheetJS parse failed, attempting backend POI parser fallback...", browserErr);
 
-          // Fallback: Send to backend parser API (handles password-protected & complex Excel files via Apache POI)
           const formData = new FormData();
           formData.append("file", file);
           if (filePassword) formData.append("password", filePassword);
@@ -354,7 +387,7 @@ export default function TransactionImportWizard({
             autoSuggestMappings(headers);
             setStep(2);
           } else {
-            throw new Error(res.data?.message || "Incorrect password or file is corrupted.");
+            throw new Error(res.data?.message || "Incorrect password or protected file. Please enter the file password.");
           }
         }
       } else {
@@ -362,7 +395,17 @@ export default function TransactionImportWizard({
       }
     } catch (err: any) {
       console.error("File processing failed:", err);
-      setStepError(err.message || "Failed to process file. Please check file and password.");
+      const serverMsg = err.response?.data?.message || err.data?.message || err.message || "";
+      if (
+        err.response?.status === 400 ||
+        serverMsg.toLowerCase().includes("password") ||
+        serverMsg.toLowerCase().includes("protected") ||
+        serverMsg.toLowerCase().includes("encrypted")
+      ) {
+        setStepError("Incorrect password or protected file. Please enter the file password.");
+      } else {
+        setStepError(serverMsg || "Failed to process file. Please check file and password.");
+      }
     } finally {
       setParsingLoading(false);
     }
@@ -379,8 +422,7 @@ export default function TransactionImportWizard({
       return;
     }
 
-    // Auto-detect best header row if user left headerRowIndex at default 1
-    let chosenHeaderIdx = Math.max(1, userHeaderIdx) - 1; // 0-indexed default
+    let chosenHeaderIdx = Math.max(1, userHeaderIdx) - 1;
     if (userHeaderIdx === 1) {
       const keywords = ["date", "txn", "transaction", "value", "details", "particulars", "remarks", "narration", "description", "debit", "credit", "withdrawal", "deposit", "balance", "amount", "ref", "cheque", "utr", "chq", "s no", "s.no"];
       let bestScore = -1;
@@ -411,7 +453,7 @@ export default function TransactionImportWizard({
 
       if (bestScore >= 2) {
         chosenHeaderIdx = bestRow;
-        setHeaderRowIndex(bestRow + 1); // Update UI state (1-indexed)
+        setHeaderRowIndex(bestRow + 1);
       }
     }
 
@@ -441,7 +483,6 @@ export default function TransactionImportWizard({
 
     setFileHeaders(headers);
     setFileDataRows(dataRows);
-
     autoSuggestMappings(headers);
   };
 
@@ -476,8 +517,6 @@ export default function TransactionImportWizard({
     });
 
     setMappings(newMappings);
-
-    // Try fetching saved preferences from server
     fetchSavedMappingPreference(headers);
   };
 
@@ -495,10 +534,10 @@ export default function TransactionImportWizard({
   };
 
   // ============================================================
-  // STEP 2: MAPPING CONFIRMATION HANDLER
+  // STEP 2: MAPPING CONFIRMATION & DUPLICATE PRE-CHECK HANDLER
   // ============================================================
 
-  const handleConfirmMapping = () => {
+  const handleConfirmMapping = async () => {
     if (!mappings.transaction_date) {
       setStepError("Please map the 'Transaction Date' column.");
       return;
@@ -513,15 +552,15 @@ export default function TransactionImportWizard({
     }
 
     setStepError(null);
+    setCheckingDuplicatesLoading(true);
 
-    // Save preferences to server
     const fingerprint = fileHeaders.slice(0, 5).join("|").toLowerCase();
     apiClient.post("/v1/imports/preferences", {
       fingerprint,
       mappingJson: JSON.stringify(mappings),
     }).catch(() => {});
 
-    // Transform fileDataRows into ParsedRow[]
+    // Parse fileDataRows into initial ParsedRow[]
     const transformed: ParsedRow[] = fileDataRows.map((raw, idx) => {
       const rawDateStr = String(raw[mappings.transaction_date] || "").trim();
       const parsedDate = parseDateString(rawDateStr, dateFormat);
@@ -542,6 +581,8 @@ export default function TransactionImportWizard({
       return {
         _rawId: `row_${idx}_${Math.random().toString(36).substr(2, 6)}`,
         _original: { ...raw },
+        rowIndex: idx,
+        selected: isValidDate && isValidAmount,
         transactionDate: parsedDate ? format(parsedDate, "yyyy-MM-dd") : "",
         rawDate: rawDateStr,
         valueDate: valueDateStr ? (parseDateString(valueDateStr, dateFormat) ? format(parseDateString(valueDateStr, dateFormat)!, "yyyy-MM-dd") : valueDateStr) : "",
@@ -552,12 +593,67 @@ export default function TransactionImportWizard({
         balance: balVal,
         category: suggested.category,
         subcategory: suggested.subcategory,
+
+        duplicateType: null,
+        confidence: null,
+        duplicateReason: null,
+        matchedTxn: null,
+
         isValidDate,
         isValidAmount,
         isDuplicate: false,
         isDeleted: false,
+        isExpanded: false,
       };
     });
+
+    // Run Backend Duplicate Check API
+    const checkPayload = transformed
+      .filter((r) => r.isValidDate && r.isValidAmount)
+      .map((r) => ({
+        rowIndex: r.rowIndex,
+        transactionDate: r.transactionDate,
+        description: r.description,
+        debitAmount: r.debitAmount || null,
+        creditAmount: r.creditAmount || null,
+        referenceNo: r.referenceNo || null,
+      }));
+
+    try {
+      if (checkPayload.length > 0) {
+        const res = await apiClient.post("/v1/transactions/duplicate-check", {
+          accountId: null,
+          transactions: checkPayload,
+        });
+
+        if (res.data?.success && res.data?.data?.results) {
+          const resultsMap = new Map<number, any>();
+          res.data.data.results.forEach((dupItem: any) => {
+            resultsMap.set(dupItem.rowIndex, dupItem);
+          });
+
+          transformed.forEach((r) => {
+            if (resultsMap.has(r.rowIndex)) {
+              const dupInfo = resultsMap.get(r.rowIndex);
+              r.duplicateType = dupInfo.duplicateType as DuplicateType;
+              r.confidence = dupInfo.confidence;
+              r.duplicateReason = dupInfo.reason;
+              r.matchedTxn = dupInfo.matchedTransaction;
+              r.isDuplicate = true;
+
+              // EXACT duplicates -> auto-deselected by default
+              if (r.duplicateType === "EXACT") {
+                r.selected = false;
+              }
+            }
+          });
+        }
+      }
+    } catch (dupErr) {
+      console.warn("Duplicate pre-check warning:", dupErr);
+    } finally {
+      setCheckingDuplicatesLoading(false);
+    }
 
     setRows(transformed);
     setStep(3);
@@ -571,12 +667,10 @@ export default function TransactionImportWizard({
     if (val == null || val === "") return null;
     let s = String(val).trim();
 
-    // Handle accounting negative format: (450.00) -> -450.00
     if (s.startsWith("(") && s.endsWith(")")) {
       s = "-" + s.substring(1, s.length - 1);
     }
 
-    // Strip currency symbols and commas
     s = s.replace(/[₹$€£Rs.,]/g, (match) => (match === "." ? "." : ""));
     const num = parseFloat(s);
     return isNaN(num) ? null : num;
@@ -585,10 +679,8 @@ export default function TransactionImportWizard({
   function parseDateString(rawStr: string, formatHint: string): Date | null {
     if (!rawStr) return null;
 
-    // Remove time portion if present
     const cleanStr = rawStr.split("T")[0].split(" ")[0].trim();
 
-    // Map user label format to date-fns tokens
     let fnsFormat = "dd/MM/yyyy";
     switch (formatHint) {
       case "DD/MM/YYYY": fnsFormat = "dd/MM/yyyy"; break;
@@ -601,11 +693,9 @@ export default function TransactionImportWizard({
       case "YYYY/MM/DD": fnsFormat = "yyyy/MM/dd"; break;
     }
 
-    // Try target format first
     let d = parse(cleanStr, fnsFormat, new Date());
     if (isValid(d)) return d;
 
-    // Fallbacks
     const fallbacks = [
       "yyyy-MM-dd",
       "dd/MM/yyyy",
@@ -625,8 +715,52 @@ export default function TransactionImportWizard({
   }
 
   // ============================================================
-  // STEP 3: PREVIEW & INLINE EDITING HANDLERS
+  // STEP 3: SELECTION, FILTERING & ROW EDITING HANDLERS
   // ============================================================
+
+  const handleToggleRowSelect = (rawId: string) => {
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r._rawId !== rawId) return r;
+        if (!r.isValidDate || !r.isValidAmount) return r;
+        return { ...r, selected: !r.selected };
+      })
+    );
+  };
+
+  const handleToggleRowExpand = (rawId: string) => {
+    setRows((prev) =>
+      prev.map((r) => (r._rawId === rawId ? { ...r, isExpanded: !r.isExpanded } : r))
+    );
+  };
+
+  const handleSelectAll = () => {
+    setRows((prev) =>
+      prev.map((r) => ({ ...r, selected: r.isValidDate && r.isValidAmount && !r.isDeleted }))
+    );
+  };
+
+  const handleUnselectAllDuplicates = () => {
+    setRows((prev) =>
+      prev.map((r) => (r.duplicateType !== null ? { ...r, selected: false } : r))
+    );
+  };
+
+  const handleUnselectAll = () => {
+    setRows((prev) => prev.map((r) => ({ ...r, selected: false })));
+  };
+
+  const handleForceImportRow = (rawId: string) => {
+    setRows((prev) =>
+      prev.map((r) => (r._rawId === rawId ? { ...r, selected: true } : r))
+    );
+  };
+
+  const handleSkipRow = (rawId: string) => {
+    setRows((prev) =>
+      prev.map((r) => (r._rawId === rawId ? { ...r, selected: false } : r))
+    );
+  };
 
   const handleUpdateCell = (rawId: string, field: keyof ParsedRow, val: any) => {
     setRows((prev) =>
@@ -700,22 +834,43 @@ export default function TransactionImportWizard({
     );
   };
 
-  // Metrics summary calculation
+  // Compute active rows and metrics
   const activeRows = rows.filter((r) => !r.isDeleted);
   const deletedCount = rows.filter((r) => r.isDeleted).length;
 
-  const validRows = activeRows.filter((r) => r.isValidDate && r.isValidAmount);
-  const errorRows = activeRows.filter((r) => !r.isValidDate || !r.isValidAmount);
-  const duplicateRows = activeRows.filter((r) => r.isDuplicate);
+  const toImportCount = activeRows.filter((r) => r.selected && r.isValidDate && r.isValidAmount).length;
+  const exactDupsCount = activeRows.filter((r) => r.duplicateType === "EXACT").length;
+  const softDupsCount = activeRows.filter((r) => r.duplicateType === "SOFT").length;
+  const errorCount = activeRows.filter((r) => !r.isValidDate || !r.isValidAmount).length;
+  const skippedCount = activeRows.filter((r) => !r.selected && r.isValidDate && r.isValidAmount).length;
+  const hasDuplicates = activeRows.some((r) => r.duplicateType !== null);
+
+  const filteredPreviewRows = activeRows.filter((row) => {
+    if (filterMode === "SELECTED") if (!row.selected || !row.isValidDate || !row.isValidAmount) return false;
+    if (filterMode === "DUPLICATES") if (row.duplicateType === null) return false;
+    if (filterMode === "ERRORS") if (row.isValidDate && row.isValidAmount) return false;
+    if (filterMode === "SKIPPED") if (row.selected || !row.isValidDate || !row.isValidAmount) return false;
+
+    if (searchTerm.trim() !== "") {
+      const query = searchTerm.toLowerCase();
+      return (
+        row.description.toLowerCase().includes(query) ||
+        (row.referenceNo && row.referenceNo.toLowerCase().includes(query))
+      );
+    }
+    return true;
+  });
+
+  const visiblePreviewRows = showAllRows ? filteredPreviewRows : filteredPreviewRows.slice(0, 100);
 
   // ============================================================
   // STEP 4: BATCH IMPORT SUBMISSION
   // ============================================================
 
   const handleExecuteImport = async () => {
-    const importable = validRows;
+    const importable = activeRows.filter((r) => r.selected && r.isValidDate && r.isValidAmount);
     if (importable.length === 0) {
-      setStepError("No valid rows available to import.");
+      setStepError("No selected valid rows available to import.");
       return;
     }
 
@@ -732,6 +887,10 @@ export default function TransactionImportWizard({
       balance: r.balance || null,
       category: r.category,
       subcategory: r.subcategory,
+      forceImport: r.duplicateType !== null,
+      duplicateType: r.duplicateType || null,
+      confidence: r.confidence || null,
+      matchedTxnId: r.matchedTxn?.id || null,
     }));
 
     try {
@@ -740,6 +899,7 @@ export default function TransactionImportWizard({
         fileName: file?.name || "statement.csv",
         fileType: file?.name.split(".").pop() || "csv",
         dateFormat: dateFormat,
+        syncToIncomeTab: syncToIncomeTab,
         transactions: payloadTransactions,
       });
 
@@ -747,7 +907,7 @@ export default function TransactionImportWizard({
         const data = res.data.data;
         setImportResult({
           importedCount: data.importedCount,
-          skippedCount: data.skippedCount,
+          skippedCount: data.skippedCount + (activeRows.length - importable.length),
           failedCount: data.failedCount,
           totalDebits: data.totalDebits || 0,
           totalCredits: data.totalCredits || 0,
@@ -770,8 +930,6 @@ export default function TransactionImportWizard({
   // RENDER MODAL UI
   // ============================================================
 
-  const visiblePreviewRows = showAllRows ? activeRows : activeRows.slice(0, 100);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200">
       <div className="relative flex flex-col w-full max-w-5xl h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
@@ -786,7 +944,7 @@ export default function TransactionImportWizard({
                 Import Bank Statement
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Multi-step transaction wizard with smart mapping & validation
+                Multi-step transaction wizard with duplicate detection & smart mapping
               </p>
             </div>
           </div>
@@ -812,7 +970,7 @@ export default function TransactionImportWizard({
           <div className={`h-[2px] flex-1 mx-4 ${step >= 3 ? "bg-blue-600/60" : "bg-zinc-200 dark:bg-zinc-800"}`} />
           <div className={`flex items-center gap-2 ${step >= 3 ? "text-blue-600 dark:text-blue-400" : ""}`}>
             <span className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${step >= 3 ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950" : "border-zinc-300"}`}>3</span>
-            <span>Preview & Edit</span>
+            <span>Preview & Select</span>
           </div>
           <div className={`h-[2px] flex-1 mx-4 ${step >= 4 ? "bg-blue-600/60" : "bg-zinc-200 dark:bg-zinc-800"}`} />
           <div className={`flex items-center gap-2 ${step >= 4 ? "text-blue-600 dark:text-blue-400" : ""}`}>
@@ -999,182 +1157,467 @@ export default function TransactionImportWizard({
                 </Button>
                 <Button
                   onClick={handleConfirmMapping}
+                  disabled={checkingDuplicatesLoading}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-6 rounded-xl shadow-md flex items-center gap-2"
                 >
-                  Next: Preview & Edit <ArrowRight className="h-4 w-4" />
+                  {checkingDuplicatesLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" /> Checking for duplicates... ({fileDataRows.length} rows)
+                    </>
+                  ) : (
+                    <>
+                      Next: Preview & Select <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: PREVIEW & EDIT */}
+          {/* STEP 3: PREVIEW & DUPLICATE SELECTION */}
           {step === 3 && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              {/* Summary Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold">
-                <div className="flex items-center gap-4">
-                  <span className="text-emerald-600 flex items-center gap-1">
-                    <CheckCircle className="h-4 w-4" /> {validRows.length} Valid
+              {/* Live Reactive Summary Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold shadow-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5" /> {toImportCount} to import
                   </span>
-                  <span className="text-amber-500 flex items-center gap-1">
-                    <AlertTriangle className="h-4 w-4" /> {duplicateRows.length} Duplicates
-                  </span>
-                  <span className="text-red-500 flex items-center gap-1">
-                    <XCircle className="h-4 w-4" /> {errorRows.length} Errors
-                  </span>
+                  {exactDupsCount > 0 && (
+                    <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-blue-500" /> {exactDupsCount} exact duplicates
+                    </span>
+                  )}
+                  {softDupsCount > 0 && (
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> {softDupsCount} possible duplicates
+                    </span>
+                  )}
+                  {errorCount > 0 && (
+                    <span className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                      <XCircle className="h-3.5 w-3.5 text-red-500" /> {errorCount} errors
+                    </span>
+                  )}
+                  {skippedCount > 0 && (
+                    <span className="px-2.5 py-1 rounded-lg bg-zinc-500/10 text-zinc-500 flex items-center gap-1.5">
+                      ⊘ {skippedCount} skipped
+                    </span>
+                  )}
                   {deletedCount > 0 && (
-                    <span className="text-zinc-400 flex items-center gap-1">
-                      <Trash2 className="h-4 w-4" /> {deletedCount} Deleted
+                    <span className="px-2.5 py-1 rounded-lg bg-zinc-500/10 text-zinc-400 flex items-center gap-1.5">
+                      <Trash2 className="h-3.5 w-3.5" /> {deletedCount} deleted
                     </span>
                   )}
                 </div>
 
-                {recentlyDeletedRow && (
-                  <Button
-                    onClick={handleUndoDelete}
-                    variant="outline"
-                    className="h-7 text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2.5 rounded-lg flex items-center gap-1"
+                {/* Bulk Action Controls */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSelectAll}
+                    className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 text-xs font-bold transition-colors"
                   >
-                    <RotateCcw className="h-3 w-3" /> Undo Delete
-                  </Button>
-                )}
+                    ☑ Select All
+                  </button>
+                  <button
+                    onClick={handleUnselectAllDuplicates}
+                    disabled={!hasDuplicates}
+                    className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 text-xs font-bold disabled:opacity-40 transition-colors"
+                  >
+                    Unselect All Duplicates
+                  </button>
+                  <button
+                    onClick={handleUnselectAll}
+                    className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 text-xs font-bold transition-colors"
+                  >
+                    Unselect All
+                  </button>
+                  {recentlyDeletedRow && (
+                    <button
+                      onClick={handleUndoDelete}
+                      className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 text-xs font-bold flex items-center gap-1 hover:bg-blue-100"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Undo Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Filter, Search & Sync Income Toggle Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-zinc-400" />
+                    <Select
+                      value={filterMode}
+                      onChange={(e) => setFilterMode(e.target.value as FilterMode)}
+                      className="w-48 h-8 text-xs font-bold"
+                    >
+                      <option value="ALL">All ({activeRows.length})</option>
+                      <option value="SELECTED">To Import ({toImportCount})</option>
+                      <option value="DUPLICATES">Duplicates ({exactDupsCount + softDupsCount})</option>
+                      <option value="ERRORS">Errors ({errorCount})</option>
+                      <option value="SKIPPED">Skipped ({skippedCount})</option>
+                    </Select>
+                  </div>
+
+                  {/* Toggle Button for adding credit amount to Income tab */}
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
+                    <input
+                      type="checkbox"
+                      id="syncToIncomeTab"
+                      checked={syncToIncomeTab}
+                      onChange={(e) => setSyncToIncomeTab(e.target.checked)}
+                      className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4"
+                    />
+                    <label htmlFor="syncToIncomeTab" className="text-xs font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer flex items-center gap-1.5 select-none">
+                      <span>Add credit amounts to Income tab</span>
+                      <span className="text-[10px] text-zinc-400 font-normal">(Off by default)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-3 top-2.5" />
+                  <Input
+                    type="text"
+                    placeholder="Search description..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 h-8 w-64 text-xs"
+                  />
+                </div>
               </div>
 
               {/* Table Container */}
-              <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden max-h-[50vh] overflow-y-auto">
+              <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden max-h-[48vh] overflow-y-auto shadow-xs">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-zinc-100 dark:bg-zinc-950 sticky top-0 font-bold text-zinc-600 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                  <thead className="bg-zinc-100 dark:bg-zinc-950 sticky top-0 font-bold text-zinc-600 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 z-10">
                     <tr>
-                      <th className="p-3 w-8">Status</th>
-                      <th className="p-3">Date</th>
+                      <th className="p-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={activeRows.length > 0 && activeRows.every((r) => r.selected || !r.isValidDate || !r.isValidAmount)}
+                          onChange={(e) => (e.target.checked ? handleSelectAll() : handleUnselectAll())}
+                          className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </th>
+                      <th className="p-3 w-28">Date</th>
                       <th className="p-3">Description</th>
                       <th className="p-3">Category</th>
                       <th className="p-3">Sub-Category</th>
                       <th className="p-3 text-right">Debit</th>
                       <th className="p-3 text-right">Credit</th>
+                      <th className="p-3 text-center w-28">Status</th>
                       <th className="p-3 text-center w-16">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {visiblePreviewRows.map((r) => {
                       const isError = !r.isValidDate || !r.isValidAmount;
+                      const isExact = r.duplicateType === "EXACT";
+                      const isSoft = r.duplicateType === "SOFT";
+                      const isSkipped = !r.selected && !isError;
+
+                      let rowClass = "hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ";
+                      if (isError) {
+                        rowClass += "bg-red-500/5 border-l-4 border-l-red-500 ";
+                      } else if (isExact) {
+                        rowClass += "bg-blue-500/5 border-l-4 border-l-blue-500 ";
+                      } else if (isSoft) {
+                        rowClass += "bg-amber-500/5 border-l-4 border-l-amber-500 ";
+                      }
+
+                      if (isSkipped) {
+                        rowClass += "opacity-40 ";
+                      }
 
                       return (
-                        <tr
-                          key={r._rawId}
-                          className={`hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${
-                            isError ? "bg-red-500/5" : r.isDuplicate ? "bg-amber-500/5" : ""
-                          }`}
-                        >
-                          <td className="p-3">
-                            {isError ? (
-                              <span title="Date or amount invalid"><XCircle className="h-4 w-4 text-red-500" /></span>
-                            ) : r.isDuplicate ? (
-                              <span title="Possible duplicate entry"><AlertTriangle className="h-4 w-4 text-amber-500" /></span>
-                            ) : (
-                              <span title="Valid row"><CheckCircle className="h-4 w-4 text-emerald-500" /></span>
-                            )}
-                          </td>
+                        <React.Fragment key={r._rawId}>
+                          <tr className={rowClass}>
+                            {/* Checkbox Column */}
+                            <td className="p-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={r.selected}
+                                disabled={isError}
+                                onChange={() => handleToggleRowSelect(r._rawId)}
+                                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </td>
 
-                          {/* Date Cell */}
-                          <td className="p-3 font-mono">
-                            <input
-                              type="text"
-                              value={r.transactionDate || r.rawDate}
-                              onChange={(e) => handleUpdateCell(r._rawId, "transactionDate", e.target.value)}
-                              className={`w-28 h-7 px-2 rounded border bg-transparent text-xs ${
-                                !r.isValidDate ? "border-red-500 text-red-600 font-bold" : "border-zinc-200 dark:border-zinc-700"
-                              }`}
-                            />
-                          </td>
+                            {/* Date Cell */}
+                            <td className="p-3 font-mono">
+                              <input
+                                type="text"
+                                value={r.transactionDate || r.rawDate}
+                                onChange={(e) => handleUpdateCell(r._rawId, "transactionDate", e.target.value)}
+                                className={`w-28 h-7 px-2 rounded border bg-transparent text-xs ${
+                                  !r.isValidDate ? "border-red-500 text-red-600 font-bold" : "border-zinc-200 dark:border-zinc-700"
+                                }`}
+                              />
+                            </td>
 
-                          {/* Description Cell */}
-                          <td className="p-3">
-                            <input
-                              type="text"
-                              value={r.description}
-                              onChange={(e) => handleUpdateCell(r._rawId, "description", e.target.value)}
-                              className="w-full min-w-[160px] h-7 px-2 rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-xs"
-                            />
-                          </td>
+                            {/* Description Cell with Expand Toggle */}
+                            <td className="p-3">
+                              <div className="flex items-center gap-1.5">
+                                {r.isDuplicate && (
+                                  <button
+                                    onClick={() => handleToggleRowExpand(r._rawId)}
+                                    className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500"
+                                    title="Toggle matching duplicate details"
+                                  >
+                                    {r.isExpanded ? (
+                                      <ChevronDown className="h-4 w-4 text-blue-600" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 text-zinc-400" />
+                                    )}
+                                  </button>
+                                )}
+                                <input
+                                  type="text"
+                                  value={r.description}
+                                  onChange={(e) => handleUpdateCell(r._rawId, "description", e.target.value)}
+                                  className="w-full min-w-[160px] h-7 px-2 rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-xs"
+                                />
+                              </div>
+                            </td>
 
-                          {/* Category Select Cell */}
-                          <td className="p-3">
-                            <select
-                              value={r.category || "Miscellaneous"}
-                              onChange={(e) => {
-                                const newCat = e.target.value;
-                                const subOptions = CATEGORY_MAP[newCat] || ["General"];
-                                handleUpdateCell(r._rawId, "category", newCat);
-                                handleUpdateCell(r._rawId, "subcategory", subOptions[0]);
-                              }}
-                              className="w-36 h-7 px-2 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-200"
-                            >
-                              {Object.keys(CATEGORY_MAP).map((cat) => (
-                                <option key={cat} value={cat}>
-                                  {cat}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-
-                          {/* Sub-Category Select Cell */}
-                          <td className="p-3">
-                            <select
-                              value={r.subcategory || (CATEGORY_MAP[r.category]?.[0] || "General")}
-                              onChange={(e) => handleUpdateCell(r._rawId, "subcategory", e.target.value)}
-                              className="w-36 h-7 px-2 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-300"
-                            >
-                              {(CATEGORY_MAP[r.category] || ["General"]).map((sub) => (
-                                <option key={sub} value={sub}>
-                                  {sub}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-
-                          {/* Debit Cell */}
-                          <td className="p-3 text-right font-mono">
-                            <input
-                              type="text"
-                              value={r.debitAmount != null ? r.debitAmount : ""}
-                              onChange={(e) => handleUpdateCell(r._rawId, "debitAmount", e.target.value)}
-                              placeholder="-"
-                              className="w-24 h-7 px-2 text-right rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-xs font-semibold text-red-600"
-                            />
-                          </td>
-
-                          {/* Credit Cell */}
-                          <td className="p-3 text-right font-mono">
-                            <input
-                              type="text"
-                              value={r.creditAmount != null ? r.creditAmount : ""}
-                              onChange={(e) => handleUpdateCell(r._rawId, "creditAmount", e.target.value)}
-                              placeholder="-"
-                              className="w-24 h-7 px-2 text-right rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-xs font-semibold text-emerald-600"
-                            />
-                          </td>
-
-                          {/* Actions */}
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => handleResetRow(r._rawId)}
-                                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                                title="Reset to original"
+                            {/* Category Select Cell */}
+                            <td className="p-3">
+                              <select
+                                value={r.category || "Miscellaneous"}
+                                onChange={(e) => {
+                                  const newCat = e.target.value;
+                                  const subOptions = CATEGORY_MAP[newCat] || ["General"];
+                                  handleUpdateCell(r._rawId, "category", newCat);
+                                  handleUpdateCell(r._rawId, "subcategory", subOptions[0]);
+                                }}
+                                className="w-36 h-7 px-2 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-200"
                               >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteRow(r._rawId)}
-                                className="p-1 text-zinc-400 hover:text-red-600"
-                                title="Delete row"
+                                {Object.keys(CATEGORY_MAP).map((cat) => (
+                                  <option key={cat} value={cat}>
+                                    {cat}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+
+                            {/* Sub-Category Select Cell */}
+                            <td className="p-3">
+                              <select
+                                value={r.subcategory || (CATEGORY_MAP[r.category]?.[0] || "General")}
+                                onChange={(e) => handleUpdateCell(r._rawId, "subcategory", e.target.value)}
+                                className="w-36 h-7 px-2 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-300"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                                {(CATEGORY_MAP[r.category] || ["General"]).map((sub) => (
+                                  <option key={sub} value={sub}>
+                                    {sub}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+
+                            {/* Debit Cell */}
+                            <td className="p-3 text-right font-mono">
+                              <input
+                                type="text"
+                                value={r.debitAmount != null ? r.debitAmount : ""}
+                                onChange={(e) => handleUpdateCell(r._rawId, "debitAmount", e.target.value)}
+                                placeholder="-"
+                                className="w-24 h-7 px-2 text-right rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-xs font-semibold text-red-600"
+                              />
+                            </td>
+
+                            {/* Credit Cell */}
+                            <td className="p-3 text-right font-mono">
+                              <input
+                                type="text"
+                                value={r.creditAmount != null ? r.creditAmount : ""}
+                                onChange={(e) => handleUpdateCell(r._rawId, "creditAmount", e.target.value)}
+                                placeholder="-"
+                                className="w-24 h-7 px-2 text-right rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-xs font-semibold text-emerald-600"
+                              />
+                            </td>
+
+                            {/* Status Badge Cell */}
+                            <td className="p-3 text-center">
+                              {isError ? (
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center gap-1" title="Date or amount invalid">
+                                  🔴 Error
+                                </span>
+                              ) : isExact ? (
+                                <button
+                                  onClick={() => handleToggleRowExpand(r._rawId)}
+                                  className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center gap-1 hover:bg-blue-500/20"
+                                  title="Exact duplicate already in account"
+                                >
+                                  🔵 Duplicate
+                                </button>
+                              ) : isSoft ? (
+                                <button
+                                  onClick={() => handleToggleRowExpand(r._rawId)}
+                                  className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1 hover:bg-amber-500/20"
+                                  title={`${Math.round((r.confidence ?? 0) * 100)}% match to existing transaction`}
+                                >
+                                  🟡 ~{Math.round((r.confidence ?? 0) * 100)}% match
+                                </button>
+                              ) : (
+                                <span className="text-emerald-500 font-bold flex items-center justify-center gap-1">
+                                  ✅
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Actions Cell */}
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => handleResetRow(r._rawId)}
+                                  className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                                  title="Reset to original"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteRow(r._rawId)}
+                                  className="p-1 text-zinc-400 hover:text-red-600"
+                                  title="Delete row"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Expandable Duplicate Detail Panel */}
+                          {r.isDuplicate && r.isExpanded && r.matchedTxn && (
+                            <tr key={`${r._rawId}_detail`} className="bg-zinc-100/80 dark:bg-zinc-950/80">
+                              <td colSpan={9} className="p-4 border-b border-zinc-200 dark:border-zinc-800">
+                                {r.duplicateType === "EXACT" ? (
+                                  <div className="space-y-3 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-blue-500/30 shadow-xs text-xs">
+                                    <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                                      <span className="font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 text-sm">
+                                        🔵 Exact Duplicate Found
+                                      </span>
+                                      <span className="text-[11px] text-zinc-400">
+                                        Matches 100% with an existing transaction
+                                      </span>
+                                    </div>
+                                    <p className="text-zinc-600 dark:text-zinc-300">
+                                      This transaction already exists in your account:
+                                    </p>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                                      <div>
+                                        <span className="text-[10px] uppercase font-bold text-zinc-400">Date</span>
+                                        <p className="font-mono font-bold text-zinc-800 dark:text-zinc-200">{r.matchedTxn.transactionDate}</p>
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] uppercase font-bold text-zinc-400">Description</span>
+                                        <p className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">{r.matchedTxn.description}</p>
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] uppercase font-bold text-zinc-400">Amount</span>
+                                        <p className="font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                                          {r.matchedTxn.debitAmount ? `₹${r.matchedTxn.debitAmount} Debit` : `₹${r.matchedTxn.creditAmount} Credit`}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] uppercase font-bold text-zinc-400">Source</span>
+                                        <p className="font-bold text-zinc-700 dark:text-zinc-300">
+                                          {r.matchedTxn.source === "import" ? "📥 Import" : "✏️ Manual entry"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-end gap-2 pt-1">
+                                      <button
+                                        onClick={() => setViewingExistingTxn(r.matchedTxn)}
+                                        className="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 flex items-center gap-1"
+                                      >
+                                        View Existing <ExternalLink className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleForceImportRow(r._rawId)}
+                                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-xs flex items-center gap-1"
+                                      >
+                                        Import Anyway
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-amber-500/30 shadow-xs text-xs">
+                                    <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                                      <span className="font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 text-sm">
+                                        🟡 Possible Duplicate — {Math.round((r.confidence ?? 0) * 100)}% similarity
+                                      </span>
+                                      <span className="text-[11px] text-zinc-400">
+                                        Reason: {r.duplicateReason}
+                                      </span>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-left border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                                        <thead className="bg-zinc-50 dark:bg-zinc-950 font-bold text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                                          <tr>
+                                            <th className="p-2">Field</th>
+                                            <th className="p-2 text-blue-600 dark:text-blue-400">This Incoming Row</th>
+                                            <th className="p-2 text-amber-600 dark:text-amber-400">Existing Matched Transaction</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-medium">
+                                          <tr>
+                                            <td className="p-2 font-bold text-zinc-500">Date</td>
+                                            <td className="p-2 font-mono">{r.transactionDate}</td>
+                                            <td className="p-2 font-mono">{r.matchedTxn.transactionDate}</td>
+                                          </tr>
+                                          <tr>
+                                            <td className="p-2 font-bold text-zinc-500">Description</td>
+                                            <td className="p-2">{r.description}</td>
+                                            <td className="p-2">{r.matchedTxn.description}</td>
+                                          </tr>
+                                          <tr>
+                                            <td className="p-2 font-bold text-zinc-500">Amount</td>
+                                            <td className="p-2 font-mono font-bold">
+                                              ₹{r.debitAmount ?? r.creditAmount}
+                                            </td>
+                                            <td className="p-2 font-mono font-bold">
+                                              ₹{r.matchedTxn.debitAmount ?? r.matchedTxn.creditAmount}
+                                            </td>
+                                          </tr>
+                                          <tr>
+                                            <td className="p-2 font-bold text-zinc-500">Source</td>
+                                            <td className="p-2">—</td>
+                                            <td className="p-2 font-bold">
+                                              {r.matchedTxn.source === "import" ? "📥 Import" : "✏️ Manual entry"}
+                                            </td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    <div className="flex items-center justify-end gap-2 pt-1">
+                                      <button
+                                        onClick={() => setViewingExistingTxn(r.matchedTxn)}
+                                        className="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 flex items-center gap-1"
+                                      >
+                                        View Existing <ExternalLink className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleSkipRow(r._rawId)}
+                                        className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs"
+                                      >
+                                        Skip This Row
+                                      </button>
+                                      <button
+                                        onClick={() => handleForceImportRow(r._rawId)}
+                                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs"
+                                      >
+                                        Keep Selected
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
@@ -1182,18 +1625,18 @@ export default function TransactionImportWizard({
               </div>
 
               {/* Load All Button */}
-              {activeRows.length > 100 && !showAllRows && (
+              {filteredPreviewRows.length > 100 && !showAllRows && (
                 <div className="text-center pt-1">
                   <button
                     onClick={() => setShowAllRows(true)}
                     className="text-xs font-bold text-blue-600 hover:underline"
                   >
-                    Showing first 100 rows — Click to load all {activeRows.length} rows
+                    Showing first 100 rows — Click to load all {filteredPreviewRows.length} rows
                   </button>
                 </div>
               )}
 
-              {/* Bottom Actions */}
+              {/* Bottom Navigation & Import Action */}
               <div className="flex items-center justify-between pt-4 border-t border-zinc-200 dark:border-zinc-800">
                 <Button
                   onClick={() => setStep(2)}
@@ -1204,7 +1647,7 @@ export default function TransactionImportWizard({
                 </Button>
                 <Button
                   onClick={handleExecuteImport}
-                  disabled={validRows.length === 0 || importingLoading}
+                  disabled={toImportCount === 0 || importingLoading}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 px-6 rounded-xl shadow-md flex items-center gap-2"
                 >
                   {importingLoading ? (
@@ -1213,7 +1656,7 @@ export default function TransactionImportWizard({
                     </>
                   ) : (
                     <>
-                      Import {validRows.length} Valid Transactions <Sparkles className="h-4 w-4 fill-white" />
+                      Import {toImportCount} Selected Transactions <Sparkles className="h-4 w-4 fill-white" />
                     </>
                   )}
                 </Button>
@@ -1293,6 +1736,59 @@ export default function TransactionImportWizard({
           )}
         </div>
       </div>
+
+      {/* Viewing Existing Transaction Details Modal Overlay */}
+      {viewingExistingTxn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+                <Info className="h-5 w-5 text-blue-600" /> Existing Transaction Details
+              </h3>
+              <button
+                onClick={() => setViewingExistingTxn(null)}
+                className="text-zinc-400 hover:text-zinc-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                <span className="font-bold text-zinc-400">Transaction ID:</span>
+                <span className="font-mono text-zinc-700 dark:text-zinc-300">{viewingExistingTxn.id}</span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                <span className="font-bold text-zinc-400">Date:</span>
+                <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200">{viewingExistingTxn.transactionDate}</span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                <span className="font-bold text-zinc-400">Description:</span>
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200 max-w-[200px] text-right">{viewingExistingTxn.description}</span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                <span className="font-bold text-zinc-400">Amount:</span>
+                <span className="font-mono font-extrabold text-zinc-900 dark:text-white">
+                  {viewingExistingTxn.debitAmount ? `₹${viewingExistingTxn.debitAmount} Debit` : `₹${viewingExistingTxn.creditAmount} Credit`}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                <span className="font-bold text-zinc-400">Source:</span>
+                <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                  {viewingExistingTxn.source === "import" ? "📥 Import" : "✏️ Manual entry"}
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button
+                onClick={() => setViewingExistingTxn(null)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 px-4 rounded-xl text-xs"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
