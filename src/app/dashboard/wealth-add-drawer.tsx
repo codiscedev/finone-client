@@ -1348,80 +1348,60 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {recordType === "Asset" ? (
                   assetCategories.map((c) => {
-                    const Icon = c.icon;
                     return (
                       <button
                         key={c.code}
                         onClick={() => handleAssetCategorySelect(c.code)}
                         className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
-                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
-                        </div>
                         <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
                       </button>
                     );
                   })
                 ) : recordType === "Debt" ? (
                   debtCategories.map((c) => {
-                    const Icon = c.icon;
                     return (
                       <button
                         key={c.code}
                         onClick={() => handleDebtCategorySelect(c.code)}
                         className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
-                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
-                        </div>
                         <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
                       </button>
                     );
                   })
                 ) : recordType === "Investment" ? (
                   investmentCategories.map((c) => {
-                    const Icon = c.icon;
                     return (
                       <button
                         key={c.code}
                         onClick={() => handleInvestmentCategorySelect(c.code)}
                         className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
-                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
-                        </div>
                         <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
                       </button>
                     );
                   })
                 ) : recordType === "Goal" ? (
                   goalCategories.map((c) => {
-                    const Icon = c.icon;
                     return (
                       <button
                         key={c.code}
                         onClick={() => handleGoalCategorySelect(c.code)}
                         className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
-                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
-                        </div>
                         <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
                       </button>
                     );
                   })
                 ) : (
                   essentialCategories.map((c) => {
-                    const Icon = c.icon;
                     return (
                       <button
                         key={c.code}
                         onClick={() => handleEssentialCategorySelect(c.code, c.id)}
                         className="flex items-center gap-3 rounded-xl border border-zinc-200 p-2.5 bg-white hover:border-blue-600 hover:bg-blue-50/10 hover:shadow-xs transition-all outline-none group cursor-pointer"
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${c.color} transition-colors group-hover:bg-blue-100 group-hover:text-blue-700`}>
-                          <Icon className="h-4.5 w-4.5 stroke-[2]" />
-                        </div>
                         <span className="text-xs font-bold text-zinc-900 group-hover:text-blue-900 transition-colors">{c.label}</span>
                       </button>
                     );
