@@ -44,9 +44,10 @@ import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 interface WealthAddDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProps) {
+export default function WealthAddDrawer({ isOpen, onClose, onSuccess }: WealthAddDrawerProps) {
   const { showSuccess, showWarning } = useCustomAlert();
   const { dbUser } = useAuth();
   const [assetCategoriesList, setAssetCategoriesList] = React.useState<any[]>([]);
@@ -1055,6 +1056,8 @@ export default function WealthAddDrawer({ isOpen, onClose }: WealthAddDrawerProp
       clearInvestmentFields();
       clearGoalFields();
       clearEssentialFields();
+      window.dispatchEvent(new Event("finone-wealth-updated"));
+      onSuccess?.();
       onClose();
     } catch (err: any) {
       console.error("Error saving record:", err);

@@ -99,6 +99,13 @@ export default function DashboardPage() {
     if (activeMenu === "Dashboard" && dbUser?.userId) {
       fetchDashboardData();
     }
+    const handleWealthUpdated = () => {
+      if (dbUser?.userId) {
+        fetchDashboardData();
+      }
+    };
+    window.addEventListener("finone-wealth-updated", handleWealthUpdated);
+    return () => window.removeEventListener("finone-wealth-updated", handleWealthUpdated);
   }, [activeMenu, dbUser?.userId, fetchDashboardData]);
 
   const profileRef = React.useRef<HTMLDivElement>(null);

@@ -112,7 +112,7 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
     }
   };
 
-  React.useEffect(() => {
+  const fetchAllData = React.useCallback(() => {
     if (dbUser) {
       fetchAssets();
       fetchDebts();
@@ -121,6 +121,12 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
       fetchInvestments();
     }
   }, [dbUser]);
+
+  React.useEffect(() => {
+    fetchAllData();
+    window.addEventListener("finone-wealth-updated", fetchAllData);
+    return () => window.removeEventListener("finone-wealth-updated", fetchAllData);
+  }, [fetchAllData]);
 
   // Investments Card derived variables
   const {

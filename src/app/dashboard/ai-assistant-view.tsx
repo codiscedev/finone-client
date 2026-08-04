@@ -25,6 +25,9 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { app } from "@/lib/firebase";
 import { getAI, getGenerativeModel } from "firebase/ai";
+import AnomalyAlertBell from "@/components/ai/AnomalyAlertBell";
+import TaxInsightCard from "@/components/ai/TaxInsightCard";
+import FinanceChat from "@/components/ai/FinanceChat";
 
 interface AIAssistantViewProps {
   onUpgradeClick?: () => void;
@@ -187,15 +190,20 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">AI Assistant</h2>
-          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 text-[10px] font-bold">
-            <Star className="h-3 w-3 fill-indigo-600 text-indigo-600" />
-            Premium
-          </span>
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">AI Assistant</h2>
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 text-[10px] font-bold">
+              <Star className="h-3 w-3 fill-indigo-600 text-indigo-600" />
+              Premium
+            </span>
+          </div>
+          <p className="text-sm text-zinc-500 mt-1">Reasoning-based wealth strategy planner and context-trained personal chatbot.</p>
         </div>
-        <p className="text-sm text-zinc-500 mt-1">Reasoning-based wealth strategy planner and context-trained personal chatbot.</p>
+        <div className="flex items-center gap-3">
+          <AnomalyAlertBell />
+        </div>
       </div>
 
       {/* Pro Upgrade Banner */}
