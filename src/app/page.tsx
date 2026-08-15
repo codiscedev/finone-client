@@ -106,11 +106,13 @@ export default function Home() {
   ];
 
   return (
-    <div className="relative flex flex-col min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans overflow-x-hidden">
+    <div className="relative flex flex-col flex-1 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
       
       {/* Decorative Gradient Background Elements */}
-      <div className="absolute top-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-emerald-500/5 dark:bg-emerald-500/10 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-indigo-500/5 dark:bg-indigo-500/10 blur-[120px] pointer-events-none" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 h-[500px] w-[500px] rounded-full bg-emerald-500/5 dark:bg-emerald-500/10 blur-[120px]" />
+        <div className="absolute top-1/3 left-0 transform -translate-x-1/4 h-[500px] w-[500px] rounded-full bg-indigo-500/5 dark:bg-indigo-500/10 blur-[120px]" />
+      </div>
 
       {/* Navigation Header */}
       <header className="relative z-20 w-full max-w-7xl mx-auto flex items-center justify-between py-5 px-6 sm:px-8 border-b border-zinc-200/50 dark:border-zinc-800/50">

@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${montserrat.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${montserrat.variable} ${geistMono.variable} min-h-screen antialiased overflow-x-clip`}
       suppressHydrationWarning
     >
       <head>
@@ -55,7 +55,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
+      <body className="min-h-screen flex flex-col font-sans bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-x-clip" suppressHydrationWarning>
         <AuthProvider>
           <CustomAlertProvider>
             <ThemeProvider>
