@@ -23,8 +23,6 @@ import { Button } from "@/components/ui/button";
 import { useCustomAlert } from "@/components/ui/custom-alert-dialog";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { app } from "@/lib/firebase";
-import { getAI, getGenerativeModel } from "firebase/ai";
 import AnomalyAlertBell from "@/components/ai/AnomalyAlertBell";
 import TaxInsightCard from "@/components/ai/TaxInsightCard";
 import FinanceChat from "@/components/ai/FinanceChat";
@@ -112,42 +110,17 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
     
     setIsTyping(true);
     let reply = "";
-    let useFallback = false;
-
-    // 1. Try Firebase AI SDK Client-Side
+    // Call server-side API Chat endpoint (which uses GEMINI_API_KEY and provides RAG context)
     try {
-      const ai = getAI(app);
-      const model = getGenerativeModel(ai, { 
-        model: "gemini-1.5-flash",
-        systemInstruction: "You are FinDisce AI, a personal finance assistant. Help with budgeting, investments, tax saving, and financial planning. Be concise, practical, and India-specific (INR, Indian tax laws)."
-      });
-      const result = await model.generateContent(text);
-      const responseText = result.response.text();
-      if (responseText) {
-        reply = responseText;
-        // Save user conversation in history on backend asynchronously
-        await apiClient.post("/ai/chat", { message: text }).catch(() => null);
+      const response = await apiClient.post("/ai/chat", { message: text });
+      if (response.data?.success && response.data?.data) {
+        reply = response.data.data.reply;
       } else {
-        useFallback = true;
-      }
-    } catch (err) {
-      console.warn("Client-side Firebase Vertex AI failed, falling back to server-side Gemini integration:", err);
-      useFallback = true;
-    }
-
-    // 2. Fallback to Server-Side API Chat endpoint
-    if (useFallback) {
-      try {
-        const response = await apiClient.post("/ai/chat", { message: text });
-        if (response.data?.success && response.data?.data) {
-          reply = response.data.data.reply;
-        } else {
-          reply = "I'm having trouble connecting to the AI model right now. Please try again later.";
-        }
-      } catch (err: any) {
-        console.error("Failed to get response from fallback server-side model", err);
         reply = "I'm having trouble connecting to the AI model right now. Please try again later.";
       }
+    } catch (err: any) {
+      console.error("Failed to get response from server-side Gemini AI model", err);
+      reply = "I'm having trouble connecting to the AI model right now. Please try again later.";
     }
 
     const botResponse = {
