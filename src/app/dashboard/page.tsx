@@ -13,15 +13,11 @@ import {
   ChevronDown,
   TrendingUp,
   TrendingDown,
-  ArrowUpRight,
   Plus,
   Filter,
   Download,
   Calendar,
   Sparkles,
-  DollarSign,
-  FileText,
-  MessageSquare,
   Menu,
   Star,
   ChevronLeft,
@@ -584,217 +580,139 @@ function DashboardView({ userName, summary, trends, recentTransactions, loading 
         </div>
       </div>
 
-      {/* Main grid section (12 Columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Side (8/12 Columns) - Charts and Transactions */}
-        <div className="lg:col-span-8 space-y-8">
-          {/* Premium Vector Chart Representation */}
-          <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-sm font-bold text-zinc-900">Savings Accumulation Trend</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">Historical growth across connected portfolios</p>
-              </div>
+      {/* Main section - Charts and Transactions */}
+      <div className="space-y-8">
+        {/* Premium Vector Chart Representation */}
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900">Savings Accumulation Trend</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">Historical growth across connected portfolios</p>
             </div>
-            {/* SVG Visualizing minimalist gradient curve */}
-            <div className="relative h-64 w-full">
-              {trends.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-zinc-400 text-xs">
-                  No historical trend data available.
-                </div>
-              ) : (
-                <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.12" />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Grid Lines */}
-                  <line x1="0" y1="40" x2="500" y2="40" stroke="#f4f4f5" strokeWidth="1" />
-                  <line x1="0" y1="90" x2="500" y2="90" stroke="#f4f4f5" strokeWidth="1" />
-                  <line x1="0" y1="140" x2="500" y2="140" stroke="#f4f4f5" strokeWidth="1" />
-                  
-                  {/* Area Gradient */}
-                  {areaD && <path d={areaD} fill="url(#chartGradient)" />}
-                  
-                  {/* Line Curve */}
-                  {lineD && (
-                    <path
-                      d={lineD}
-                      fill="none"
-                      stroke="#2563eb"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-                  )}
+          </div>
+          {/* SVG Visualizing minimalist gradient curve */}
+          <div className="relative h-64 w-full">
+            {trends.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-zinc-400 text-xs">
+                No historical trend data available.
+              </div>
+            ) : (
+              <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2563eb" stopOpacity="0.12" />
+                    <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+                {/* Grid Lines */}
+                <line x1="0" y1="40" x2="500" y2="40" stroke="#f4f4f5" strokeWidth="1" />
+                <line x1="0" y1="90" x2="500" y2="90" stroke="#f4f4f5" strokeWidth="1" />
+                <line x1="0" y1="140" x2="500" y2="140" stroke="#f4f4f5" strokeWidth="1" />
+                
+                {/* Area Gradient */}
+                {areaD && <path d={areaD} fill="url(#chartGradient)" />}
+                
+                {/* Line Curve */}
+                {lineD && (
+                  <path
+                    d={lineD}
+                    fill="none"
+                    stroke="#2563eb"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                )}
 
-                  {/* Data Points */}
-                  {points.map((p, idx) => (
-                    <circle
-                      key={idx}
-                      cx={p.x}
-                      cy={p.y}
-                      r="4.5"
-                      fill="#2563eb"
-                      stroke="#ffffff"
-                      strokeWidth="2"
-                      className="cursor-pointer"
-                    >
-                      <title>{`${p.month}: ${formatRupee(p.savings)}`}</title>
-                    </circle>
-                  ))}
-                </svg>
-              )}
-            </div>
-            
-            {/* Chart Month Labels */}
-            {trends.length > 0 && (
-              <div className="flex justify-between items-center text-[10px] text-zinc-400 font-semibold mt-4 px-2.5">
-                {trends.map((t, idx) => {
-                  const date = new Date(t.month + "-01");
-                  const label = date.toLocaleString("en-US", { month: "short" });
-                  return <span key={idx}>{label}</span>;
-                })}
-              </div>
+                {/* Data Points */}
+                {points.map((p, idx) => (
+                  <circle
+                    key={idx}
+                    cx={p.x}
+                    cy={p.y}
+                    r="4.5"
+                    fill="#2563eb"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="cursor-pointer"
+                  >
+                    <title>{`${p.month}: ${formatRupee(p.savings)}`}</title>
+                  </circle>
+                ))}
+              </svg>
             )}
           </div>
-
-          {/* Recent Activity Table */}
-          <div className="rounded-2xl border border-zinc-200/80 bg-white overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-            <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
-              <div>
-                <h3 className="text-sm font-bold text-zinc-900">Recent Transactions</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">Real-time asset deposits and advisory settlements</p>
-              </div>
+          
+          {/* Chart Month Labels */}
+          {trends.length > 0 && (
+            <div className="flex justify-between items-center text-[10px] text-zinc-400 font-semibold mt-4 px-2.5">
+              {trends.map((t, idx) => {
+                const date = new Date(t.month + "-01");
+                const label = date.toLocaleString("en-US", { month: "short" });
+                return <span key={idx}>{label}</span>;
+              })}
             </div>
-            
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-zinc-100 bg-zinc-50/50 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                    <th className="px-6 py-3">Description</th>
-                    <th className="px-6 py-3">Category</th>
-                    <th className="px-6 py-3">Amount</th>
-                    <th className="px-6 py-3">Date</th>
-                    <th className="px-6 py-3">Status</th>
+          )}
+        </div>
+
+        {/* Recent Activity Table */}
+        <div className="rounded-2xl border border-zinc-200/80 bg-white overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+          <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900">Recent Transactions</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">Real-time asset deposits and advisory settlements</p>
+            </div>
+          </div>
+          
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-zinc-100 bg-zinc-50/50 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  <th className="px-6 py-3">Description</th>
+                  <th className="px-6 py-3">Category</th>
+                  <th className="px-6 py-3">Amount</th>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 text-xs">
+                {recentTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-zinc-400">
+                      No transactions logged yet.
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 text-xs">
-                  {recentTransactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-zinc-400">
-                        No transactions logged yet.
+                ) : (
+                  recentTransactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-zinc-50/50 transition-colors">
+                      <td className="px-6 py-3.5 font-semibold text-zinc-900">{tx.merchant || tx.note || "Untitled Transaction"}</td>
+                      <td className="px-6 py-3.5 text-zinc-500">{tx.categoryName || "Uncategorized"}</td>
+                      <td className={`px-6 py-3.5 font-semibold ${tx.type === "INCOME" ? "text-emerald-600" : "text-zinc-900"}`}>
+                        {tx.type === "INCOME" ? "+" : "-"}{formatRupee(tx.amount)}
+                      </td>
+                      <td className="px-6 py-3.5 text-zinc-500">
+                        {new Date(tx.transactionDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric"
+                        })}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          tx.reviewRequired 
+                            ? "bg-amber-55 text-amber-705" 
+                            : "bg-emerald-55 text-emerald-705"
+                        }`}>
+                          {tx.reviewRequired ? "Under Review" : "Completed"}
+                        </span>
                       </td>
                     </tr>
-                  ) : (
-                    recentTransactions.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-6 py-3.5 font-semibold text-zinc-900">{tx.merchant || tx.note || "Untitled Transaction"}</td>
-                        <td className="px-6 py-3.5 text-zinc-500">{tx.categoryName || "Uncategorized"}</td>
-                        <td className={`px-6 py-3.5 font-semibold ${tx.type === "INCOME" ? "text-emerald-600" : "text-zinc-900"}`}>
-                          {tx.type === "INCOME" ? "+" : "-"}{formatRupee(tx.amount)}
-                        </td>
-                        <td className="px-6 py-3.5 text-zinc-500">
-                          {new Date(tx.transactionDate).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric"
-                          })}
-                        </td>
-                        <td className="px-6 py-3.5">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            tx.reviewRequired 
-                              ? "bg-amber-55 text-amber-705" 
-                              : "bg-emerald-55 text-emerald-705"
-                          }`}>
-                            {tx.reviewRequired ? "Under Review" : "Completed"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        {/* Right Side (4/12 Columns) - Quick Actions & AI Advisor */}
-        <div className="lg:col-span-4 space-y-8">
-          
-          {/* Quick Actions Pane */}
-          <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-            <h3 className="text-sm font-bold text-zinc-900 mb-4">Quick Wealth Actions</h3>
-            <div className="space-y-3">
-              <button className="flex w-full items-center justify-between rounded-xl border border-zinc-100 hover:border-zinc-200 bg-zinc-50/40 p-3 text-left transition-all hover:bg-zinc-50">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                    <DollarSign className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-zinc-900">Transfer & Move Wealth</p>
-                    <p className="text-[10px] text-zinc-505 mt-0.5">Fund portfolios or adjust cash reserves</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="h-4 w-4 text-zinc-400" />
-              </button>
-
-              <button className="flex w-full items-center justify-between rounded-xl border border-zinc-100 hover:border-zinc-200 bg-zinc-50/40 p-3 text-left transition-all hover:bg-zinc-50">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                    <FileText className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-zinc-900">Schedule Tax Projections</p>
-                    <p className="text-[10px] text-zinc-505 mt-0.5">Optimize long-term capital tax offsets</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="h-4 w-4 text-zinc-400" />
-              </button>
-
-              <button className="flex w-full items-center justify-between rounded-xl border border-zinc-100 hover:border-zinc-200 bg-zinc-50/40 p-3 text-left transition-all hover:bg-zinc-50">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
-                    <MessageSquare className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-zinc-900">Request Consultant Call</p>
-                    <p className="text-[10px] text-zinc-505 mt-0.5">Collaborate directly with certified CPAs</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="h-4 w-4 text-zinc-400" />
-              </button>
-            </div>
-          </div>
-
-          {/* AI Asset Insights Pane */}
-          <div className="rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/40 to-indigo-50/30 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative overflow-hidden">
-            {/* Small subtle background graphics */}
-            <div className="absolute top-[-20px] right-[-20px] h-24 w-24 rounded-full bg-blue-500/5 blur-xl" />
-            
-            <div className="flex items-center gap-2 text-blue-600 mb-3">
-              <Sparkles className="h-4.5 w-4.5 animate-pulse" />
-              <h3 className="text-xs font-bold uppercase tracking-wider">AI Asset Suggestion</h3>
-            </div>
-            <p className="text-xs font-bold text-zinc-900">Optimize Growth Portfolio allocations</p>
-            <p className="text-xs text-zinc-650 leading-relaxed mt-1">
-              Your growth portfolio risk profile is currently 14.2% higher than your set baseline. Reallocating $15,000 from high-volatility crypto indexes to treasury indexes can preserve yield while capping downside risk.
-            </p>
-            
-            <div className="flex items-center gap-2.5 mt-4 pt-4 border-t border-blue-100/50">
-              <button className="rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-[10px] font-bold text-white transition-colors">
-                Apply Allocation
-              </button>
-              <button className="rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 px-3 py-1.5 text-[10px] font-bold text-zinc-700 transition-colors">
-                Ignore Recommendation
-              </button>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   );

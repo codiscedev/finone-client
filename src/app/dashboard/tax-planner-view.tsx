@@ -20,15 +20,54 @@ import {
   ThumbsUp,
   Check,
   X,
-  Trash2
+  Trash2,
+  Globe,
+  Users,
+  Heart,
+  Edit3,
+  Cake,
+  MapPin,
+  Coins,
+  Layers,
+  Home,
+  ShieldPlus,
+  PiggyBank,
+  GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
 
 export default function TaxPlannerView() {
+  const { dbUser } = useAuth();
   // Onboarding states
   const [taxOnboardingCompleted, setTaxOnboardingCompleted] = React.useState<boolean | null>(null);
   const [onboardingStep, setOnboardingStep] = React.useState(1);
+
+  // Form 1 - Personal & Tax Residency Profile states
+  const [residenceCountry, setResidenceCountry] = React.useState("India");
+  const [customResidenceCountry, setCustomResidenceCountry] = React.useState("");
+  const [taxCountryType, setTaxCountryType] = React.useState("Same as where I live");
+  const [taxCountry, setTaxCountry] = React.useState("India");
+  const [dateOfBirth, setDateOfBirth] = React.useState("");
+  const [maritalStatus, setMaritalStatus] = React.useState("Single");
+  const [supportDependents, setSupportDependents] = React.useState("No");
+
+  // Form 2 - Income Sources & Earnings states
+  const [incomeSources, setIncomeSources] = React.useState<string[]>(["Salary"]);
+  const [annualIncome, setAnnualIncome] = React.useState(0);
+  const [hasMultipleIncomeSources, setHasMultipleIncomeSources] = React.useState(false);
+  const [hasForeignIncome, setHasForeignIncome] = React.useState(false);
+  const [hasSoldAssets, setHasSoldAssets] = React.useState(false);
+
+  // Form 3 - Deductions & Commitments states
+  const [paysRent, setPaysRent] = React.useState(false);
+  const [hasHomeLoan, setHasHomeLoan] = React.useState(false);
+  const [paysHealthInsurance, setPaysHealthInsurance] = React.useState(false);
+  const [investsOrSaves, setInvestsOrSaves] = React.useState(false);
+  const [paysEducationLoan, setPaysEducationLoan] = React.useState(false);
+  const [detectedHomeLoans, setDetectedHomeLoans] = React.useState<any[]>([]);
+  const [detectedEduLoans, setDetectedEduLoans] = React.useState<any[]>([]);
 
   // 1. Tax Regime Comparison states
   const [selectedRegime, setSelectedRegime] = React.useState<"Old" | "New">("New");
@@ -61,25 +100,68 @@ export default function TaxPlannerView() {
 
   const [newFileName, setNewFileName] = React.useState("");
 
+  const calculateAge = (dobString: string) => {
+    if (!dobString) return null;
+    const dob = new Date(dobString);
+    if (isNaN(dob.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : null;
+  };
+
   const fetchTaxProfile = React.useCallback(async () => {
     try {
       const res = await apiClient.get("/v1/tax/profile");
       if (res.data?.success) {
         const p = res.data.data;
-        setSalary(p.salaryIncome);
-        setFreelance(p.freelanceIncome);
-        setRental(p.rentalIncome);
-        setCapitalGains(p.capitalGains);
-        setOtherIncome(p.otherIncome);
-        setDed80C(p.deduction80c);
-        setDed80D(p.deduction80d);
-        setDed80CCD(p.deduction80ccd);
-        setDed24b(p.deduction24b);
-        setDed80G(p.deduction80g);
-        setHraBasic(p.hraBasic);
-        setHraReceived(p.hraReceived);
-        setHraRentPaid(p.hraRentPaid);
-        setHraIsMetro(p.hraIsMetro);
+        if (p.residenceCountry) {
+          if (["India", "United States", "United Kingdom", "Canada", "Australia", "United Arab Emirates", "Singapore", "Germany"].includes(p.residenceCountry)) {
+            setResidenceCountry(p.residenceCountry);
+          } else {
+            setResidenceCountry("Other");
+            setCustomResidenceCountry(p.residenceCountry);
+          }
+        }
+        if (p.taxCountryType) setTaxCountryType(p.taxCountryType);
+        if (p.taxCountry) setTaxCountry(p.taxCountry);
+        if (p.dateOfBirth) setDateOfBirth(p.dateOfBirth);
+        if (p.maritalStatus) setMaritalStatus(p.maritalStatus);
+        if (p.supportDependents) setSupportDependents(p.supportDependents);
+        if (p.incomeSources) {
+          const parsed = p.incomeSources.split(",").map((s: string) => s.trim()).filter(Boolean);
+          if (parsed.length > 0) setIncomeSources(parsed);
+        }
+        if (p.annualIncome !== undefined && p.annualIncome !== null && p.annualIncome > 0) {
+          setAnnualIncome(p.annualIncome);
+        } else if (p.salaryIncome) {
+          setAnnualIncome(p.salaryIncome);
+        }
+        if (p.hasMultipleIncomeSources !== undefined) setHasMultipleIncomeSources(p.hasMultipleIncomeSources);
+        if (p.hasForeignIncome !== undefined) setHasForeignIncome(p.hasForeignIncome);
+        if (p.hasSoldAssets !== undefined) setHasSoldAssets(p.hasSoldAssets);
+        if (p.paysRent !== undefined) setPaysRent(p.paysRent);
+        if (p.hasHomeLoan !== undefined) setHasHomeLoan(p.hasHomeLoan);
+        if (p.paysHealthInsurance !== undefined) setPaysHealthInsurance(p.paysHealthInsurance);
+        if (p.investsOrSaves !== undefined) setInvestsOrSaves(p.investsOrSaves);
+        if (p.paysEducationLoan !== undefined) setPaysEducationLoan(p.paysEducationLoan);
+        setSalary(p.salaryIncome ?? 0);
+        setFreelance(p.freelanceIncome ?? 0);
+        setRental(p.rentalIncome ?? 0);
+        setCapitalGains(p.capitalGains ?? 0);
+        setOtherIncome(p.otherIncome ?? 0);
+        setDed80C(p.deduction80c ?? 0);
+        setDed80D(p.deduction80d ?? 0);
+        setDed80CCD(p.deduction80ccd ?? 0);
+        setDed24b(p.deduction24b ?? 0);
+        setDed80G(p.deduction80g ?? 0);
+        setHraBasic(p.hraBasic ?? 0);
+        setHraReceived(p.hraReceived ?? 0);
+        setHraRentPaid(p.hraRentPaid ?? 0);
+        setHraIsMetro(p.hraIsMetro ?? false);
         setSelectedRegime(p.selectedRegime === "OLD" ? "Old" : "New");
         setTaxOnboardingCompleted(p.taxOnboardingCompleted);
       }
@@ -88,10 +170,66 @@ export default function TaxPlannerView() {
     }
   }, []);
 
+  const fetchUserDebts = React.useCallback(async () => {
+    if (!dbUser?.userId) return;
+    try {
+      const res = await apiClient.get(`/v1/debt/users/${dbUser.userId}`);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const debtsList = res.data.data;
+        const homeLoans = debtsList.filter((d: any) => {
+          const text = ((d.categoryName || "") + " " + (d.name || "")).toLowerCase();
+          return text.includes("home") || text.includes("housing") || text.includes("mortgage") || text.includes("property");
+        });
+        const eduLoans = debtsList.filter((d: any) => {
+          const text = ((d.categoryName || "") + " " + (d.name || "")).toLowerCase();
+          return text.includes("education") || text.includes("edu") || text.includes("student") || text.includes("college") || text.includes("tuition");
+        });
+        setDetectedHomeLoans(homeLoans);
+        setDetectedEduLoans(eduLoans);
+        if (homeLoans.length > 0) {
+          setHasHomeLoan(true);
+        }
+        if (eduLoans.length > 0) {
+          setPaysEducationLoan(true);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch user debts for tax planning", err);
+    }
+  }, [dbUser?.userId]);
+
   const saveTaxProfile = async (updates: any) => {
     try {
+      const activeResidenceCountry = updates.residenceCountry !== undefined
+        ? updates.residenceCountry
+        : (residenceCountry === "Other" && customResidenceCountry ? customResidenceCountry : residenceCountry);
+
+      const activeIncomeSources = updates.incomeSources !== undefined
+        ? updates.incomeSources
+        : incomeSources;
+
+      const activeAnnualIncome = updates.annualIncome !== undefined
+        ? updates.annualIncome
+        : (annualIncome || updates.salary || salary);
+
       const payload = {
-        salaryIncome: updates.salary ?? salary,
+        residenceCountry: activeResidenceCountry,
+        taxCountryType: updates.taxCountryType ?? taxCountryType,
+        taxCountry: updates.taxCountry ?? (taxCountryType === "Same as where I live" ? activeResidenceCountry : taxCountry),
+        dateOfBirth: updates.dateOfBirth !== undefined ? updates.dateOfBirth : dateOfBirth,
+        maritalStatus: updates.maritalStatus ?? maritalStatus,
+        supportDependents: updates.supportDependents ?? supportDependents,
+        incomeSources: Array.isArray(activeIncomeSources) ? activeIncomeSources.join(", ") : activeIncomeSources,
+        annualIncome: activeAnnualIncome,
+        hasMultipleIncomeSources: updates.hasMultipleIncomeSources !== undefined ? updates.hasMultipleIncomeSources : hasMultipleIncomeSources,
+        hasForeignIncome: updates.hasForeignIncome !== undefined ? updates.hasForeignIncome : hasForeignIncome,
+        hasSoldAssets: updates.hasSoldAssets !== undefined ? updates.hasSoldAssets : hasSoldAssets,
+        paysRent: updates.paysRent !== undefined ? updates.paysRent : paysRent,
+        hasHomeLoan: updates.hasHomeLoan !== undefined ? updates.hasHomeLoan : hasHomeLoan,
+        paysHealthInsurance: updates.paysHealthInsurance !== undefined ? updates.paysHealthInsurance : paysHealthInsurance,
+        investsOrSaves: updates.investsOrSaves !== undefined ? updates.investsOrSaves : investsOrSaves,
+        paysEducationLoan: updates.paysEducationLoan !== undefined ? updates.paysEducationLoan : paysEducationLoan,
+        salaryIncome: updates.salary ?? (salary || activeAnnualIncome),
         freelanceIncome: updates.freelance ?? freelance,
         rentalIncome: updates.rental ?? rental,
         capitalGains: updates.capitalGains ?? capitalGains,
@@ -158,7 +296,8 @@ export default function TaxPlannerView() {
     fetchTaxProfile();
     fetchAutoDetections();
     fetchDocuments();
-  }, [fetchTaxProfile, fetchAutoDetections, fetchDocuments]);
+    fetchUserDebts();
+  }, [fetchTaxProfile, fetchAutoDetections, fetchDocuments, fetchUserDebts]);
 
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,149 +483,745 @@ export default function TaxPlannerView() {
   };
 
   if (taxOnboardingCompleted === false) {
+    const age = calculateAge(dateOfBirth);
+
     return (
       <div className="relative flex min-h-[600px] items-center justify-center bg-zinc-50 dark:bg-zinc-950/20 px-4 sm:px-6 overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 transition-all">
         {/* Decorative Gradients */}
-        <div className="absolute top-[-10%] right-[-10%] h-[300px] w-[300px] rounded-full bg-emerald-500/5 blur-[80px]" />
-        <div className="absolute bottom-[-10%] left-[-10%] h-[300px] w-[300px] rounded-full bg-blue-500/5 blur-[80px]" />
+        <div className="absolute top-[-10%] right-[-10%] h-[300px] w-[300px] rounded-full bg-blue-500/5 blur-[80px]" />
+        <div className="absolute bottom-[-10%] left-[-10%] h-[300px] w-[300px] rounded-full bg-emerald-500/5 blur-[80px]" />
 
         <div className="w-full max-w-2xl rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-xl relative z-10 text-zinc-900 dark:text-zinc-150 my-8">
           
           {/* Progress Header */}
           <div className="mb-8">
             <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
-              <span>Tax Planner Setup</span>
-              <span>Step {onboardingStep} of 3</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-blue-600 dark:text-blue-400">TAX PLANNER SETUP</span>
+                {onboardingStep === 1 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    Form 1: Personal Profile
+                  </span>
+                )}
+              </div>
+              <span>Step {onboardingStep} of 4</span>
             </div>
             <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
-                style={{ width: `${(onboardingStep / 3) * 100}%` }}
+                className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 transition-all duration-300"
+                style={{ width: `${(onboardingStep / 4) * 100}%` }}
               />
             </div>
           </div>
 
-          {/* Step 1: Incomes */}
+          {/* ==========================================
+              Step 1: Form 1 - Tax Residency & Personal Profile
+              ========================================== */}
           {onboardingStep === 1 && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Step 1: Your Annual Incomes</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Please enter your estimated annual incomes for the financial year.</p>
+              <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  Step 1: Tax Residency & Personal Profile (Form 1)
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  Answer these essential questions to personalize tax rules, residency regulations, age benefits, and family deductions.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Salary Income (Per Annum)</label>
-                  <input
-                    type="number"
-                    value={salary}
-                    onChange={(e) => setSalary(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+              <div className="space-y-4">
+                {/* 1. Which country do you live in? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5 text-blue-600" />
+                      1. Which country do you live in?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Local tax rules
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select
+                      value={residenceCountry}
+                      onChange={(e) => setResidenceCountry(e.target.value)}
+                      className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs font-medium text-zinc-900 dark:text-zinc-100"
+                    >
+                      <option value="India">India</option>
+                      <option value="United States">United States</option>
+                      <option value="United Kingdom">United Kingdom</option>
+                      <option value="Canada">Canada</option>
+                      <option value="Australia">Australia</option>
+                      <option value="United Arab Emirates">United Arab Emirates</option>
+                      <option value="Singapore">Singapore</option>
+                      <option value="Germany">Germany</option>
+                      <option value="Other">Other (Custom)</option>
+                    </select>
+                    {residenceCountry === "Other" && (
+                      <input
+                        type="text"
+                        placeholder="Enter country name"
+                        value={customResidenceCountry}
+                        onChange={(e) => setCustomResidenceCountry(e.target.value)}
+                        className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs text-zinc-900 dark:text-zinc-100"
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Freelance / Business Income</label>
-                  <input
-                    type="number"
-                    value={freelance}
-                    onChange={(e) => setFreelance(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 2. Which country do you pay taxes in? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                      2. Which country do you pay taxes in?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Tax residency / cross-border rules
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { val: "Same as where I live", label: "Same as where I live" },
+                      { val: "Another country", label: "Another country" },
+                      { val: "Both", label: "Both" }
+                    ].map((opt) => (
+                      <button
+                        key={opt.val}
+                        type="button"
+                        onClick={() => setTaxCountryType(opt.val)}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          taxCountryType === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {(taxCountryType === "Another country" || taxCountryType === "Both") && (
+                    <div className="pt-1">
+                      <input
+                        type="text"
+                        placeholder="Specify secondary or alternate tax country"
+                        value={taxCountry}
+                        onChange={(e) => setTaxCountry(e.target.value)}
+                        className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Rental Income Received</label>
-                  <input
-                    type="number"
-                    value={rental}
-                    onChange={(e) => setRental(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 3. What is your date of birth? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Cake className="h-3.5 w-3.5 text-purple-600" />
+                      3. What is your date of birth?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Age-based tax benefits and rules
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                    <input
+                      type="date"
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs text-zinc-900 dark:text-zinc-100"
+                    />
+                    {dateOfBirth && age !== null && (
+                      <div className="p-2.5 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/80 rounded-xl flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                        <span className="truncate">
+                          Age: <strong>{age} yrs</strong> • {age >= 80 ? "Super Senior (80+)" : age >= 60 ? "Senior Citizen (60+)" : "Standard Individual"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Capital Gains</label>
-                  <input
-                    type="number"
-                    value={capitalGains}
-                    onChange={(e) => setCapitalGains(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 4. What is your marital status? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Heart className="h-3.5 w-3.5 text-rose-500" />
+                      4. What is your marital status?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Family-related tax rules
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {["Single", "Married", "Divorced", "Widowed"].map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setMaritalStatus(status)}
+                        className={`h-9 rounded-xl text-xs font-semibold px-2 transition-all border text-center ${
+                          maritalStatus === status
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Other Income (Interest, Dividends, etc.)</label>
-                  <input
-                    type="number"
-                    value={otherIncome}
-                    onChange={(e) => setOtherIncome(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 5. Do you financially support anyone? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-amber-600" />
+                      5. Do you financially support anyone?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Dependents & deductions
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      "No",
+                      "Yes — Children",
+                      "Yes — Parents",
+                      "Yes — Spouse",
+                      "Yes — Other"
+                    ].map((dep) => (
+                      <button
+                        key={dep}
+                        type="button"
+                        onClick={() => setSupportDependents(dep)}
+                        className={`h-9 rounded-xl text-xs font-semibold px-2 transition-all border text-center ${
+                          supportDependents === dep
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {dep}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 2: Deductions */}
+          {/* ==========================================
+              Step 2: Form 2 - Income Sources & Earnings
+              ========================================== */}
           {onboardingStep === 2 && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Step 2: Tax Deductions (Section 80)</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Provide any investments or premiums eligible for tax deductions under the Old Regime.</p>
+              <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                    Step 2: Income Sources & Earnings (Form 2)
+                  </h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    Form 2 / Incomes
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  Answer these questions regarding how you generate revenue, multiple streams, cross-border receipts, and asset disposals.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80C (PPF, LIC, ELSS, EPF - Max ₹1.5L)</label>
-                  <input
-                    type="number"
-                    value={ded80C}
-                    onChange={(e) => setDed80C(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+              <div className="space-y-4">
+                {/* 1. How do you earn your money? (Multi-select) */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Coins className="h-3.5 w-3.5 text-emerald-600" />
+                      1. How do you earn your money? (Select all that apply)
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Determines which tax rules apply
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {["Salary", "Business", "Freelance", "Rent", "Investments", "Pension", "Other"].map((src) => {
+                      const isSelected = incomeSources.includes(src);
+                      return (
+                        <button
+                          key={src}
+                          type="button"
+                          onClick={() => {
+                            let updated: string[];
+                            if (isSelected) {
+                              updated = incomeSources.filter((s) => s !== src);
+                              if (updated.length === 0) updated = ["Salary"];
+                            } else {
+                              updated = [...incomeSources, src];
+                            }
+                            setIncomeSources(updated);
+                            if (updated.length > 1) {
+                              setHasMultipleIncomeSources(true);
+                            }
+                          }}
+                          className={`h-9 rounded-xl text-xs font-semibold px-3.5 transition-all border flex items-center gap-1.5 ${
+                            isSelected
+                              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                              : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                          }`}
+                        >
+                          {isSelected && <Check className="h-3 w-3" />}
+                          {src}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80D (Health Insurance self+parents)</label>
-                  <input
-                    type="number"
-                    value={ded80D}
-                    onChange={(e) => setDed80D(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 2. How much money do you earn in a year? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Calculator className="h-3.5 w-3.5 text-blue-600" />
+                      2. How much money do you earn in a year?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Main basis for tax calculation
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-zinc-400">₹</span>
+                    <input
+                      type="number"
+                      placeholder="e.g. 1500000"
+                      value={annualIncome || ""}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setAnnualIncome(val);
+                        setSalary(val);
+                      }}
+                      className="w-full h-10 pl-7 pr-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm font-bold text-zinc-900 dark:text-zinc-100"
+                    />
+                  </div>
+                  {annualIncome > 0 && (
+                    <div className="text-[11px] text-zinc-500 font-medium">
+                      Estimated Monthly Inflow: <strong className="text-zinc-800 dark:text-zinc-200">{formatRupee(Math.round(annualIncome / 12))}</strong> / month
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80CCD (NPS - Max ₹50k)</label>
-                  <input
-                    type="number"
-                    value={ded80CCD}
-                    onChange={(e) => setDed80CCD(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 3. Do you have more than one income source? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-indigo-600" />
+                      3. Do you have more than one income source?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Combines all income for tax calculation
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes, I have multiple sources", val: true },
+                      { label: "No, single primary source", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => setHasMultipleIncomeSources(opt.val)}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          hasMultipleIncomeSources === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 24b (Home Loan Interest - Max ₹2L)</label>
-                  <input
-                    type="number"
-                    value={ded24b}
-                    onChange={(e) => setDed24b(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 4. Do you earn money from another country? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5 text-teal-600" />
+                      4. Do you earn money from another country?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Foreign income & DTAA tax rules
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes (Foreign Inflow / DTAA)", val: true },
+                      { label: "No (Domestic only)", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => setHasForeignIncome(opt.val)}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          hasForeignIncome === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Section 80G (Charitable Donations)</label>
-                  <input
-                    type="number"
-                    value={ded80G}
-                    onChange={(e) => setDed80G(Number(e.target.value))}
-                    className="w-full h-10 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors text-sm text-zinc-900 dark:text-zinc-100"
-                  />
+
+                {/* 5. Did you sell any investments, property, or other assets this year? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-rose-500" />
+                      5. Did you sell any investments, property, or other assets this year?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Capital gains / loss offsets
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes (Stocks, Real Estate, Crypto)", val: true },
+                      { label: "No asset sales", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => {
+                          setHasSoldAssets(opt.val);
+                          if (!opt.val) setCapitalGains(0);
+                        }}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          hasSoldAssets === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {hasSoldAssets && (
+                    <div className="pt-1">
+                      <label className="text-[11px] font-medium text-zinc-500 mb-1 block">Estimated net Capital Gains (optional):</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 100000"
+                        value={capitalGains || ""}
+                        onChange={(e) => setCapitalGains(Number(e.target.value))}
+                        className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs text-zinc-900 dark:text-zinc-100 font-semibold"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 3: HRA & Regime Preference */}
+          {/* ==========================================
+              Step 3: Form 3 - Deductions & Financial Commitments
+              ========================================== */}
           {onboardingStep === 3 && (
             <div className="space-y-6">
+              <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-purple-600" />
+                    Step 3: Deductions & Commitments (Form 3)
+                  </h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                    Form 3 / Deductions
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  Identify your rent, active debts, insurance, and investments to maximize your tax deductions and exemptions.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {/* 1. Do you pay rent? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Home className="h-3.5 w-3.5 text-blue-600" />
+                      1. Do you pay rent?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Possible housing/rent tax benefits
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes, I pay rent", val: true },
+                      { label: "No, own house / no rent", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => {
+                          setPaysRent(opt.val);
+                          if (!opt.val) setHraRentPaid(0);
+                        }}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          paysRent === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {paysRent && (
+                    <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-zinc-500 mb-1 block">Annual Rent Paid:</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 180000"
+                          value={hraRentPaid || ""}
+                          onChange={(e) => setHraRentPaid(Number(e.target.value))}
+                          className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                        />
+                      </div>
+                      <div className="flex items-end pb-1 text-[11px] text-zinc-500">
+                        Monthly: <strong className="ml-1 text-zinc-800 dark:text-zinc-200">{formatRupee(Math.round((hraRentPaid || 0) / 12))}/mo</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Do you have a home loan? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <Home className="h-3.5 w-3.5 text-indigo-600" />
+                      2. Do you have a home loan?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Possible home-loan tax benefits
+                    </span>
+                  </div>
+
+                  {detectedHomeLoans.length > 0 && (
+                    <div className="p-2.5 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/80 rounded-xl flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>
+                          <strong>Auto-detected from Debts:</strong> {detectedHomeLoans[0].name} ({formatRupee(detectedHomeLoans[0].outstanding || detectedHomeLoans[0].principal)})
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-md">
+                        Debt Table Synced
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes, I have an active home loan", val: true },
+                      { label: "No home loan", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => {
+                          setHasHomeLoan(opt.val);
+                          if (!opt.val) setDed24b(0);
+                        }}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          hasHomeLoan === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {hasHomeLoan && (
+                    <div className="pt-1">
+                      <label className="text-[11px] font-medium text-zinc-500 mb-1 block">Annual Interest deduction under Sec 24(b) (Max ₹2,00,000):</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 150000"
+                        value={ded24b || ""}
+                        onChange={(e) => setDed24b(Number(e.target.value))}
+                        className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Do you pay for health insurance? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <ShieldPlus className="h-3.5 w-3.5 text-rose-500" />
+                      3. Do you pay for health insurance?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Possible health-related tax benefits (Section 80D)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes, I pay health insurance premiums", val: true },
+                      { label: "No health insurance", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => {
+                          setPaysHealthInsurance(opt.val);
+                          if (!opt.val) setDed80D(0);
+                        }}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          paysHealthInsurance === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {paysHealthInsurance && (
+                    <div className="pt-1">
+                      <label className="text-[11px] font-medium text-zinc-500 mb-1 block">Annual Health Insurance Premiums under Sec 80D (Self & Parents):</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 25000"
+                        value={ded80D || ""}
+                        onChange={(e) => setDed80D(Number(e.target.value))}
+                        className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Do you invest or save money? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <PiggyBank className="h-3.5 w-3.5 text-emerald-600" />
+                      4. Do you invest or save money?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Finds tax-saving opportunities (Section 80C & NPS)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes (PPF, EPF, ELSS, NPS, Life Insurance)", val: true },
+                      { label: "No savings / investments", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => {
+                          setInvestsOrSaves(opt.val);
+                          if (!opt.val) {
+                            setDed80C(0);
+                            setDed80CCD(0);
+                          }
+                        }}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          investsOrSaves === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {investsOrSaves && (
+                    <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-zinc-500 mb-1 block">Section 80C (PPF, ELSS, EPF, LIC - Max ₹1.5L):</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 150000"
+                          value={ded80C || ""}
+                          onChange={(e) => setDed80C(Number(e.target.value))}
+                          className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-zinc-500 mb-1 block">Section 80CCD(1B) (NPS - Max ₹50,000):</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 50000"
+                          value={ded80CCD || ""}
+                          onChange={(e) => setDed80CCD(Number(e.target.value))}
+                          className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Do you pay for education or an education loan? */}
+                <div className="bg-zinc-50/70 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                      <GraduationCap className="h-3.5 w-3.5 text-amber-600" />
+                      5. Do you pay for education or an education loan?
+                    </label>
+                    <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-800 self-start sm:self-auto">
+                      Why it matters: Possible education-related benefits (Sec 80E interest deduction)
+                    </span>
+                  </div>
+
+                  {detectedEduLoans.length > 0 && (
+                    <div className="p-2.5 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/80 rounded-xl flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>
+                          <strong>Auto-detected from Debts:</strong> {detectedEduLoans[0].name} ({formatRupee(detectedEduLoans[0].outstanding || detectedEduLoans[0].principal)})
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-md">
+                        Debt Table Synced
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Yes, active education loan / tuition fees", val: true },
+                      { label: "No education loan", val: false }
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => setPaysEducationLoan(opt.val)}
+                        className={`h-9 rounded-xl text-xs font-semibold px-3 transition-all border text-center ${
+                          paysEducationLoan === opt.val
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              Step 4: HRA & Regime Preference
+              ========================================== */}
+          {onboardingStep === 4 && (
+            <div className="space-y-6">
               <div>
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Step 3: HRA & Preferred Regime</h3>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Step 4: HRA & Preferred Regime</h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Configure your rent details for HRA exemption and select your preferred tax regime.</p>
               </div>
 
@@ -590,10 +1325,13 @@ export default function TaxPlannerView() {
               Back
             </Button>
 
-            {onboardingStep < 3 ? (
+            {onboardingStep < 4 ? (
               <Button
                 type="button"
-                onClick={() => setOnboardingStep((prev) => prev + 1)}
+                onClick={async () => {
+                  await saveTaxProfile({});
+                  setOnboardingStep((prev) => prev + 1);
+                }}
                 className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all"
               >
                 Next
@@ -617,6 +1355,8 @@ export default function TaxPlannerView() {
     );
   }
 
+  const currentAge = calculateAge(dateOfBirth);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
@@ -625,10 +1365,163 @@ export default function TaxPlannerView() {
           <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Tax Planner & Filing</h2>
           <p className="text-sm text-zinc-500 mt-1">Optimize your taxable yield assumptions, verify auto tax sections, and file Indian ITR returns.</p>
         </div>
-        <Button onClick={handleDownloadReport} className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]">
-          <Download className="h-4 w-4 mr-1.5" />
-          Download Tax Report PDF
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setOnboardingStep(1);
+              setTaxOnboardingCompleted(false);
+            }}
+            className="h-10 px-3.5 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:bg-zinc-50 rounded-xl font-semibold transition-all flex items-center gap-1.5"
+          >
+            <Edit3 className="h-4 w-4 text-blue-600" />
+            Edit Profile (Form 1)
+          </Button>
+          <Button onClick={handleDownloadReport} className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]">
+            <Download className="h-4 w-4 mr-1.5" />
+            Download Tax Report PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* ==========================================
+          0. Form 1, Form 2 & Form 3 Summary Banners
+          ========================================== */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Form 1 Card */}
+        <div className="rounded-2xl border border-blue-150/80 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-zinc-900">Personal & Residency</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">Form 1</span>
+                </div>
+                <p className="text-xs text-zinc-500 mt-0.5">Residency & age bracket</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setOnboardingStep(1);
+                setTaxOnboardingCompleted(false);
+              }}
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50/80 h-7 px-2 rounded-lg"
+            >
+              Edit →
+            </Button>
+          </div>
+
+          <div className="space-y-1.5 mt-4 pt-3 border-t border-blue-100/70 text-xs">
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Country:</span>
+              <span className="font-bold text-zinc-900 truncate max-w-[140px]">{residenceCountry === "Other" && customResidenceCountry ? customResidenceCountry : residenceCountry}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Tax Jurisdiction:</span>
+              <span className="font-bold text-zinc-900 truncate max-w-[140px]">{taxCountryType === "Same as where I live" ? residenceCountry : `${taxCountryType} (${taxCountry})`}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Age & Status:</span>
+              <span className="font-bold text-zinc-900">{currentAge !== null ? `${currentAge}y` : "N/A"} • {maritalStatus}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Form 2 Card */}
+        <div className="rounded-2xl border border-emerald-150/80 bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                <Coins className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-zinc-900">Income Sources</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Form 2</span>
+                </div>
+                <p className="text-xs text-zinc-500 mt-0.5">Earnings & multiple streams</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setOnboardingStep(2);
+                setTaxOnboardingCompleted(false);
+              }}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50/80 h-7 px-2 rounded-lg"
+            >
+              Edit →
+            </Button>
+          </div>
+
+          <div className="space-y-1.5 mt-4 pt-3 border-t border-emerald-100/70 text-xs">
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Sources:</span>
+              <span className="font-bold text-zinc-900 truncate max-w-[140px]">{incomeSources.join(", ") || "Salary"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Annual Total:</span>
+              <span className="font-bold text-zinc-900">{formatRupee(annualIncome || grossIncome)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Foreign / Assets:</span>
+              <span className="font-bold text-zinc-900">
+                {hasForeignIncome ? "Foreign" : "Domestic"} • {hasSoldAssets ? "Asset Sales" : "None"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Form 3 Card */}
+        <div className="rounded-2xl border border-purple-150/80 bg-gradient-to-r from-purple-50/70 via-fuchsia-50/40 to-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white shadow-sm">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-zinc-900">Deductions & Loans</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">Form 3</span>
+                </div>
+                <p className="text-xs text-zinc-500 mt-0.5">Rent, debts, and savings</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setOnboardingStep(3);
+                setTaxOnboardingCompleted(false);
+              }}
+              className="text-xs font-bold text-purple-700 hover:text-purple-800 hover:bg-purple-50/80 h-7 px-2 rounded-lg"
+            >
+              Edit →
+            </Button>
+          </div>
+
+          <div className="space-y-1.5 mt-4 pt-3 border-t border-purple-100/70 text-xs">
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Rent Paid:</span>
+              <span className="font-bold text-zinc-900">{paysRent ? formatRupee(hraRentPaid) : "No"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Active Loans:</span>
+              <span className="font-bold text-zinc-900">
+                {hasHomeLoan ? "Home Loan" : ""}{hasHomeLoan && paysEducationLoan ? " & " : ""}{paysEducationLoan ? "Edu Loan" : ""}{!hasHomeLoan && !paysEducationLoan ? "None" : ""}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Insurance & 80C:</span>
+              <span className="font-bold text-zinc-900">
+                {paysHealthInsurance ? "Health Ins." : "No Ins."} • {investsOrSaves ? "Investments" : "No 80C"}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Grid of Rounded Cards */}
