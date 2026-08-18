@@ -8,7 +8,6 @@ import {
   Plus,
   FileText,
   MessageSquare,
-  Mail,
   ChevronLeft,
   Calendar,
   Sparkles,
@@ -33,6 +32,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import SmsAppModal from "./sms-app-modal";
 
 interface TransactionOnboardingDrawerProps {
   isOpen: boolean;
@@ -73,13 +73,6 @@ const getMockSMSAlerts = () => [
   { id: "sms_4", date: "2026-07-08", amount: 15.00, merchant: "Spotify Premium", category: "Entertainment", raw: "VPA Auto Debit: Spotify Premium USD 15.00 from A/C *4829.", type: "expense", account: "Chase checking (*4829)", method: "UPI / Instant Pay", isDuplicate: true }, // will trigger duplicate warning
 ];
 
-const getMockGmailAlerts = () => [
-  { id: "gmail_1", date: "2026-07-10", amount: 89.90, merchant: "Amazon Inc", category: "Shopping", subject: "Your Amazon order confirmation - #114-82901", type: "expense", account: "Chase Sapphire (*9930)", method: "Credit Card" },
-  { id: "gmail_2", date: "2026-07-08", amount: 24.50, merchant: "Uber Eats", category: "Food & Dining", subject: "Your receipt from Uber Eats order", type: "expense", account: "Chase Sapphire (*9930)", method: "Credit Card" },
-  { id: "gmail_3", date: "2026-07-07", amount: 65.00, merchant: "Shell Gas Station", category: "Fuel", subject: "Shell Receipt for pumps transactions", type: "expense", account: "Cash / Petty Cash", method: "Cash" },
-  { id: "gmail_4", date: "2026-07-05", amount: 14.99, merchant: "Netflix.com", category: "Entertainment", subject: "Netflix Subscription Renewal Invoice", type: "expense", account: "Amex Gold (*1002)", method: "Credit Card", isDuplicate: true },
-];
-
 export default function TransactionOnboardingDrawer({
   isOpen,
   onClose,
@@ -92,7 +85,7 @@ export default function TransactionOnboardingDrawer({
 
   React.useEffect(() => {
     if (isOpen && dbUser) {
-      apiClient.get(`/v1/category/users/${dbUser.userId}`)
+      apiClient.get(`/v1/transactioncategory/users/${dbUser.userId}`)
         .then(res => {
           if (res.data && res.data.success) {
             setBackendCategories(res.data.data);
@@ -114,11 +107,10 @@ export default function TransactionOnboardingDrawer({
 
   // Steps: 1 = Selector, 2 = Connection / Inputs, 3 = Column Mapping (Files Only), 4 = Preview, 5 = Summary
   const [step, setStep] = React.useState(1);
-  const [importMethod, setImportMethod] = React.useState<"manual" | "file" | "sms" | "gmail" | null>(null);
+  const [importMethod, setImportMethod] = React.useState<"manual" | "file" | "sms" | null>(null);
 
   // Help Article Modals
   const [showSMSHelp, setShowSMSHelp] = React.useState(false);
-  const [showGmailHelp, setShowGmailHelp] = React.useState(false);
 
   // Simulated state for UI actions
   const [dragActive, setDragActive] = React.useState(false);
@@ -360,29 +352,11 @@ export default function TransactionOnboardingDrawer({
     }
   };
 
-  // Connect SMS / Gmail flows
-  const handleConnectIntegration = async (method: "sms" | "gmail") => {
+  // Connect SMS flow
+  const handleConnectIntegration = (method: "sms") => {
     if (method === "sms") {
       setPreviewTransactions(getMockSMSAlerts());
       setStep(4);
-      return;
-    }
-
-    setConnectLoading(true);
-    try {
-      await apiClient.post("/v1/imports/gmail/connect", {
-        refreshToken: "mock_gmail_oauth_refresh_token"
-      });
-
-      const res = await apiClient.post("/v1/imports/gmail/sync");
-      if (res.data && res.data.success) {
-        const jobId = res.data.data.id;
-        pollJobStatus(jobId);
-      }
-    } catch (e) {
-      console.error("Gmail integration sync failed", e);
-    } finally {
-      setConnectLoading(false);
     }
   };
 
@@ -536,7 +510,6 @@ export default function TransactionOnboardingDrawer({
                 {step === 2 && importMethod === "manual" && "Record an income, expense, or asset transfer"}
                 {step === 2 && importMethod === "file" && "Select format: CSV, Excel, OFX, or QIF"}
                 {step === 2 && importMethod === "sms" && "Extract details from transaction SMS messages"}
-                {step === 2 && importMethod === "gmail" && "Sync bank accounts via read-only Gmail tokens"}
                 {step === 3 && "Map spreadsheet headers to system columns"}
                 {step === 4 && "Review extracted entries before final submission"}
                 {step === 5 && "Onboarding completed successfully"}
@@ -646,28 +619,6 @@ export default function TransactionOnboardingDrawer({
                     </p>
                     <button className="text-[10px] font-bold text-indigo-600 group-hover:underline flex items-center pt-1.5">
                       Connect SMS <ArrowRight className="h-3 w-3 ml-1" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Gmail card */}
-                <div
-                  onClick={() => { setImportMethod("gmail"); setStep(2); }}
-                  className="group relative flex items-start gap-4 p-4 rounded-xl border border-zinc-200/80 bg-white hover:border-blue-500 hover:shadow-md cursor-pointer transition-all duration-200 active:scale-[0.99]"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors duration-200">
-                    <Mail className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-zinc-800">Option 4 – Import via Gmail</span>
-                      <span className="text-[10px] text-zinc-400 font-bold">Statement Scan</span>
-                    </div>
-                    <p className="text-xs text-zinc-500 leading-relaxed">
-                      Sync transaction notifications, statement e-receipts, and payment emails.
-                    </p>
-                    <button className="text-[10px] font-bold text-rose-600 group-hover:underline flex items-center pt-1.5">
-                      Connect Gmail <ArrowRight className="h-3 w-3 ml-1" />
                     </button>
                   </div>
                 </div>
@@ -1187,76 +1138,6 @@ export default function TransactionOnboardingDrawer({
             </div>
           )}
 
-          {/* 2D: Gmail Sync Connection */}
-          {step === 2 && importMethod === "gmail" && (
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600 mb-2">
-                  <Mail className="h-6 w-6" />
-                </div>
-                <h4 className="text-base font-bold text-zinc-800">Connect Gmail Statements Sync</h4>
-                <p className="text-xs text-zinc-505 max-w-sm mx-auto">
-                  Automatically pull transaction notifications, statements, and bills from supported banking emails.
-                </p>
-              </div>
-
-              {/* Features summary */}
-              <div className="space-y-3 bg-zinc-50 p-4 rounded-xl border border-zinc-150/70">
-                <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Features</p>
-                <ul className="text-xs text-zinc-650 space-y-2">
-                  <li className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <span><strong>OAuth 2.0 Auth:</strong> Directly connect using Google Secure sign-in protocols.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <span><strong>Read-Only Scopes:</strong> Access strictly constrained to search transaction emails.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <span><strong>Auto Bank Detection:</strong> Parses statements for 150+ international banks automatically.</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Help articles link */}
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowGmailHelp(true)}
-                  className="text-xs font-bold text-blue-600 hover:underline flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
-                >
-                  <HelpCircle className="h-4 w-4" /> How to connect Gmail?
-                </button>
-              </div>
-
-              {/* Sticky Actions Footer */}
-              <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-zinc-150 px-6 py-4 -mx-6 -mb-6 pb-6 flex justify-end gap-3 mt-8 z-10">
-                <button
-                  type="button"
-                  onClick={() => { setStep(1); setImportMethod(null); }}
-                  className="px-4 h-9 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-650 transition-colors"
-                >
-                  Cancel
-                </button>
-                <Button
-                  type="button"
-                  onClick={() => handleConnectIntegration("gmail")}
-                  className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-5 h-9 font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
-                  disabled={connectLoading}
-                >
-                  {connectLoading ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Connecting...
-                    </>
-                  ) : (
-                    <>Connect Secure Gmail</>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-
           {/* ==========================================
               STEP 3: FILE COLUMN MAPPING (Files Only)
               ========================================== */}
@@ -1481,10 +1362,10 @@ export default function TransactionOnboardingDrawer({
                           </div>
                         </div>
 
-                        {/* Raw preview detail for SMS / Subject for Gmail */}
-                        {(t.raw || t.subject) && (
+                        {/* Raw preview detail for SMS */}
+                        {t.raw && (
                           <div className="bg-zinc-50 border border-zinc-100 p-2 rounded-lg text-[9px] text-zinc-500 leading-normal font-medium">
-                            {t.raw ? `SMS Body: "${t.raw}"` : `Email: "${t.subject}"`}
+                            SMS Body: "{t.raw}"
                           </div>
                         )}
                       </div>
@@ -1586,111 +1467,11 @@ export default function TransactionOnboardingDrawer({
           MODALS / HELP DIALOGS
           ========================================== */}
 
-      {/* SMS Connect Help Article Dialog */}
-      {showSMSHelp && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-          <div
-            onClick={() => setShowSMSHelp(false)}
-            className="absolute inset-0 bg-zinc-950/60 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
-          />
-          <div className="relative bg-white border border-zinc-200 w-full max-w-md p-6 rounded-2xl shadow-2xl z-10 space-y-4 animate-in zoom-in-95">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
-                  <MessageSquare className="h-5 w-5" />
-                </div>
-                <h4 className="font-extrabold text-zinc-900 text-sm">SMS Import Setup & Guide</h4>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSMSHelp(false)}
-                className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-650 transition-colors cursor-pointer"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
-            </div>
-            
-            <div className="space-y-3.5 text-xs text-zinc-600 leading-relaxed overflow-y-auto max-h-[300px] pr-1">
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">1. Required Permissions</h5>
-                <p>On mobile apps, this integration requires "Read SMS" permission scopes. The app scans messages from verified bank sender codes (e.g. shortcodes like CHASE, AMEX, WELLS).</p>
-              </div>
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">2. Supported Banks</h5>
-                <p>Supports transaction alerts from Chase, Citibank, Amex, Wells Fargo, Bank of America, Capital One, HSBC, and UPI-linked merchant payment providers.</p>
-              </div>
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">3. Privacy Policy</h5>
-                <p>We do not scan personal messages. Our parser utilizes regex filters matching only financial keyword tags (e.g. "spent", "credited", "debited", "ATM withdrawal").</p>
-              </div>
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">4. Data Security</h5>
-                <p>Parsing is performed locally on-device. Extracted raw digits are normalized and transmitted using secure TLS/SSL tunnels directly to your encrypted server vault.</p>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => setShowSMSHelp(false)}
-              className="w-full h-9 bg-zinc-950 text-white text-xs font-bold rounded-xl hover:bg-zinc-800 cursor-pointer"
-            >
-              Understand & Close
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Gmail Connect Help Article Dialog */}
-      {showGmailHelp && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-          <div
-            onClick={() => setShowGmailHelp(false)}
-            className="absolute inset-0 bg-zinc-950/60 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
-          />
-          <div className="relative bg-white border border-zinc-200 w-full max-w-md p-6 rounded-2xl shadow-2xl z-10 space-y-4 animate-in zoom-in-95">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-rose-50 text-rose-600">
-                  <Mail className="h-5 w-5" />
-                </div>
-                <h4 className="font-extrabold text-zinc-900 text-sm">Gmail Sync Connection Setup</h4>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGmailHelp(false)}
-                className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-650 transition-colors cursor-pointer"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
-            </div>
-            
-            <div className="space-y-3.5 text-xs text-zinc-650 leading-relaxed overflow-y-auto max-h-[300px] pr-1">
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">1. Gmail OAuth Connection</h5>
-                <p>Authenticating redirects you securely to Google Accounts. You grant permission for FinOne to connect to your Gmail inbox via API tokens.</p>
-              </div>
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">2. Scoped Inbox Permissions</h5>
-                <p>We request access to search and view messages. We only inspect bank statements, invoice confirmations, and notifications fitting bank domains.</p>
-              </div>
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">3. Privacy & Security</h5>
-                <p>FinOne never stores Google account credentials. Access tokens are encrypted inside an isolated credential container. You can revoke access at any time from Google's Account settings panel.</p>
-              </div>
-              <div className="space-y-1">
-                <h5 className="font-bold text-zinc-800 text-[11px] uppercase tracking-wider">4. Supported Statements</h5>
-                <p>Supports automatic bank notification statements, subscription invoices (Netflix, Spotify, AWS), and UPI/wallet receipts.</p>
-              </div>
-            </div>
-
-            <Button
-              onClick={() => setShowGmailHelp(false)}
-              className="w-full h-9 bg-zinc-950 text-white text-xs font-bold rounded-xl hover:bg-zinc-800 cursor-pointer"
-            >
-              Understand & Close
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* SMS Connect Help & App Download Modal */}
+      <SmsAppModal
+        isOpen={showSMSHelp}
+        onClose={() => setShowSMSHelp(false)}
+      />
 
     </div>
   );

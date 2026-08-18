@@ -20,7 +20,6 @@ import {
   SlidersHorizontal,
   FolderSync,
   MessageSquare,
-  Mail,
   Tag,
   X,
   ChevronDown,
@@ -44,6 +43,7 @@ import { useAuth } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/use-currency";
 import { apiClient } from "@/lib/api";
 import ReviewQueueDrawer from "./review-queue-drawer";
+import SmsAppModal from "./sms-app-modal";
 
 // ============================================================
 // TYPES
@@ -293,6 +293,7 @@ export default function MoneyFlowView() {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   const [drawerMode, setDrawerMode] = React.useState<"manual" | "import" | null>(null);
   const [isWizardOpen, setIsWizardOpen] = React.useState(false);
+  const [isSmsModalOpen, setIsSmsModalOpen] = React.useState(false);
 
   // ---- Review Queue ----
   const [reviewCount, setReviewCount] = React.useState(0);
@@ -336,7 +337,7 @@ export default function MoneyFlowView() {
     try {
       const [txRes, catRes, billRes, budgetRes, incRes, cardRes] = await Promise.all([
         apiClient.get(`/v1/transaction/users/${dbUser.userId}`),
-        apiClient.get(`/v1/category/users/${dbUser.userId}`),
+        apiClient.get(`/v1/transactioncategory/users/${dbUser.userId}`),
         apiClient.get(`/v1/bill/users/${dbUser.userId}`),
         apiClient.get(`/v1/budget/users/${dbUser.userId}`),
         apiClient.get(`/v1/income/users/${dbUser.userId}`),
@@ -518,6 +519,7 @@ export default function MoneyFlowView() {
               setIsDrawerOpen(true);
             }
           }}
+          onOpenSmsModal={() => setIsSmsModalOpen(true)}
         />
       )}
 
@@ -614,7 +616,7 @@ export default function MoneyFlowView() {
             amount: tx.amount,
             category: tx.category?.name || "Uncategorized",
             merchant: tx.merchant,
-            description: tx.note || "Gmail Import",
+            description: tx.note || "Imported",
             type: tx.type?.toLowerCase() || "expense",
             account: tx.accountLast4 ? `Card ending in *${tx.accountLast4}` : "Imported Account",
             paymentMethod: tx.paymentMethod || "Other",
@@ -622,6 +624,12 @@ export default function MoneyFlowView() {
           };
           setTransactions(prev => [newTx, ...prev]);
         }}
+      />
+
+      {/* SMS Mobile App Download Modal */}
+      <SmsAppModal
+        isOpen={isSmsModalOpen}
+        onClose={() => setIsSmsModalOpen(false)}
       />
     </div>
   );
@@ -632,7 +640,7 @@ export default function MoneyFlowView() {
 // ============================================================
 function SpendingTab({
   transactions, setTransactions, expenseList, totalSpending,
-  categories, setCategories, budgets, fmt, currency, onOpenDrawer
+  categories, setCategories, budgets, fmt, currency, onOpenDrawer, onOpenSmsModal
 }: {
   transactions: Transaction[];
   setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
@@ -644,6 +652,7 @@ function SpendingTab({
   fmt: (v: number) => string;
   currency: string;
   onOpenDrawer: (mode: "manual" | "import") => void;
+  onOpenSmsModal?: () => void;
 }) {
   const [search, setSearch] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState("all");
@@ -712,7 +721,7 @@ function SpendingTab({
   const handleAddCategory = async () => {
     if (!newCat.name.trim()) return;
     try {
-      const res = await apiClient.post("/v1/category", {
+      const res = await apiClient.post("/v1/transactioncategory", {
         name: newCat.name,
         color: newCat.color,
         type: "EXPENSE"
@@ -762,20 +771,12 @@ function SpendingTab({
           </Button>
 
           <button
-            onClick={() => onOpenDrawer("import")}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all"
+            onClick={() => onOpenSmsModal ? onOpenSmsModal() : onOpenDrawer("import")}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all cursor-pointer"
             title="Import via SMS"
           >
             <MessageSquare className="h-3.5 w-3.5" />
             SMS
-          </button>
-          <button
-            onClick={() => onOpenDrawer("import")}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
-            title="Import via Gmail"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            Gmail
           </button>
         </div>
       </div>

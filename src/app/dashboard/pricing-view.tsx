@@ -9,7 +9,7 @@ import { apiClient } from "@/lib/api";
 
 export default function PricingView() {
   const { dbUser, refreshUserStatus } = useAuth();
-  
+
   const [billingCycle, setBillingCycle] = React.useState<"monthly" | "lifetime">("monthly");
   const [openFaq, setOpenFaq] = React.useState<number | null>(null);
 
@@ -52,7 +52,7 @@ export default function PricingView() {
 
         if (res.data?.success && res.data?.data) {
           const order = res.data.data;
-          
+
           if (order.isMock) {
             await apiClient.post("/v1/billing/razorpay/verify", {
               razorpayOrderId: order.orderId,
@@ -66,7 +66,7 @@ export default function PricingView() {
             setLoadingPlan(null);
             return;
           }
- 
+
           const options = {
             key: order.keyId,
             amount: order.amount,
@@ -123,7 +123,7 @@ export default function PricingView() {
 
         if (res.data?.success && res.data?.data) {
           const session = res.data.data;
-          
+
           if (session.isMock) {
             await apiClient.post("/v1/billing/dodo/callback", {
               planName,
@@ -183,7 +183,7 @@ export default function PricingView() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-10 pb-20 px-4">
-      
+
       {/* Title Header */}
       <div className="text-center space-y-3 pt-2">
         <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block bg-blue-50/70 px-3 py-1 rounded-full w-fit mx-auto border border-blue-100/50">
@@ -201,21 +201,19 @@ export default function PricingView() {
           <div className="bg-zinc-100 p-1 rounded-xl flex items-center border border-zinc-200/50">
             <button
               onClick={() => setBillingCycle("monthly")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${
-                billingCycle === "monthly"
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${billingCycle === "monthly"
                   ? "bg-white text-zinc-950 shadow-sm"
                   : "text-zinc-500 hover:text-zinc-900"
-              }`}
+                }`}
             >
               Monthly (₹99/mo)
             </button>
             <button
               onClick={() => setBillingCycle("lifetime")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer flex items-center gap-1.5 ${
-                billingCycle === "lifetime"
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer flex items-center gap-1.5 ${billingCycle === "lifetime"
                   ? "bg-emerald-600 text-white shadow-sm"
                   : "text-zinc-500 hover:text-zinc-900"
-              }`}
+                }`}
             >
               Lifetime Pass <span className="bg-emerald-500 text-[9px] font-black text-white px-1.5 py-0.5 rounded uppercase">₹2,500</span>
             </button>
@@ -244,7 +242,7 @@ export default function PricingView() {
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch pt-2 max-w-3xl mx-auto">
-            
+
             {/* FREE PLAN */}
             <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative">
               <div className="space-y-4">
@@ -252,7 +250,7 @@ export default function PricingView() {
                   <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wide block">Starter</span>
                   <h3 className="text-xl font-black text-zinc-900 mt-1">FREE</h3>
                 </div>
-                
+
                 <div className="py-2">
                   <span className="text-3xl font-extrabold text-zinc-950">₹0</span>
                   <span className="text-zinc-500 text-xs font-semibold"> / month</span>
@@ -277,7 +275,7 @@ export default function PricingView() {
               </div>
 
               <div className="pt-8">
-                <Button 
+                <Button
                   disabled
                   className="w-full h-10 bg-zinc-100 text-zinc-400 rounded-xl text-xs font-bold cursor-not-allowed outline-none shadow-sm"
                 >
@@ -297,7 +295,7 @@ export default function PricingView() {
                   <span className="text-[10px] font-black uppercase text-blue-600 tracking-wide block">Full Suite Access</span>
                   <h3 className="text-xl font-black text-zinc-900 mt-1">PRO ACCESS</h3>
                 </div>
-                
+
                 <div className="py-2">
                   <span className="text-3xl font-extrabold text-zinc-950">
                     {billingCycle === "monthly" ? "₹99" : "₹2,500"}
@@ -335,14 +333,13 @@ export default function PricingView() {
               </div>
 
               <div className="pt-8">
-                <Button 
+                <Button
                   onClick={() => handleUpgrade("PRO")}
                   disabled={loadingPlan !== null || isProActive}
-                  className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-md active:scale-[0.98] ${
-                    isProActive 
-                      ? "bg-blue-500/10 border border-blue-500/30 text-blue-600 cursor-default" 
+                  className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-md active:scale-[0.98] ${isProActive
+                      ? "bg-blue-500/10 border border-blue-500/30 text-blue-600 cursor-default"
                       : "bg-blue-600 hover:bg-blue-700 text-white"
-                  }`}
+                    }`}
                 >
                   {loadingPlan === "PRO" ? (
                     <Loader2 className="h-4 w-4 animate-spin mx-auto text-white" />
