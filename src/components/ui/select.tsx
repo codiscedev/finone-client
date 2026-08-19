@@ -12,11 +12,22 @@ interface SelectProps {
   name?: string;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }
 
+function getTextFromChildren(children: any): string {
+  if (children === null || children === undefined) return "";
+  if (typeof children === "string" || typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(getTextFromChildren).join("");
+  if (React.isValidElement(children) && (children.props as any)?.children) {
+    return getTextFromChildren((children.props as any).children);
+  }
+  return String(children);
+}
+
 export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
-  ({ className, value, defaultValue, onChange, name, placeholder, children, ...props }, ref) => {
+  ({ className, value, defaultValue, onChange, name, placeholder, disabled, children, ...props }, ref) => {
     const [isOpen, setIsOpen] = React.useState(false)
     const containerRef = React.useRef<HTMLDivElement>(null)
 
@@ -40,18 +51,20 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
       if (React.isValidElement(child)) {
         const element = child as React.ReactElement<any>
         if (element.type === "option" || (element.type as any).displayName === "option") {
+          const textLabel = getTextFromChildren(element.props.children)
           options.push({
-            value: String(element.props.value !== undefined ? element.props.value : element.props.children || ""),
-            label: String(element.props.children || ""),
+            value: String(element.props.value !== undefined ? element.props.value : textLabel),
+            label: textLabel || String(element.props.value || ""),
           })
         } else if (element.props.children) {
           React.Children.forEach(element.props.children, (nestedChild) => {
             if (React.isValidElement(nestedChild)) {
               const nestedElement = nestedChild as React.ReactElement<any>
               if (nestedElement.type === "option" || (nestedElement.type as any).displayName === "option") {
+                const nestedLabel = getTextFromChildren(nestedElement.props.children)
                 options.push({
-                  value: String(nestedElement.props.value !== undefined ? nestedElement.props.value : nestedElement.props.children || ""),
-                  label: String(nestedElement.props.children || ""),
+                  value: String(nestedElement.props.value !== undefined ? nestedElement.props.value : nestedLabel),
+                  label: nestedLabel || String(nestedElement.props.value || ""),
                 })
               }
             }
@@ -83,9 +96,11 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
       >
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
+          disabled={disabled}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
           className={cn(
             "font-sans flex items-center justify-between w-full h-9 rounded-lg border px-3 bg-zinc-50/50 text-zinc-900 text-sm font-medium focus:outline-none transition-all cursor-pointer text-left",
+            disabled && "opacity-60 cursor-not-allowed",
             isOpen
               ? "border-blue-500 bg-white ring-4 ring-blue-500/10 shadow-sm"
               : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/20",

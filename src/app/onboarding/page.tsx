@@ -20,6 +20,41 @@ import {
   ShieldAlert
 } from "lucide-react";
 
+interface CountryOption {
+  id: string;
+  name: string;
+  codeAlpha2: string;
+  codeAlpha3: string;
+  codeNumeric: string;
+  defaultCurrencyCode?: string;
+  defaultCurrencySymbol?: string;
+  defaultCurrencyName?: string;
+  currencies?: Array<{
+    code: string;
+    name: string;
+    symbol: string;
+    decimalPlaces: number;
+    isDefault?: boolean;
+  }>;
+}
+
+interface CurrencyOption {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  decimalPlaces: number;
+}
+
+function getCountryFlag(countryCode?: string): string {
+  if (!countryCode || countryCode.length !== 2) return "🌐";
+  const codePoints = countryCode
+    .toUpperCase()
+    .split("")
+    .map((char) => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { dbUser, completeOnboarding } = useAuth();
@@ -30,6 +65,11 @@ export default function OnboardingPage() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Reference Data from API
+  const [countriesList, setCountriesList] = React.useState<CountryOption[]>([]);
+  const [currenciesList, setCurrenciesList] = React.useState<CurrencyOption[]>([]);
+  const [loadingReferenceData, setLoadingReferenceData] = React.useState(true);
+
   // Form State
   const [country, setCountry] = React.useState("India");
   const [currency, setCurrency] = React.useState("INR");
@@ -39,6 +79,40 @@ export default function OnboardingPage() {
   const [emailNotifs, setEmailNotifs] = React.useState(true);
   const [pushNotifs, setPushNotifs] = React.useState(true);
   const [smsNotifs, setSmsNotifs] = React.useState(false);
+
+  // Fetch countries and currencies from API
+  React.useEffect(() => {
+    async function loadReferenceData() {
+      try {
+        setLoadingReferenceData(true);
+        const [countriesRes, currenciesRes] = await Promise.all([
+          apiClient.get("/v1/countries"),
+          apiClient.get("/v1/currencies"),
+        ]);
+
+        if (countriesRes.data?.success && Array.isArray(countriesRes.data.data)) {
+          const list = countriesRes.data.data;
+          setCountriesList(list);
+          const initialCountry = list.find((c: CountryOption) => c.name === "India") || list[0];
+          if (initialCountry) {
+            setCountry(initialCountry.name);
+            if (initialCountry.defaultCurrencyCode) {
+              setCurrency(initialCountry.defaultCurrencyCode);
+            }
+          }
+        }
+        if (currenciesRes.data?.success && Array.isArray(currenciesRes.data.data)) {
+          setCurrenciesList(currenciesRes.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to load countries and currencies from API", err);
+      } finally {
+        setLoadingReferenceData(false);
+      }
+    }
+
+    loadReferenceData();
+  }, []);
 
   // Sync theme configurations live
   React.useEffect(() => {
@@ -63,38 +137,47 @@ export default function OnboardingPage() {
   // Auto-populate helper
   const handleCountryChange = (c: string) => {
     setCountry(c);
+    const matched = countriesList.find(
+      (item) => item.name.toLowerCase() === c.toLowerCase()
+    );
+
+    if (matched?.defaultCurrencyCode) {
+      setCurrency(matched.defaultCurrencyCode);
+    }
+
     switch (c) {
       case "India":
-        setCurrency("INR");
         setInflationRate(6.0);
         break;
       case "United States":
-        setCurrency("USD");
         setInflationRate(3.1);
         break;
       case "United Kingdom":
-        setCurrency("GBP");
         setInflationRate(4.1);
         break;
       case "Germany":
-        setCurrency("EUR");
+      case "France":
+      case "Italy":
         setInflationRate(2.2);
         break;
+      case "United Arab Emirates":
       case "UAE":
-        setCurrency("AED");
         setInflationRate(2.5);
         break;
       case "Singapore":
-        setCurrency("SGD");
         setInflationRate(3.5);
         break;
       case "Canada":
-        setCurrency("CAD");
         setInflationRate(3.0);
         break;
       case "Australia":
-        setCurrency("AUD");
         setInflationRate(3.2);
+        break;
+      case "Japan":
+        setInflationRate(1.5);
+        break;
+      default:
+        setInflationRate(3.0);
         break;
     }
   };
@@ -207,36 +290,42 @@ export default function OnboardingPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="font-semibold text-zinc-500">Country / Region</label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-zinc-500">Country / Region</label>
+                    {loadingReferenceData && (
+                      <span className="text-[10px] text-zinc-400 animate-pulse">Loading...</span>
+                    )}
+                  </div>
                   <Select
                     value={country}
                     onChange={(e) => handleCountryChange(e.target.value)}
+                    disabled={loadingReferenceData}
                   >
-                    <option value="India">India 🇮🇳</option>
-                    <option value="United States">United States 🇺🇸</option>
-                    <option value="United Kingdom">United Kingdom 🇬🇧</option>
-                    <option value="Germany">Germany 🇩🇪</option>
-                    <option value="UAE">UAE 🇦🇪</option>
-                    <option value="Singapore">Singapore 🇸🇬</option>
-                    <option value="Canada">Canada 🇨🇦</option>
-                    <option value="Australia">Australia 🇦🇺</option>
+                    {countriesList.map((c) => (
+                      <option key={c.id || c.codeAlpha2} value={c.name}>
+                        {c.name} {getCountryFlag(c.codeAlpha2)}
+                      </option>
+                    ))}
                   </Select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="font-semibold text-zinc-500">Preferred Currency</label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-zinc-500">Preferred Currency</label>
+                    {loadingReferenceData && (
+                      <span className="text-[10px] text-zinc-400 animate-pulse">Loading...</span>
+                    )}
+                  </div>
                   <Select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
+                    disabled={loadingReferenceData}
                   >
-                    <option value="INR">INR (₹)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="AED">AED (د.إ)</option>
-                    <option value="SGD">SGD ($)</option>
-                    <option value="CAD">CAD ($)</option>
-                    <option value="AUD">AUD ($)</option>
+                    {currenciesList.map((curr) => (
+                      <option key={curr.id || curr.code} value={curr.code}>
+                        {curr.code} - {curr.name} ({curr.symbol})
+                      </option>
+                    ))}
                   </Select>
                 </div>
               </div>
