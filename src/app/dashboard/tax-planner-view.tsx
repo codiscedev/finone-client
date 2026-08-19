@@ -350,15 +350,15 @@ export default function TaxPlannerView() {
     );
   };
 
-  // Step descriptions
+  // Step definitions
   const stepTitles = [
-    { num: 1, title: "About You", desc: "Residency, age & family" },
-    { num: 2, title: "Your Income", desc: "Earnings & inflow streams" },
-    { num: 3, title: "Expenses & Savings", desc: "Rent, debts & insurance" },
-    { num: 4, title: "Investments & Assets", desc: "Portfolio & property" },
-    { num: 5, title: "Tax History", desc: "Taxes paid & withholding" },
-    { num: 6, title: "Your Goals", desc: "Budget & risk preference" },
-    { num: 7, title: "Your Tax Plan", desc: "Results & action plan" }
+    { num: 1, title: "About You", short: "About", desc: "Residency & age" },
+    { num: 2, title: "Income", short: "Income", desc: "Earnings & inflow" },
+    { num: 3, title: "Expenses", short: "Expenses", desc: "Rent & insurance" },
+    { num: 4, title: "Assets", short: "Assets", desc: "Investments" },
+    { num: 5, title: "History", short: "History", desc: "Taxes paid" },
+    { num: 6, title: "Goals", short: "Goals", desc: "Priorities" },
+    { num: 7, title: "Tax Plan", short: "Plan", desc: "Results" }
   ];
 
   // Derived Estimates for Form 7
@@ -420,38 +420,44 @@ export default function TaxPlannerView() {
         </div>
       </div>
 
-      {/* Stepper Progress Bar */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xs">
-        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
-          {stepTitles.map((s, idx) => {
+      {/* Stepper Progress Bar (Responsive 7-Step Grid, Zero Scroll) */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-xs overflow-hidden">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 items-center">
+          {stepTitles.map((s) => {
             const isCompleted = currentStep > s.num;
             const isCurrent = currentStep === s.num;
             return (
               <button
                 key={s.num}
                 onClick={() => setCurrentStep(s.num)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all text-left shrink-0 cursor-pointer ${
+                type="button"
+                className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2 p-1.5 sm:px-3 sm:py-2 rounded-xl transition-all text-center sm:text-left cursor-pointer ${
                   isCurrent
-                    ? "bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/80 text-blue-700 dark:text-blue-300"
+                    ? "bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/80 text-blue-700 dark:text-blue-300 shadow-2xs"
                     : isCompleted
-                    ? "bg-zinc-50 dark:bg-zinc-800/40 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-600"
+                    ? "bg-zinc-50/80 dark:bg-zinc-800/30 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    : "text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50/50"
                 }`}
               >
                 <div
-                  className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                  className={`h-5 w-5 sm:h-6 sm:w-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-black transition-all shrink-0 ${
                     isCurrent
-                      ? "bg-blue-600 text-white"
+                      ? "bg-blue-600 text-white shadow-xs"
                       : isCompleted
                       ? "bg-emerald-600 text-white"
                       : "border border-zinc-300 dark:border-zinc-700 text-zinc-400"
                   }`}
                 >
-                  {isCompleted ? <Check className="h-3.5 w-3.5" /> : s.num}
+                  {isCompleted ? <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : s.num}
                 </div>
-                <div className="hidden md:block">
-                  <p className="text-xs font-extrabold leading-tight">{s.title}</p>
-                  <p className="text-[10px] text-zinc-400 leading-none">{s.desc}</p>
+                <div className="min-w-0 flex-1 truncate">
+                  <p className="text-[10px] sm:text-xs font-extrabold leading-tight truncate">
+                    <span className="hidden sm:inline">{s.title}</span>
+                    <span className="sm:hidden">{s.short}</span>
+                  </p>
+                  <p className="hidden lg:block text-[9px] text-zinc-400 leading-none truncate mt-0.5">
+                    {s.desc}
+                  </p>
                 </div>
               </button>
             );
