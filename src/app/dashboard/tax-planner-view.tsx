@@ -362,11 +362,29 @@ export default function TaxPlannerView() {
   ];
 
   // Derived Estimates for Form 7
+  const isOldRecommended = calculationResult?.recommended_regime === "OLD";
+  const isEqual = calculationResult?.recommended_regime === "EQUAL";
   const estGross = calculationResult?.gross_total_income ?? calculationResult?.gross_income ?? annualIncome;
-  const estTaxable = calculationResult?.taxable_income_new ?? Math.max(0, estGross - countryConfig.standardDeduction);
-  const estTax = calculationResult?.tax_payable_new ?? calculationResult?.new_tax ?? Math.round(estTaxable * 0.15);
-  const estSavings = calculationResult?.total_potential_savings ?? calculationResult?.tax_difference ?? Math.round(estTax * 0.22);
-  const recommendedRegime = calculationResult?.recommended_regime ?? countryConfig.defaultRegime;
+  
+  // Taxable income of the recommended regime
+  const estTaxable = isOldRecommended
+    ? (calculationResult?.taxable_income_old ?? calculationResult?.old_taxable_income ?? Math.max(0, estGross - 50000))
+    : (calculationResult?.taxable_income_new ?? calculationResult?.new_taxable_income ?? Math.max(0, estGross - countryConfig.standardDeduction));
+
+  // Final tax payable of the recommended regime
+  const estTax = isOldRecommended
+    ? (calculationResult?.tax_payable_old ?? calculationResult?.old_tax ?? calculationResult?.old_final_tax ?? 0)
+    : (calculationResult?.tax_payable_new ?? calculationResult?.new_tax ?? calculationResult?.new_final_tax ?? 0);
+
+  const estSavings = calculationResult?.tax_difference ?? calculationResult?.estimated_savings ?? 0;
+
+  const recommendedRegimeDisplay = calculationResult?.optimal_regime || (
+    isOldRecommended
+      ? (countryConfig.alternativeRegimeName || "Old Tax Regime")
+      : isEqual
+      ? "Both Options Equal"
+      : countryConfig.defaultRegime
+  );
 
   return (
     <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50 p-4 sm:p-8 space-y-6 max-w-6xl mx-auto">
@@ -1592,25 +1610,33 @@ export default function TaxPlannerView() {
             </div>
 
             {/* Recommended Option / Regime Card */}
-            <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg space-y-3">
+            <div className={`p-6 rounded-2xl text-white shadow-lg space-y-3 ${
+              isOldRecommended
+                ? "bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700"
+                : isEqual
+                ? "bg-gradient-to-r from-emerald-600 to-teal-700"
+                : "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700"
+            }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <span className="text-[10px] uppercase font-black bg-white/20 px-2.5 py-0.5 rounded-full">
                     Recommended Tax Option
                   </span>
                   <h3 className="text-xl font-black mt-1">
-                    {recommendedRegime} ({countryConfig.countryName})
+                    {recommendedRegimeDisplay} ({countryConfig.countryName})
                   </h3>
                 </div>
                 <Button
                   onClick={() => setShowCalcDetailsModal(true)}
-                  className="bg-white hover:bg-zinc-100 text-blue-900 font-extrabold h-9 px-4 rounded-xl text-xs"
+                  className="bg-white hover:bg-zinc-100 text-zinc-900 font-extrabold h-9 px-4 rounded-xl text-xs shadow-xs"
                 >
                   View Details & Slabs
                 </Button>
               </div>
-              <p className="text-xs text-blue-100 leading-relaxed max-w-2xl">
-                <strong>Why this was recommended:</strong> Based on the information you provided and your deduction profile in {countryConfig.countryName}, choosing this tax option results in a lower estimated tax liability by <strong>{formatCountryCurrency(estSavings, activeCountry)}</strong> compared to alternate treatments.
+              <p className="text-xs text-white/90 leading-relaxed max-w-2xl">
+                <strong>Why this was recommended:</strong> {calculationResult?.recommendation_reason || (
+                  `Based on the information you provided and your deduction profile in ${countryConfig.countryName}, choosing ${recommendedRegimeDisplay} results in a lower estimated tax liability by ${formatCountryCurrency(estSavings, activeCountry)} compared to alternate treatments.`
+                )}
               </p>
             </div>
 
@@ -1794,7 +1820,7 @@ export default function TaxPlannerView() {
       {/* ========================================================================= */}
       {showExplainModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-xl bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-zinc-200 dark:border-zinc-800 space-y-5 animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-zinc-200 dark:border-zinc-800 space-y-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
@@ -1802,9 +1828,9 @@ export default function TaxPlannerView() {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-zinc-900 dark:text-white">
-                    Why is my estimated tax {formatCountryCurrency(estTax, activeCountry)}?
+                    Why is {recommendedRegimeDisplay} recommended?
                   </h3>
-                  <p className="text-[11px] text-zinc-400">Step-by-step explainable calculation breakdown</p>
+                  <p className="text-[11px] text-zinc-400">Side-by-side mathematical regime comparison</p>
                 </div>
               </div>
               <button
@@ -1815,43 +1841,104 @@ export default function TaxPlannerView() {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-                <span>1. Gross Annual Earnings</span>
-                <strong className="text-zinc-900 dark:text-white">{formatCountryCurrency(estGross, activeCountry)}</strong>
-              </div>
+            {/* Side-by-Side Comparison Table */}
+            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden text-xs">
+              <table className="w-full text-left">
+                <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 font-bold border-b border-zinc-200 dark:border-zinc-800">
+                  <tr>
+                    <th className="p-3">Calculation Step</th>
+                    <th className={`p-3 text-right ${isOldRecommended ? "bg-amber-50/70 dark:bg-amber-950/40 text-amber-900 font-black" : ""}`}>
+                      Old Tax Regime {isOldRecommended && "(Better)"}
+                    </th>
+                    <th className={`p-3 text-right ${!isOldRecommended && !isEqual ? "bg-blue-50/70 dark:bg-blue-950/40 text-blue-900 font-black" : ""}`}>
+                      New Tax Regime {!isOldRecommended && !isEqual && "(Better)"}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  <tr>
+                    <td className="p-3 font-medium">1. Gross Annual Income</td>
+                    <td className="p-3 text-right font-bold">{formatCountryCurrency(estGross, activeCountry)}</td>
+                    <td className="p-3 text-right font-bold">{formatCountryCurrency(estGross, activeCountry)}</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-medium">2. Standard Deduction</td>
+                    <td className="p-3 text-right font-bold text-emerald-600">
+                      -{formatCountryCurrency(calculationResult?.standard_deduction_old ?? 50000, activeCountry)}
+                    </td>
+                    <td className="p-3 text-right font-bold text-emerald-600">
+                      -{formatCountryCurrency(calculationResult?.standard_deduction_new ?? countryConfig.standardDeduction, activeCountry)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-medium">3. Total Itemized Deductions (80C, 80D, 24b, HRA)</td>
+                    <td className="p-3 text-right font-bold text-emerald-600">
+                      -{formatCountryCurrency(Math.max(0, (calculationResult?.total_deductions_old ?? 0) - (calculationResult?.standard_deduction_old ?? 50000)), activeCountry)}
+                    </td>
+                    <td className="p-3 text-right font-bold text-zinc-400">
+                      ₹0 (Not allowed)
+                    </td>
+                  </tr>
+                  <tr className="bg-zinc-50/50 dark:bg-zinc-800/30">
+                    <td className="p-3 font-bold">4. Net Taxable Income</td>
+                    <td className="p-3 text-right font-bold">
+                      {formatCountryCurrency(calculationResult?.taxable_income_old ?? 0, activeCountry)}
+                    </td>
+                    <td className="p-3 text-right font-bold">
+                      {formatCountryCurrency(calculationResult?.taxable_income_new ?? 0, activeCountry)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-medium">5. Base Slabs Tax</td>
+                    <td className="p-3 text-right">{formatCountryCurrency(calculationResult?.old_base_tax ?? 0, activeCountry)}</td>
+                    <td className="p-3 text-right">{formatCountryCurrency(calculationResult?.new_base_tax ?? 0, activeCountry)}</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-medium">6. Section 87A Tax Rebate</td>
+                    <td className="p-3 text-right text-emerald-600">
+                      -{formatCountryCurrency(calculationResult?.old_rebate ?? 0, activeCountry)}
+                    </td>
+                    <td className="p-3 text-right text-emerald-600">
+                      -{formatCountryCurrency(calculationResult?.new_rebate ?? 0, activeCountry)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-medium">7. Surcharge & Marginal Relief</td>
+                    <td className="p-3 text-right">+{formatCountryCurrency(calculationResult?.old_surcharge ?? 0, activeCountry)}</td>
+                    <td className="p-3 text-right">+{formatCountryCurrency(calculationResult?.new_surcharge ?? 0, activeCountry)}</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-medium">8. 4% Health & Education Cess</td>
+                    <td className="p-3 text-right">+{formatCountryCurrency(calculationResult?.old_cess ?? 0, activeCountry)}</td>
+                    <td className="p-3 text-right">+{formatCountryCurrency(calculationResult?.new_cess ?? 0, activeCountry)}</td>
+                  </tr>
+                  <tr className="bg-zinc-100/70 dark:bg-zinc-800/80 font-black text-sm">
+                    <td className="p-3">Final Tax Payable</td>
+                    <td className={`p-3 text-right ${isOldRecommended ? "text-emerald-600" : "text-zinc-900 dark:text-white"}`}>
+                      {formatCountryCurrency(calculationResult?.old_final_tax ?? calculationResult?.tax_payable_old ?? 0, activeCountry)}
+                    </td>
+                    <td className={`p-3 text-right ${!isOldRecommended && !isEqual ? "text-emerald-600" : "text-zinc-900 dark:text-white"}`}>
+                      {formatCountryCurrency(calculationResult?.new_final_tax ?? calculationResult?.tax_payable_new ?? 0, activeCountry)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between text-emerald-600">
-                <span>2. Standard Deduction ({countryConfig.countryName})</span>
-                <strong>-{formatCountryCurrency(countryConfig.standardDeduction, activeCountry)}</strong>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex items-center justify-between text-blue-700 dark:text-blue-300 font-bold">
-                <span>3. Net Taxable Income</span>
-                <span>{formatCountryCurrency(estTaxable, activeCountry)}</span>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>4. Progressive Slabs Applied</span>
-                  <span className="font-bold text-zinc-900 dark:text-white">Marginal Slabs (0% to 30%)</span>
-                </div>
-                <p className="text-[10px] text-zinc-400">
-                  Income is taxed progressively in slices according to {countryConfig.countryName} law.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center justify-between text-rose-700 dark:text-rose-300 font-black">
-                <span>Final Estimated Tax Liability</span>
-                <span>{formatCountryCurrency(estTax, activeCountry)}</span>
-              </div>
+            <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-950 dark:text-blue-200 space-y-1">
+              <p className="font-extrabold flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-blue-600" /> Verdict: {recommendedRegimeDisplay} saves {formatCountryCurrency(estSavings, activeCountry)}
+              </p>
+              <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
+                {calculationResult?.recommendation_reason || `The recommended regime lowers your estimated tax burden by maximizing available statutory reliefs.`}
+              </p>
             </div>
 
             <Button
               onClick={() => setShowExplainModal(false)}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 rounded-xl text-xs"
             >
-              Close Breakdown
+              Close Comparison
             </Button>
           </div>
         </div>
