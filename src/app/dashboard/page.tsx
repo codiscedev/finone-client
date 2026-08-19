@@ -37,6 +37,26 @@ import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
 import { BrandLogo } from "@/components/brand-logo";
 
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return "Just now";
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (isNaN(diffInSeconds) || diffInSeconds < 60) return "Just now";
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 30) return `${diffInDays}d ago`;
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch (e) {
+    return "Recently";
+  }
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { firebaseUser, dbUser, loading: authLoading, logout: handleLogout } = useAuth();
@@ -132,11 +152,84 @@ export default function DashboardPage() {
     { name: "Pricing", icon: CreditCard },
   ];
 
-  const notifications = [
-    { id: 1, text: "Your monthly tax projection is ready to view.", time: "10m ago", read: false },
-    { id: 2, text: "AI Assistant suggested rebalancing your growth portfolio.", time: "2h ago", read: false },
-    { id: 3, text: "Collaboration invite accepted by Sarah (Financial Advisor).", time: "1d ago", read: true },
-  ];
+  const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [unreadNotifCount, setUnreadNotifCount] = React.useState<number>(0);
+  const [notifLoading, setNotifLoading] = React.useState<boolean>(false);
+
+  const fetchNotifications = React.useCallback(async () => {
+    if (!dbUser?.userId) return;
+    try {
+      setNotifLoading(true);
+      const res = await apiClient.get("/v1/notifications");
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setNotifications(res.data.data);
+        const unread = res.data.data.filter((n: any) => !n.isRead).length;
+        setUnreadNotifCount(unread);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications", err);
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [dbUser?.userId]);
+
+  React.useEffect(() => {
+    if (dbUser?.userId) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 45000);
+      return () => clearInterval(interval);
+    }
+  }, [dbUser?.userId, fetchNotifications]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await apiClient.put("/v1/notifications/read-all");
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadNotifCount(0);
+    } catch (err) {
+      console.error("Failed to mark all as read", err);
+    }
+  };
+
+  const handleMarkAsRead = async (id: string, actionUrl?: string) => {
+    try {
+      await apiClient.put(`/v1/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+      setUnreadNotifCount((prev) => Math.max(0, prev - 1));
+      if (actionUrl) {
+        const menuMatch = ["Wealth", "Money Flow", "Tax Planner", "Collaboration", "AI Assistant", "Settings", "Pricing"].find(
+          (m) =>
+            actionUrl.toLowerCase().includes(m.toLowerCase().replace(" ", "-")) ||
+            actionUrl.toLowerCase().includes(m.toLowerCase())
+        );
+        if (menuMatch) {
+          setActiveMenu(menuMatch);
+          setShowNotifications(false);
+        } else if (actionUrl.startsWith("/")) {
+          router.push(actionUrl);
+          setShowNotifications(false);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to mark notification as read", err);
+    }
+  };
+
+  const handleDeleteNotification = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await apiClient.delete(`/v1/notifications/${id}`);
+      setNotifications((prev) => {
+        const filtered = prev.filter((n) => n.id !== id);
+        setUnreadNotifCount(filtered.filter((n) => !n.isRead).length);
+        return filtered;
+      });
+    } catch (err) {
+      console.error("Failed to delete notification", err);
+    }
+  };
 
   // Helper component to render active menu screen
   const renderContent = () => {
@@ -311,12 +404,19 @@ export default function DashboardPage() {
                 onClick={() => {
                   setShowNotifications(true);
                   setShowProfileMenu(false);
+                  fetchNotifications();
                 }}
                 className="relative rounded-lg p-2 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 outline-none transition-colors border border-transparent hover:border-zinc-200/60"
+                title="Notifications"
               >
                 <Bell className="h-4.5 w-4.5" />
                 {/* Unread indicator */}
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white" />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600 ring-2 ring-white"></span>
+                  </span>
+                )}
               </button>
 
               {showNotifications && (
@@ -332,9 +432,21 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-2">
                         <Bell className="h-4.5 w-4.5 text-blue-600" />
                         <h2 className="text-sm font-bold text-zinc-900">Notifications</h2>
+                        {unreadNotifCount > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
+                            {unreadNotifCount}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2.5">
-                        <button className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer">Mark all read</button>
+                        {notifications.length > 0 && unreadNotifCount > 0 && (
+                          <button
+                            onClick={handleMarkAllRead}
+                            className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                          >
+                            Mark all read
+                          </button>
+                        )}
                         <button
                           onClick={() => setShowNotifications(false)}
                           className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors border border-transparent outline-none cursor-pointer flex items-center justify-center font-bold text-xs"
@@ -345,15 +457,58 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="flex-1 divide-y divide-zinc-100 overflow-y-auto pr-1">
-                      {notifications.map((n) => (
-                        <div key={n.id} className="py-3.5 hover:bg-zinc-50/50 transition-colors flex items-start justify-between gap-3 first:pt-0">
-                          <div>
-                            <p className={`text-xs ${n.read ? 'text-zinc-600' : 'text-zinc-900 font-semibold'}`}>{n.text}</p>
-                            <span className="text-[10px] text-zinc-400 mt-1 block">{n.time}</span>
-                          </div>
-                          {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500 mt-1.5" />}
+                      {notifLoading && notifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-48 text-zinc-400 gap-2">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                          <span className="text-xs">Loading notifications...</span>
                         </div>
-                      ))}
+                      ) : notifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-center px-4">
+                          <div className="h-10 w-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 mb-3">
+                            <Bell className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs font-semibold text-zinc-800">No notifications</p>
+                          <p className="text-[11px] text-zinc-400 mt-1 max-w-[220px]">
+                            You are all caught up! Reminders and alerts will appear here.
+                          </p>
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => handleMarkAsRead(n.id, n.actionUrl)}
+                            className={`group py-3 px-2.5 rounded-lg hover:bg-zinc-50 transition-colors flex items-start justify-between gap-3 cursor-pointer ${
+                              !n.isRead ? "bg-blue-50/40" : ""
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-xs ${n.isRead ? "text-zinc-600 font-normal" : "text-zinc-900 font-semibold"}`}>
+                                {n.title || n.message}
+                              </p>
+                              {n.title && n.message && n.title !== n.message && (
+                                <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug break-words">
+                                  {n.message}
+                                </p>
+                              )}
+                              <span className="text-[10px] text-zinc-400 mt-1 block">
+                                {formatRelativeTime(n.createdAt)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 mt-1">
+                              {!n.isRead && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                              )}
+                              <button
+                                onClick={(e) => handleDeleteNotification(e, n.id)}
+                                className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-opacity p-0.5 rounded text-xs"
+                                title="Delete notification"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </>
