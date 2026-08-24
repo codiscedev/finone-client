@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Check, X, Star, CreditCard, ChevronDown, ChevronUp, Sparkles, HelpCircle, Loader2, ShieldCheck, Mail } from "lucide-react";
+import { Check, X, Star, CreditCard, ChevronDown, ChevronUp, Sparkles, HelpCircle, Loader2, ShieldCheck, Mail, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
@@ -10,7 +10,7 @@ import { apiClient } from "@/lib/api";
 export default function PricingView() {
   const { dbUser, refreshUserStatus } = useAuth();
 
-  const [billingCycle, setBillingCycle] = React.useState<"monthly" | "lifetime">("monthly");
+  const [billingCycle, setBillingCycle] = React.useState<"monthly" | "yearly" | "lifetime">("monthly");
   const [openFaq, setOpenFaq] = React.useState<number | null>(null);
 
   const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
@@ -36,7 +36,14 @@ export default function PricingView() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const isINR = dbUser?.currency === "INR";
+    const isINR = dbUser?.currency === "INR" || !dbUser?.currency;
+
+    const planCode =
+      billingCycle === "yearly"
+        ? "PRO_YEARLY"
+        : billingCycle === "lifetime"
+        ? "PRO_LIFETIME"
+        : "PRO_MONTHLY";
 
     if (isINR) {
       try {
@@ -45,49 +52,54 @@ export default function PricingView() {
           throw new Error("Failed to load Razorpay SDK");
         }
 
-        const res = await apiClient.post("/v1/billing/razorpay/order", {
-          planName,
-          billingCycle
-        });
+        // Use appropriate backend endpoint depending on recurring subscription vs lifetime one-time order
+        let res;
+        if (billingCycle === "lifetime") {
+          res = await apiClient.post("/v1/billing/checkout/lifetime", {
+            planCode: "PRO_LIFETIME"
+          });
+        } else {
+          res = await apiClient.post("/v1/billing/checkout/subscription", {
+            planCode
+          });
+        }
 
         if (res.data?.success && res.data?.data) {
-          const order = res.data.data;
+          const checkoutData = res.data.data;
 
-          if (order.isMock) {
-            await apiClient.post("/v1/billing/razorpay/verify", {
-              razorpayOrderId: order.orderId,
+          if (checkoutData.isMock) {
+            await apiClient.post("/v1/billing/payment/verify", {
+              razorpayOrderId: checkoutData.orderId || null,
+              razorpaySubscriptionId: checkoutData.subscriptionId || null,
               razorpayPaymentId: "pay_mock_" + Math.random().toString(36).substring(7),
               razorpaySignature: "mock_signature",
-              planName,
-              billingCycle
+              planCode
             });
             await refreshUserStatus();
-            setSuccessMsg(`Simulated Sandbox Upgrade: Welcome to FinDisce ${planName} (${billingCycle})!`);
+            setSuccessMsg(`Simulated Sandbox Upgrade: Welcome to FinOne ${planName} (${billingCycle})!`);
             setLoadingPlan(null);
             return;
           }
 
-          const options = {
-            key: order.keyId,
-            amount: order.amount,
-            currency: order.currency,
-            name: "FinDisce",
-            description: `${planName} Subscription (${billingCycle})`,
-            order_id: order.orderId,
+          const options: any = {
+            key: checkoutData.keyId,
+            currency: checkoutData.currency || "INR",
+            name: "FinOne",
+            description: `${checkoutData.name || "FinOne"} ${checkoutData.description || "Subscription"}`,
             handler: async function (response: any) {
               try {
                 setLoadingPlan(planName);
-                await apiClient.post("/v1/billing/razorpay/verify", {
-                  razorpayOrderId: response.razorpay_order_id,
+                await apiClient.post("/v1/billing/payment/verify", {
+                  razorpayOrderId: response.razorpay_order_id || null,
+                  razorpaySubscriptionId: response.razorpay_subscription_id || checkoutData.subscriptionId || null,
                   razorpayPaymentId: response.razorpay_payment_id,
                   razorpaySignature: response.razorpay_signature,
-                  planName,
-                  billingCycle
+                  planCode
                 });
                 await refreshUserStatus();
-                setSuccessMsg(`Payment successful! Welcome to FinDisce ${planName}.`);
+                setSuccessMsg(`Payment successful! Welcome to FinOne Pro.`);
               } catch (err: any) {
-                setErrorMsg(err.response?.data?.message || "Verification failed");
+                setErrorMsg(err.response?.data?.message || "Payment verification failed");
               } finally {
                 setLoadingPlan(null);
               }
@@ -106,12 +118,19 @@ export default function PricingView() {
             }
           };
 
+          if (billingCycle === "lifetime") {
+            options.order_id = checkoutData.orderId;
+            options.amount = checkoutData.amount;
+          } else {
+            options.subscription_id = checkoutData.subscriptionId;
+          }
+
           const rzp = new (window as any).Razorpay(options);
           rzp.open();
         }
       } catch (err: any) {
         console.error("Razorpay error", err);
-        setErrorMsg(err.message || "Razorpay integration failed");
+        setErrorMsg(err.response?.data?.message || err.message || "Payment integration failed");
         setLoadingPlan(null);
       }
     } else {
@@ -130,14 +149,14 @@ export default function PricingView() {
               billingCycle
             });
             await refreshUserStatus();
-            setSuccessMsg(`Simulated Dodo Upgrade: Welcome to FinDisce ${planName}!`);
+            setSuccessMsg(`Simulated Dodo Upgrade: Welcome to FinOne ${planName}!`);
           } else {
             window.location.href = session.checkoutUrl;
           }
         }
       } catch (err: any) {
         console.error("Dodo payments error", err);
-        setErrorMsg(err.message || "Dodo Payments integration failed");
+        setErrorMsg(err.response?.data?.message || err.message || "Dodo Payments integration failed");
       } finally {
         setLoadingPlan(null);
       }
@@ -156,6 +175,10 @@ export default function PricingView() {
     {
       q: "What is included in the Pro tier (Beta Pricing)?",
       a: "The Pro tier unlocks all advanced features: Income tracking, Net Worth & Asset ledgers, Debt repayment planner, Tax Planning & forecasting, AI Financial Assistant, and automated SMS transaction parsing."
+    },
+    {
+      q: "What is the difference between Monthly (₹59) and Yearly (₹599)?",
+      a: "Both plans provide full, unrestricted access to all Pro features. The Yearly plan gives you a ~15% discount (equivalent to 2 months free) with convenient annual billing."
     },
     {
       q: "How does the Lifetime Pass work?",
@@ -189,31 +212,43 @@ export default function PricingView() {
         <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block bg-blue-50/70 px-3 py-1 rounded-full w-fit mx-auto border border-blue-100/50">
           MICRO SAAS BETA PRICING
         </span>
-        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-zinc-950">
+        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-zinc-950 dark:text-white">
           Simple, Transparent Plans
         </h2>
-        <p className="text-xs sm:text-sm text-zinc-500 max-w-lg mx-auto leading-relaxed">
+        <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto leading-relaxed">
           Expense tracking is free for everyone. Upgrade to Pro for complete financial planning, AI insights, and automated transaction parsing.
         </p>
 
         {/* Billing cycle Switch Toggle */}
         <div className="flex justify-center pt-2">
-          <div className="bg-zinc-100 p-1 rounded-xl flex items-center border border-zinc-200/50">
+          <div className="bg-zinc-100 dark:bg-zinc-800/70 p-1 rounded-xl flex items-center border border-zinc-200/60 dark:border-zinc-700/60 gap-1">
             <button
               onClick={() => setBillingCycle("monthly")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${billingCycle === "monthly"
-                  ? "bg-white text-zinc-950 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-900"
-                }`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${
+                billingCycle === "monthly"
+                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
+              }`}
             >
-              Monthly (₹99/mo)
+              Monthly (₹59/mo)
+            </button>
+            <button
+              onClick={() => setBillingCycle("yearly")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer flex items-center gap-1.5 ${
+                billingCycle === "yearly"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
+              }`}
+            >
+              Yearly (₹599/yr) <span className="bg-indigo-700 text-[9px] font-black text-white px-1.5 py-0.5 rounded uppercase">Save 15%</span>
             </button>
             <button
               onClick={() => setBillingCycle("lifetime")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer flex items-center gap-1.5 ${billingCycle === "lifetime"
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer flex items-center gap-1.5 ${
+                billingCycle === "lifetime"
                   ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-900"
-                }`}
+                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
+              }`}
             >
               Lifetime Pass <span className="bg-emerald-500 text-[9px] font-black text-white px-1.5 py-0.5 rounded uppercase">₹2,500</span>
             </button>
@@ -240,30 +275,58 @@ export default function PricingView() {
       {(() => {
         const isProActive = dbUser?.subscriptionTier === "PRO" && dbUser?.subscriptionStatus === "ACTIVE";
 
+        const currentPrice =
+          billingCycle === "monthly"
+            ? "₹59"
+            : billingCycle === "yearly"
+            ? "₹599"
+            : "₹2,500";
+
+        const currentPeriodText =
+          billingCycle === "monthly"
+            ? " / month"
+            : billingCycle === "yearly"
+            ? " / year"
+            : " / one-time lifetime";
+
+        const currentBadgeText =
+          billingCycle === "monthly"
+            ? "Beta Rate (₹59/mo)"
+            : billingCycle === "yearly"
+            ? "Annual Discount (Save ~15%)"
+            : "Lifetime Pass (₹2,500)";
+
+        const currentButtonText =
+          billingCycle === "monthly"
+            ? "Upgrade to Pro (₹59/mo)"
+            : billingCycle === "yearly"
+            ? "Upgrade to Pro (₹599/yr)"
+            : "Get Lifetime Pass (₹2,500)";
+
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch pt-2 max-w-3xl mx-auto">
 
             {/* FREE PLAN */}
-            <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative">
               <div className="space-y-4">
                 <div>
                   <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wide block">Starter</span>
-                  <h3 className="text-xl font-black text-zinc-900 mt-1">FREE</h3>
+                  <h3 className="text-xl font-black text-zinc-900 dark:text-white mt-1">FREE</h3>
                 </div>
 
                 <div className="py-2">
-                  <span className="text-3xl font-extrabold text-zinc-950">₹0</span>
+                  <span className="text-3xl font-extrabold text-zinc-950 dark:text-white">₹0</span>
                   <span className="text-zinc-500 text-xs font-semibold"> / month</span>
                 </div>
 
-                <p className="text-[11px] text-zinc-500 leading-normal">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal">
                   Expense tracking provided free of cost to log daily transactions and monitor category spending.
                 </p>
 
-                <div className="border-t border-zinc-100 pt-4 space-y-2.5">
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2.5">
                   <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Features Included</span>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-medium text-zinc-700">
+                    <div className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
                       <span className="h-4 w-4 bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center rounded-full text-[9px] shrink-0 font-bold">✓</span>
                       <span>Expense Tracking & Cash Flow</span>
                     </div>
@@ -277,7 +340,7 @@ export default function PricingView() {
               <div className="pt-8">
                 <Button
                   disabled
-                  className="w-full h-10 bg-zinc-100 text-zinc-400 rounded-xl text-xs font-bold cursor-not-allowed outline-none shadow-sm"
+                  className="w-full h-10 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-xl text-xs font-bold cursor-not-allowed outline-none shadow-sm"
                 >
                   {dbUser?.subscriptionTier && dbUser?.subscriptionTier !== "FREE" ? "Standard Starter Plan" : "Current Plan"}
                 </Button>
@@ -285,34 +348,62 @@ export default function PricingView() {
             </div>
 
             {/* PRO PLAN - BETA PRICING */}
-            <div className="bg-white border-2 border-blue-600 rounded-3xl p-6 shadow-[0_4px_20px_rgba(59,130,246,0.12)] flex flex-col justify-between hover:shadow-lg transition-shadow relative">
-              <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
-                <Star className="h-3 w-3 fill-current text-white" /> Beta Pricing
+            <div className={`bg-white dark:bg-zinc-900 border-2 rounded-3xl p-6 shadow-[0_4px_20px_rgba(59,130,246,0.12)] flex flex-col justify-between hover:shadow-lg transition-shadow relative ${
+              billingCycle === "yearly"
+                ? "border-indigo-600"
+                : billingCycle === "lifetime"
+                ? "border-emerald-600"
+                : "border-blue-600"
+            }`}>
+              <span className={`absolute -top-3 left-1/2 transform -translate-x-1/2 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1 ${
+                billingCycle === "yearly"
+                  ? "bg-indigo-600"
+                  : billingCycle === "lifetime"
+                  ? "bg-emerald-600"
+                  : "bg-blue-600"
+              }`}>
+                {billingCycle === "yearly" ? (
+                  <>
+                    <Zap className="h-3 w-3 fill-current text-amber-300" /> Best Annual Value
+                  </>
+                ) : billingCycle === "lifetime" ? (
+                  <>
+                    <Sparkles className="h-3 w-3 fill-current text-white" /> Lifetime Pass
+                  </>
+                ) : (
+                  <>
+                    <Star className="h-3 w-3 fill-current text-white" /> Beta Pricing
+                  </>
+                )}
               </span>
 
               <div className="space-y-4">
                 <div className="mt-2">
-                  <span className="text-[10px] font-black uppercase text-blue-600 tracking-wide block">Full Suite Access</span>
-                  <h3 className="text-xl font-black text-zinc-900 mt-1">PRO ACCESS</h3>
+                  <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wide block">
+                    Full Suite Access
+                  </span>
+                  <h3 className="text-xl font-black text-zinc-900 dark:text-white mt-1">
+                    {billingCycle === "yearly" ? "PRO YEARLY" : billingCycle === "lifetime" ? "PRO LIFETIME" : "PRO MONTHLY"}
+                  </h3>
                 </div>
 
                 <div className="py-2">
-                  <span className="text-3xl font-extrabold text-zinc-950">
-                    {billingCycle === "monthly" ? "₹99" : "₹2,500"}
+                  <span className="text-3xl font-extrabold text-zinc-950 dark:text-white">
+                    {currentPrice}
                   </span>
                   <span className="text-zinc-500 text-xs font-semibold">
-                    {billingCycle === "monthly" ? " / month" : " / one-time lifetime"}
+                    {currentPeriodText}
                   </span>
                   <p className="text-[10px] text-emerald-600 font-bold mt-1">
-                    {billingCycle === "monthly" ? "Beta Rate (₹99/mo)" : "Lifetime Pass (₹2,500)"}
+                    {currentBadgeText}
                   </p>
                 </div>
 
-                <p className="text-[11px] text-zinc-500 leading-normal">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal">
                   Unlock income tracking, net worth ledgers, tax planner, AI advisor, and automated SMS parsing.
                 </p>
 
-                <div className="border-t border-zinc-100 pt-4 space-y-2.5">
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2.5">
                   <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Everything in Pro:</span>
                   <div className="space-y-2">
                     {[
@@ -323,8 +414,8 @@ export default function PricingView() {
                       "SMS & Bank Transaction Parser",
                       "Priority Support (codisce.dev@gmail.com)"
                     ].map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700">
-                        <span className="h-4 w-4 bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center rounded-full text-[9px] shrink-0 font-bold">✓</span>
+                      <div key={i} className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        <span className="h-4 w-4 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 flex items-center justify-center rounded-full text-[9px] shrink-0 font-bold">✓</span>
                         <span>{f}</span>
                       </div>
                     ))}
@@ -336,17 +427,22 @@ export default function PricingView() {
                 <Button
                   onClick={() => handleUpgrade("PRO")}
                   disabled={loadingPlan !== null || isProActive}
-                  className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-md active:scale-[0.98] ${isProActive
+                  className={`w-full h-10 rounded-xl text-xs font-bold cursor-pointer outline-none shadow-md active:scale-[0.98] ${
+                    isProActive
                       ? "bg-blue-500/10 border border-blue-500/30 text-blue-600 cursor-default"
+                      : billingCycle === "yearly"
+                      ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                      : billingCycle === "lifetime"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                       : "bg-blue-600 hover:bg-blue-700 text-white"
-                    }`}
+                  }`}
                 >
                   {loadingPlan === "PRO" ? (
                     <Loader2 className="h-4 w-4 animate-spin mx-auto text-white" />
                   ) : isProActive ? (
                     "Active Pro Subscription"
                   ) : (
-                    `Upgrade to Pro (${billingCycle === "monthly" ? "₹99/mo" : "₹2,500 Lifetime"})`
+                    currentButtonText
                   )}
                 </Button>
               </div>
@@ -357,26 +453,26 @@ export default function PricingView() {
       })()}
 
       {/* Feature Comparison Matrix */}
-      <div className="bg-white border border-zinc-200/80 rounded-2xl shadow-sm p-5 space-y-4">
-        <h3 className="text-xs font-black uppercase text-zinc-900 tracking-wide block border-b border-zinc-100 pb-3">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-sm p-5 space-y-4">
+        <h3 className="text-xs font-black uppercase text-zinc-900 dark:text-white tracking-wide block border-b border-zinc-100 dark:border-zinc-800 pb-3">
           Feature Comparison Matrix
         </h3>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-50/50">
+              <tr className="border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-50/50 dark:bg-zinc-800/50">
                 <th className="p-3 pl-4">Feature</th>
                 <th className="p-3 text-center">Free Plan</th>
                 <th className="p-3 text-center">Pro Plan (Beta)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 font-medium text-zinc-700">
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium text-zinc-700 dark:text-zinc-300">
               {featuresList.map((row, idx) => (
-                <tr key={idx} className="hover:bg-zinc-50/40 transition-colors">
-                  <td className="p-3 pl-4 font-bold text-zinc-900">{row.name}</td>
+                <tr key={idx} className="hover:bg-zinc-50/40 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td className="p-3 pl-4 font-bold text-zinc-900 dark:text-white">{row.name}</td>
                   <td className="p-3 text-center text-zinc-500">{row.free}</td>
-                  <td className="p-3 text-center text-blue-600 font-bold">{row.pro}</td>
+                  <td className="p-3 text-center text-blue-600 dark:text-blue-400 font-bold">{row.pro}</td>
                 </tr>
               ))}
             </tbody>
@@ -387,7 +483,7 @@ export default function PricingView() {
       {/* FAQs */}
       <div className="space-y-4 pt-4">
         <div className="text-center space-y-1">
-          <h3 className="text-base font-black text-zinc-950 uppercase tracking-wide">Frequently Asked Questions</h3>
+          <h3 className="text-base font-black text-zinc-950 dark:text-white uppercase tracking-wide">Frequently Asked Questions</h3>
         </div>
 
         <div className="max-w-3xl mx-auto space-y-2">
@@ -396,13 +492,13 @@ export default function PricingView() {
             return (
               <div
                 key={idx}
-                className="bg-white border border-zinc-200/80 rounded-xl overflow-hidden shadow-xs"
+                className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs"
               >
                 <button
                   onClick={() => toggleFaq(idx)}
-                  className="w-full p-3.5 text-left flex justify-between items-center outline-none cursor-pointer hover:bg-zinc-50/40"
+                  className="w-full p-3.5 text-left flex justify-between items-center outline-none cursor-pointer hover:bg-zinc-50/40 dark:hover:bg-zinc-800/40"
                 >
-                  <span className="text-xs font-bold text-zinc-900">{faq.q}</span>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-white">{faq.q}</span>
                   {isOpen ? (
                     <ChevronUp className="h-4 w-4 text-zinc-400 shrink-0" />
                   ) : (
@@ -410,7 +506,7 @@ export default function PricingView() {
                   )}
                 </button>
                 {isOpen && (
-                  <div className="px-3.5 pb-3.5 text-xs text-zinc-600 leading-relaxed border-t border-zinc-50 pt-2.5 bg-zinc-50/20">
+                  <div className="px-3.5 pb-3.5 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed border-t border-zinc-50 dark:border-zinc-800 pt-2.5 bg-zinc-50/20 dark:bg-zinc-800/20">
                     {faq.a}
                   </div>
                 )}
@@ -421,15 +517,15 @@ export default function PricingView() {
       </div>
 
       {/* Dashboard Footer Compliance Links */}
-      <div className="border-t border-zinc-200/80 pt-6 text-center text-xs text-zinc-500 space-y-2">
-        <div className="flex flex-wrap justify-center gap-4 font-semibold text-zinc-600">
-          <Link href="/terms" className="hover:text-zinc-900">Terms & Conditions</Link>
+      <div className="border-t border-zinc-200/80 dark:border-zinc-800 pt-6 text-center text-xs text-zinc-500 space-y-2">
+        <div className="flex flex-wrap justify-center gap-4 font-semibold text-zinc-600 dark:text-zinc-400">
+          <Link href="/terms" className="hover:text-zinc-900 dark:hover:text-white">Terms & Conditions</Link>
           <span>•</span>
-          <Link href="/privacy" className="hover:text-zinc-900">Privacy Policy</Link>
+          <Link href="/privacy" className="hover:text-zinc-900 dark:hover:text-white">Privacy Policy</Link>
           <span>•</span>
-          <Link href="/refund-policy" className="hover:text-zinc-900">Refund & Cancellation Policy</Link>
+          <Link href="/refund-policy" className="hover:text-zinc-900 dark:hover:text-white">Refund & Cancellation Policy</Link>
           <span>•</span>
-          <Link href="/shipping-policy" className="hover:text-zinc-900">Shipping Policy</Link>
+          <Link href="/shipping-policy" className="hover:text-zinc-900 dark:hover:text-white">Shipping Policy</Link>
         </div>
         <p className="text-[11px] text-zinc-400">
           For support or billing inquiries, contact us at: <a href="mailto:codisce.dev@gmail.com" className="text-blue-600 underline">codisce.dev@gmail.com</a>

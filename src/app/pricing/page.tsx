@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { Footer } from "@/components/footer";
-import { ArrowLeft, Check, Sparkles, Star, ShieldCheck, HelpCircle } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, Star, ShieldCheck, HelpCircle, Zap } from "lucide-react";
 
 export const metadata = {
   title: "Pricing & Plans | FinDisce (Beta Pricing)",
-  description: "Simple, transparent pricing for FinDisce personal finance software. Expense tracking is free, unlock all features for ₹99/mo or ₹2,500 lifetime.",
+  description: "Simple, transparent pricing for FinDisce personal finance software. Expense tracking is free, unlock all features for ₹59/mo, ₹599/yr, or ₹2,500 lifetime.",
 };
 
 export default function PublicPricingPage() {
@@ -27,7 +27,7 @@ export default function PublicPricingPage() {
     <div className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
       {/* Header */}
       <header className="w-full border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Back to Home
           </Link>
@@ -44,7 +44,7 @@ export default function PublicPricingPage() {
       </header>
 
       {/* Main Pricing Hero & Content */}
-      <main className="flex-1 max-w-6xl mx-auto px-6 py-12 space-y-12">
+      <main className="flex-1 max-w-7xl mx-auto px-6 py-12 space-y-12">
         {/* Banner Tag */}
         <div className="text-center space-y-4 max-w-2xl mx-auto">
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-1 text-xs font-extrabold text-blue-600 dark:text-blue-400 backdrop-blur-md">
@@ -60,9 +60,9 @@ export default function PublicPricingPage() {
           </p>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-4">
-          {/* FREE PLAN */}
+        {/* Pricing Cards (4-Tier Grid) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch pt-4">
+          {/* 1. FREE PLAN */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative">
             <div className="space-y-4">
               <div>
@@ -103,7 +103,7 @@ export default function PublicPricingPage() {
             </div>
           </div>
 
-          {/* PRO MONTHLY (BETA) */}
+          {/* 2. PRO MONTHLY (BETA) */}
           <div className="bg-white dark:bg-zinc-900 border-2 border-blue-600 rounded-3xl p-6 shadow-xl flex flex-col justify-between relative">
             <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
               <Star className="h-3 w-3 fill-current text-white" /> Popular Monthly
@@ -116,13 +116,13 @@ export default function PublicPricingPage() {
               </div>
 
               <div className="py-2">
-                <span className="text-3xl font-extrabold text-zinc-950 dark:text-white">₹99</span>
+                <span className="text-3xl font-extrabold text-zinc-950 dark:text-white">₹59</span>
                 <span className="text-zinc-500 text-xs font-semibold"> / month</span>
                 <p className="text-[10px] text-emerald-600 font-bold mt-1">Beta Intro Rate</p>
               </div>
 
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-normal">
-                Unlock all features including income, debts, portfolio tracking, tax planning, and AI mentor.
+                Flexible month-to-month access to all wealth tools, tax planner, and AI mentor.
               </p>
 
               <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2">
@@ -143,15 +143,60 @@ export default function PublicPricingPage() {
                 href="/signup?plan=pro_monthly"
                 className="w-full inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md active:scale-[0.98]"
               >
-                Upgrade to Pro (₹99/mo)
+                Upgrade to Pro (₹59/mo)
               </Link>
             </div>
           </div>
 
-          {/* PRO LIFETIME (BETA) */}
+          {/* 3. PRO YEARLY (BETA) */}
+          <div className="bg-white dark:bg-zinc-900 border-2 border-indigo-600 rounded-3xl p-6 shadow-xl flex flex-col justify-between relative">
+            <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+              <Zap className="h-3 w-3 fill-current text-amber-300" /> Best Annual Value
+            </span>
+
+            <div className="space-y-4">
+              <div className="mt-2">
+                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider block">Discounted Annual</span>
+                <h3 className="text-xl font-black text-zinc-900 dark:text-white mt-1">PRO YEARLY</h3>
+              </div>
+
+              <div className="py-2">
+                <span className="text-3xl font-extrabold text-zinc-950 dark:text-white">₹599</span>
+                <span className="text-zinc-500 text-xs font-semibold"> / year</span>
+                <p className="text-[10px] text-emerald-600 font-bold mt-1">Save ~15% (₹50/mo eq.)</p>
+              </div>
+
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-normal">
+                Full year of uninterruped Pro power with 2 months free equivalent pricing.
+              </p>
+
+              <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">Everything in Pro, plus:</span>
+                <div className="space-y-2 text-xs">
+                  {["All Pro Features Included", "2 Months Free Equivalent", "Annual Inflation & Tax Projections", "AI Financial Assistant", "SMS & Bank Parser", "Priority Support"].map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 font-medium">
+                      <Check className="h-4 w-4 text-indigo-600 shrink-0" />
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-8">
+              <Link
+                href="/signup?plan=pro_yearly"
+                className="w-full inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md active:scale-[0.98]"
+              >
+                Get Pro Yearly (₹599/yr)
+              </Link>
+            </div>
+          </div>
+
+          {/* 4. PRO LIFETIME (BETA) */}
           <div className="bg-white dark:bg-zinc-900 border border-emerald-500/50 rounded-3xl p-6 shadow-lg flex flex-col justify-between relative">
             <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
-              Best Value Lifetime
+              Lifetime Pass
             </span>
 
             <div className="space-y-4">

@@ -64,7 +64,7 @@ export default function TermsPage() {
             </p>
             <ul className="list-disc pl-5 space-y-1 text-xs">
               <li><strong>Expense Tracking (Free):</strong> Core expense ledger logging is provided free of cost.</li>
-              <li><strong>Beta Pricing Plans:</strong> Paid tiers (e.g., ₹99/month or ₹2,500 Lifetime) are offered as introductory Beta Pricing. We reserve the right to revise subscription fees with advance notice to existing users.</li>
+              <li><strong>Beta Pricing Plans:</strong> Paid tiers (e.g., ₹59/month, ₹599/year, or ₹2,500 Lifetime) are offered as introductory Beta Pricing. We reserve the right to revise subscription fees with advance notice to existing users.</li>
               <li><strong>Automatic Renewal:</strong> Recurring monthly plans auto-renew until cancelled by the user in account settings prior to the next billing cycle.</li>
             </ul>
           </section>

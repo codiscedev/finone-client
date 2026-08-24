@@ -40,7 +40,7 @@ export default function Home() {
     },
     {
       q: "What is Beta Pricing?",
-      a: "As part of our initial Micro SaaS launch, we offer our Pro features (Income tracking, Net worth ledgers, Tax Planner, AI Mentor, SMS parser) at a discounted Beta rate of ₹99/month or a ₹2,500 Lifetime pass."
+      a: "As part of our initial Micro SaaS launch, we offer our Pro features (Income tracking, Net worth ledgers, Tax Planner, AI Mentor, SMS parser) at discounted Beta rates: ₹59/month, ₹599/year, or a ₹2,500 Lifetime pass."
     },
     {
       q: "How does the 7-day refund policy work?",
@@ -177,7 +177,7 @@ export default function Home() {
               href="#pricing"
               className="w-full sm:w-auto inline-flex h-12 items-center justify-center rounded-xl border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-7 text-xs font-bold text-zinc-900 dark:text-white transition-all active:scale-[0.98]"
             >
-              Explore Beta Pricing (₹99/mo)
+              Explore Beta Pricing (₹59/mo)
             </a>
           </div>
 
@@ -236,7 +236,7 @@ export default function Home() {
         </section>
 
         {/* 3. Beta Pricing Section */}
-        <section id="pricing" className="w-full max-w-5xl mt-28 space-y-12">
+        <section id="pricing" className="w-full max-w-7xl mt-28 space-y-12">
           <div className="text-center space-y-3">
             <span className="text-xs font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider">
               Transparent Micro SaaS Pricing
@@ -249,7 +249,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-left items-stretch">
             {/* Free Tier */}
             <div className="rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between shadow-sm">
               <div className="space-y-4">
@@ -280,19 +280,19 @@ export default function Home() {
             {/* Pro Monthly (Beta) */}
             <div className="rounded-3xl border-2 border-blue-600 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between shadow-xl relative">
               <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
-                <Star className="h-3 w-3 fill-current" /> Beta Special
+                <Star className="h-3 w-3 fill-current" /> Popular
               </span>
               <div className="space-y-4">
                 <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider block mt-2">Full Pro Access</span>
                 <h3 className="text-xl font-black text-zinc-900 dark:text-white">PRO MONTHLY</h3>
                 <div className="py-2">
-                  <span className="text-3xl font-black text-zinc-950 dark:text-white">₹99</span>
+                  <span className="text-3xl font-black text-zinc-950 dark:text-white">₹59</span>
                   <span className="text-xs text-zinc-500 font-semibold"> / month</span>
-                  <p className="text-[10px] text-emerald-600 font-bold mt-1">Special Beta Rate</p>
+                  <p className="text-[10px] text-emerald-600 font-bold mt-1">Beta Monthly Rate</p>
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">All features including Income, Debts, Assets, Tax Planner, AI Mentor, and SMS Parser.</p>
                 <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2 text-xs">
-                  {["All Pro Features Unlocked", "AI Financial Mentor", "SMS & Bank Automatic Parser", "Tax Planner & Offsets", "Priority Support"].map((f, i) => (
+                  {["All Pro Features Unlocked", "AI Financial Mentor", "SMS & Bank Parser", "Tax Planner & Offsets", "Priority Support"].map((f, i) => (
                     <div key={i} className="flex items-center gap-2 font-medium">
                       <Check className="h-4 w-4 text-blue-600" />
                       <span>{f}</span>
@@ -305,7 +305,40 @@ export default function Home() {
                   href="/signup?plan=pro_monthly"
                   className="w-full inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors shadow-md"
                 >
-                  Get Pro Monthly (₹99/mo)
+                  Get Pro Monthly (₹59/mo)
+                </Link>
+              </div>
+            </div>
+
+            {/* Pro Yearly (Beta) */}
+            <div className="rounded-3xl border-2 border-indigo-600 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between shadow-xl relative">
+              <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                <Zap className="h-3 w-3 fill-current text-amber-300" /> Best Annual Value
+              </span>
+              <div className="space-y-4">
+                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider block mt-2">Discounted Annual</span>
+                <h3 className="text-xl font-black text-zinc-900 dark:text-white">PRO YEARLY</h3>
+                <div className="py-2">
+                  <span className="text-3xl font-black text-zinc-950 dark:text-white">₹599</span>
+                  <span className="text-xs text-zinc-500 font-semibold"> / year</span>
+                  <p className="text-[10px] text-emerald-600 font-bold mt-1">Save ~15% (2 Months Free)</p>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Complete year of Pro wealth suite with discounted continuous access.</p>
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2 text-xs">
+                  {["All Pro Features Unlocked", "2 Months Free Equivalent", "Annual Tax Planning", "AI Financial Mentor", "Priority Support"].map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 font-medium">
+                      <Check className="h-4 w-4 text-indigo-600" />
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="pt-8">
+                <Link
+                  href="/signup?plan=pro_yearly"
+                  className="w-full inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors shadow-md"
+                >
+                  Get Pro Yearly (₹599/yr)
                 </Link>
               </div>
             </div>
@@ -313,7 +346,7 @@ export default function Home() {
             {/* Lifetime Pass */}
             <div className="rounded-3xl border border-emerald-500/50 bg-white dark:bg-zinc-900 p-6 flex flex-col justify-between shadow-lg relative">
               <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
-                Lifetime Value
+                Lifetime Pass
               </span>
               <div className="space-y-4">
                 <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider block mt-2">One-Time Payment</span>
