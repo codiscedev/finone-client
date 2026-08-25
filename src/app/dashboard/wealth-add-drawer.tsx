@@ -61,15 +61,15 @@ export default function WealthAddDrawer({ isOpen, onClose, onSuccess }: WealthAd
     if (!dbUser?.userId) return;
     setLoadingCategories(true);
     try {
-      const assetRes = await apiClient.get(`/v1/assetcategory/${dbUser.userId}`);
+      const assetRes = await apiClient.get(`/v1/assetcategory/users/${dbUser.userId}`);
       if (assetRes.data?.success) {
         setAssetCategoriesList(assetRes.data.data);
       }
-      const debtRes = await apiClient.get(`/v1/debtcategory/${dbUser.userId}`);
+      const debtRes = await apiClient.get(`/v1/debtcategory/users/${dbUser.userId}`);
       if (debtRes.data?.success) {
         setDebtCategoriesList(debtRes.data.data);
       }
-      const investRes = await apiClient.get(`/v1/investmentcategory/${dbUser.userId}`);
+      const investRes = await apiClient.get(`/v1/investmentcategory/users/${dbUser.userId}`);
       if (investRes.data?.success) {
         setInvestmentCategoriesList(investRes.data.data);
       }
