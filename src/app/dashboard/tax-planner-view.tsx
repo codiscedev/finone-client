@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ProFeatureGuard } from "@/components/licensing/pro-feature-guard";
 import {
   Calculator,
   Calendar,
@@ -59,7 +60,11 @@ import {
   formatCountryCurrency
 } from "@/lib/tax/global-tax-rules";
 
-export default function TaxPlannerView() {
+interface TaxPlannerViewProps {
+  onUpgradeClick?: () => void;
+}
+
+export default function TaxPlannerView({ onUpgradeClick }: TaxPlannerViewProps = {}) {
   const { dbUser } = useAuth();
 
   // Wizard Step (1 to 7)
@@ -387,7 +392,12 @@ export default function TaxPlannerView() {
   );
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50 p-4 sm:p-8 space-y-6 max-w-6xl mx-auto">
+    <ProFeatureGuard
+      moduleName="Global Tax Planner & Deductions Spotter"
+      description="Optimize your taxes with country-specific tax rules, regime comparisons, and automated deduction discovery."
+      onUpgradeClick={onUpgradeClick}
+    >
+      <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50 p-4 sm:p-8 space-y-6 max-w-6xl mx-auto">
       
       {/* Top Main Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-200 dark:border-zinc-800">
@@ -2011,5 +2021,6 @@ export default function TaxPlannerView() {
         </div>
       )}
     </div>
+    </ProFeatureGuard>
   );
 }

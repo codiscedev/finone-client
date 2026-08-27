@@ -27,11 +27,16 @@ import AnomalyAlertBell from "@/components/ai/AnomalyAlertBell";
 import TaxInsightCard from "@/components/ai/TaxInsightCard";
 import FinanceChat from "@/components/ai/FinanceChat";
 
+import ProFeatureGuard from "@/components/licensing/pro-feature-guard";
+
 interface AIAssistantViewProps {
   onUpgradeClick?: () => void;
 }
 
 export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps) {
+  // ...
+  // [Internal logic unchanged]
+
   const { dbUser } = useAuth();
   const { showSuccess } = useCustomAlert();
   
@@ -161,7 +166,12 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-16">
+    <ProFeatureGuard
+      moduleName="AI Assistant & Strategy Planner"
+      description="Access your personal finance chatbot, automated portfolio insights, and reasoning-based wealth planner."
+      onUpgradeClick={onUpgradeClick}
+    >
+      <div className="max-w-7xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -421,6 +431,7 @@ export default function AIAssistantView({ onUpgradeClick }: AIAssistantViewProps
         </div>
 
       </div>
-    </div>
+      </div>
+    </ProFeatureGuard>
   );
 }

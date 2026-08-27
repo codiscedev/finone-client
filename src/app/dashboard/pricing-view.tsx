@@ -126,6 +126,14 @@ export default function PricingView() {
           }
 
           const rzp = new (window as any).Razorpay(options);
+          rzp.on("payment.failed", function (response: any) {
+            console.warn("Razorpay payment failed:", response.error);
+            setErrorMsg(
+              response.error?.description ||
+                "Payment was unsuccessful as it was cancelled or timed out. Please try again."
+            );
+            setLoadingPlan(null);
+          });
           rzp.open();
         }
       } catch (err: any) {

@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { ProFeatureGuard } from "@/components/licensing/pro-feature-guard";
 
 interface CollaborationViewProps {
   onUpgradeClick?: () => void;
@@ -199,20 +200,25 @@ export default function CollaborationView({ onUpgradeClick }: CollaborationViewP
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-16">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Collaboration</h2>
-          <p className="text-sm text-zinc-500 mt-1">Manage shared finances, goals, and expenses with your family and friends.</p>
-        </div>
-        <Button 
-          onClick={() => setIsCreateOpen(true)}
-          className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]"
-        >
-          <Plus className="h-4 w-4 mr-1.5" />
-          Create Workspace
-        </Button>
+    <ProFeatureGuard
+      moduleName="Multi-User Workspace Collaboration"
+      description="Co-manage household budgets, shared savings goals, and family expense tracking."
+      onUpgradeClick={onUpgradeClick}
+    >
+      <div className="space-y-8 max-w-7xl mx-auto pb-16">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">Collaboration</h2>
+            <p className="text-sm text-zinc-500 mt-1">Manage shared finances, goals, and expenses with your family and friends.</p>
+          </div>
+          <Button 
+            onClick={() => setIsCreateOpen(true)}
+            className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-semibold transition-all active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            Create Workspace
+          </Button>
       </div>
 
       {/* Collaboration Family Plan Upgrade Banner */}
@@ -546,6 +552,7 @@ export default function CollaborationView({ onUpgradeClick }: CollaborationViewP
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ProFeatureGuard>
   );
 }

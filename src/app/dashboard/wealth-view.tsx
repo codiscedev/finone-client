@@ -29,6 +29,7 @@ import DebtDetailView from "./debt-detail-view";
 import InvestmentDetailView from "./investment-detail-view";
 import GoalsDetailView from "./goals-detail-view";
 import EmergencyDetailView from "./emergency-detail-view";
+import { ProFeatureGuard } from "@/components/licensing/pro-feature-guard";
 
 interface WealthViewProps {
   onAddClick: () => void;
@@ -470,7 +471,12 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-16">
+    <ProFeatureGuard
+      moduleName="Wealth & Net Worth Portfolio"
+      description="Track, grow, and optimize your financial assets, investments, debts, and net worth with AI projections."
+      onUpgradeClick={onUpgradeClick}
+    >
+      <div className="max-w-7xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -1058,8 +1064,8 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
             </div>
           </div>
         </div>
-
       </div>
     </div>
-  );
+  </ProFeatureGuard>
+);
 }

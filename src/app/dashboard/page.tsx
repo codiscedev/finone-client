@@ -32,6 +32,7 @@ import SettingsView from "./settings-view";
 import TaxPlannerView from "./tax-planner-view";
 import AIAssistantView from "./ai-assistant-view";
 import PricingView from "./pricing-view";
+import ProFeatureGuard from "@/components/licensing/pro-feature-guard";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
@@ -247,15 +248,23 @@ export default function DashboardPage() {
       case "Wealth":
         return <WealthView onAddClick={() => setIsAddDrawerOpen(true)} onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Money Flow":
-        return <MoneyFlowView />;
+        return <MoneyFlowView onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Tax Planner":
-        return <TaxPlannerView />;
+        return <TaxPlannerView onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Collaboration":
         return <CollaborationView onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "AI Assistant":
         return <AIAssistantView onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Settings":
-        return <SettingsView />;
+        return (
+          <ProFeatureGuard
+            moduleName="Settings & Customization"
+            description="Manage your account preferences, profile, and app settings."
+            onUpgradeClick={() => setActiveMenu("Pricing")}
+          >
+            <SettingsView />
+          </ProFeatureGuard>
+        );
       case "Pricing":
         return <PricingView />;
       default:

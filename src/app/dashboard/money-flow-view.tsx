@@ -44,6 +44,7 @@ import { formatCurrency } from "@/lib/use-currency";
 import { apiClient } from "@/lib/api";
 import ReviewQueueDrawer from "./review-queue-drawer";
 import SmsAppModal from "./sms-app-modal";
+import { ProFeatureGuard } from "@/components/licensing/pro-feature-guard";
 
 // ============================================================
 // TYPES
@@ -280,7 +281,11 @@ const selectCls = "w-full h-9 rounded-lg border border-zinc-200 px-2 text-sm bg-
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
-export default function MoneyFlowView() {
+interface MoneyFlowViewProps {
+  onUpgradeClick?: () => void;
+}
+
+export default function MoneyFlowView({ onUpgradeClick }: MoneyFlowViewProps = {}) {
   const { dbUser } = useAuth();
   const currency = dbUser?.currency || "INR";
   const fmt = (v: number) => formatCurrency(v, currency);
@@ -527,63 +532,93 @@ export default function MoneyFlowView() {
           TAB 2 — RECURRING BILLS
           ════════════════════════════════════════ */}
       {activeTab === "recurring" && (
-        <RecurringBillsTab
-          bills={recurringBills}
-          setBills={setRecurringBills}
-          categories={categories}
-          fmt={fmt}
-        />
+        <ProFeatureGuard
+          moduleName="Recurring Bills & Subscriptions"
+          description="Track recurring subscriptions, auto-debit calendars, and upcoming bill reminders."
+          onUpgradeClick={onUpgradeClick}
+        >
+          <RecurringBillsTab
+            bills={recurringBills}
+            setBills={setRecurringBills}
+            categories={categories}
+            fmt={fmt}
+          />
+        </ProFeatureGuard>
       )}
 
       {/* ════════════════════════════════════════
           TAB 3 — BUDGET
           ════════════════════════════════════════ */}
       {activeTab === "budget" && (
-        <BudgetTab
-          budgets={budgets}
-          setBudgets={setBudgets}
-          categories={categories}
-          expenseList={expenseList}
-          fmt={fmt}
-        />
+        <ProFeatureGuard
+          moduleName="Budgeting & Spending Caps"
+          description="Set custom category budgets, monthly spending caps, and real-time overspend alerts."
+          onUpgradeClick={onUpgradeClick}
+        >
+          <BudgetTab
+            budgets={budgets}
+            setBudgets={setBudgets}
+            categories={categories}
+            expenseList={expenseList}
+            fmt={fmt}
+          />
+        </ProFeatureGuard>
       )}
 
       {/* ════════════════════════════════════════
           TAB 4 — INCOME
           ════════════════════════════════════════ */}
       {activeTab === "income" && (
-        <IncomeTab
-          incomeItems={incomeItems}
-          setIncomeItems={setIncomeItems}
-          fmt={fmt}
-        />
+        <ProFeatureGuard
+          moduleName="Income Streams & Payroll Management"
+          description="Track multiple salary credits, freelance invoices, and automated income detection."
+          onUpgradeClick={onUpgradeClick}
+        >
+          <IncomeTab
+            incomeItems={incomeItems}
+            setIncomeItems={setIncomeItems}
+            fmt={fmt}
+          />
+        </ProFeatureGuard>
       )}
 
       {/* ════════════════════════════════════════
           TAB 5 — CREDIT CARDS
           ════════════════════════════════════════ */}
       {activeTab === "creditcard" && (
-        <CreditCardTab
-          cards={creditCards}
-          setCards={setCreditCards}
-          fmt={fmt}
-          currency={currency}
-        />
+        <ProFeatureGuard
+          moduleName="Credit Card Management"
+          description="Monitor credit limits, statement billing cycles, and outstanding balance payoff plans."
+          onUpgradeClick={onUpgradeClick}
+        >
+          <CreditCardTab
+            cards={creditCards}
+            setCards={setCreditCards}
+            fmt={fmt}
+            currency={currency}
+          />
+        </ProFeatureGuard>
       )}
 
       {/* ════════════════════════════════════════
           TAB 6 — CASH FLOW INSIGHTS
           ════════════════════════════════════════ */}
       {activeTab === "insights" && (
-        <InsightsTab
-          expenseList={expenseList}
-          incomeList={incomeList}
-          totalSpending={totalSpending}
-          totalIncome={totalIncome}
-          categories={categories}
-          budgets={budgets}
-          fmt={fmt}
-        />
+        <ProFeatureGuard
+          moduleName="Money Flow AI Analytics"
+          description="Unlock deep cashflow analytics, category trend breakdown, and spending anomaly warnings."
+          onUpgradeClick={onUpgradeClick}
+        >
+          <InsightsTab
+            expenseList={expenseList}
+            incomeList={incomeList}
+            totalSpending={totalSpending}
+            totalIncome={totalIncome}
+            categories={categories}
+            budgets={budgets}
+            fmt={fmt}
+          />
+        </ProFeatureGuard>
       )}
 
       {/* Transaction Drawer */}

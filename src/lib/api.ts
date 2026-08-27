@@ -28,12 +28,19 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Uniform error log
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       console.warn("401 Unauthorized — Please sign in to FinOne");
+    } else if (
+      error.response?.status === 403 &&
+      error.response?.data?.error === "PRO_LICENSE_REQUIRED"
+    ) {
+      console.warn(
+        "403 Pro License Required — Upgrade to Pro Plan to access this module."
+      );
+      error.isLicenseRequired = true;
     }
     return Promise.reject(error);
   }
