@@ -16,6 +16,9 @@ export function useLicense(): LicenseStatus {
   const { dbUser, loading } = useAuth();
 
   const isPro = React.useMemo(() => {
+    if (process.env.NEXT_PUBLIC_BYPASS_LICENSE === "true") {
+      return true;
+    }
     if (!dbUser) return false;
     const tier = dbUser.subscriptionTier?.toUpperCase();
     const status = dbUser.subscriptionStatus?.toUpperCase();

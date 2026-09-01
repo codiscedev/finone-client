@@ -30,6 +30,7 @@ import InvestmentDetailView from "./investment-detail-view";
 import GoalsDetailView from "./goals-detail-view";
 import EmergencyDetailView from "./emergency-detail-view";
 import { ProFeatureGuard } from "@/components/licensing/pro-feature-guard";
+import { useLicense } from "@/hooks/use-license";
 
 interface WealthViewProps {
   onAddClick: () => void;
@@ -38,6 +39,7 @@ interface WealthViewProps {
 
 export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewProps) {
   const { dbUser } = useAuth();
+  const { isPro } = useLicense();
   const [assets, setAssets] = React.useState<any[]>([]);
   const [loadingAssets, setLoadingAssets] = React.useState(false);
   const [debts, setDebts] = React.useState<any[]>([]);
@@ -421,62 +423,8 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
     }).format(val);
   };
 
-  if (showHealthDetails) {
-    return <FinancialHealthView onBack={() => setShowHealthDetails(false)} />;
-  }
-
-  if (showNetWorthDetails) {
-    return <NetWorthDetailView onBack={() => setShowNetWorthDetails(false)} />;
-  }
-
-  if (showDebtDetails) {
-    return <DebtDetailView onBack={() => setShowDebtDetails(false)} onAddClick={onAddClick} />;
-  }
-
-  if (showInvestmentDetails) {
-    return (
-      <InvestmentDetailView
-        onBack={() => {
-          fetchInvestments();
-          setShowInvestmentDetails(false);
-        }}
-        onAddClick={onAddClick}
-        onUpgradeClick={onUpgradeClick}
-      />
-    );
-  }
-
-  if (showGoalDetails) {
-    return <GoalsDetailView onBack={() => { setShowGoalDetails(false); fetchGoals(); }} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
-  }
-
-  if (showEmergencyDetails) {
-    return <EmergencyDetailView onBack={() => { setShowEmergencyDetails(false); fetchEssentials(); }} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
-  }
-
-  if (selectedAsset === "overview") {
-    return (
-      <AssetsOverviewView 
-        onBack={() => { setSelectedAsset(null); fetchAssets(); }} 
-        onAssetClick={(id) => setSelectedAsset(id)} 
-        onAddClick={onAddClick}
-        assets={assets}
-        loading={loadingAssets}
-      />
-    );
-  }
-
-  if (selectedAsset) {
-    return <AssetDetailView assetId={selectedAsset} onBack={() => { setSelectedAsset(null); fetchAssets(); }} />;
-  }
-
-  return (
-    <ProFeatureGuard
-      moduleName="Wealth & Net Worth Portfolio"
-      description="Track, grow, and optimize your financial assets, investments, debts, and net worth with AI projections."
-      onUpgradeClick={onUpgradeClick}
-    >
-      <div className="max-w-7xl mx-auto space-y-8 pb-16">
+  const mainWealthDashboard = (
+    <div className="max-w-7xl mx-auto space-y-8 pb-16">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -1066,6 +1014,68 @@ export default function WealthView({ onAddClick, onUpgradeClick }: WealthViewPro
         </div>
       </div>
     </div>
-  </ProFeatureGuard>
-);
+  );
+
+  if (!isPro) {
+    return (
+      <ProFeatureGuard
+        moduleName="Wealth & Net Worth Portfolio"
+        description="Track, grow, and optimize your financial assets, investments, debts, and net worth with AI projections."
+        onUpgradeClick={onUpgradeClick}
+      >
+        {mainWealthDashboard}
+      </ProFeatureGuard>
+    );
+  }
+
+  if (showHealthDetails) {
+    return <FinancialHealthView onBack={() => setShowHealthDetails(false)} />;
+  }
+
+  if (showNetWorthDetails) {
+    return <NetWorthDetailView onBack={() => setShowNetWorthDetails(false)} />;
+  }
+
+  if (showDebtDetails) {
+    return <DebtDetailView onBack={() => setShowDebtDetails(false)} onAddClick={onAddClick} />;
+  }
+
+  if (showInvestmentDetails) {
+    return (
+      <InvestmentDetailView
+        onBack={() => {
+          fetchInvestments();
+          setShowInvestmentDetails(false);
+        }}
+        onAddClick={onAddClick}
+        onUpgradeClick={onUpgradeClick}
+      />
+    );
+  }
+
+  if (showGoalDetails) {
+    return <GoalsDetailView onBack={() => { setShowGoalDetails(false); fetchGoals(); }} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+  }
+
+  if (showEmergencyDetails) {
+    return <EmergencyDetailView onBack={() => { setShowEmergencyDetails(false); fetchEssentials(); }} onAddClick={onAddClick} onUpgradeClick={onUpgradeClick} />;
+  }
+
+  if (selectedAsset === "overview") {
+    return (
+      <AssetsOverviewView 
+        onBack={() => { setSelectedAsset(null); fetchAssets(); }} 
+        onAssetClick={(id) => setSelectedAsset(id)} 
+        onAddClick={onAddClick}
+        assets={assets}
+        loading={loadingAssets}
+      />
+    );
+  }
+
+  if (selectedAsset) {
+    return <AssetDetailView assetId={selectedAsset} onBack={() => { setSelectedAsset(null); fetchAssets(); }} />;
+  }
+
+  return mainWealthDashboard;
 }

@@ -256,15 +256,7 @@ export default function DashboardPage() {
       case "AI Assistant":
         return <AIAssistantView onUpgradeClick={() => setActiveMenu("Pricing")} />;
       case "Settings":
-        return (
-          <ProFeatureGuard
-            moduleName="Settings & Customization"
-            description="Manage your account preferences, profile, and app settings."
-            onUpgradeClick={() => setActiveMenu("Pricing")}
-          >
-            <SettingsView />
-          </ProFeatureGuard>
-        );
+        return <SettingsView />;
       case "Pricing":
         return <PricingView />;
       default:
