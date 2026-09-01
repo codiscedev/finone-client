@@ -68,17 +68,17 @@ export default function SettingsView() {
     setLoadingCategories(true);
     try {
       if (categoryType === "asset") {
-        const res = await apiClient.get(`/v1/assetcategory/${dbUser.userId}`);
+        const res = await apiClient.get(`/v1/assetcategory/users/${dbUser.userId}`);
         if (res.data?.success) {
           setAssetCategories(res.data.data);
         }
       } else if (categoryType === "debt") {
-        const res = await apiClient.get(`/v1/debtcategory/${dbUser.userId}`);
+        const res = await apiClient.get(`/v1/debtcategory/users/${dbUser.userId}`);
         if (res.data?.success) {
           setDebtCategoriesList(res.data.data);
         }
       } else if (categoryType === "investment") {
-        const res = await apiClient.get(`/v1/investmentcategory/${dbUser.userId}`);
+        const res = await apiClient.get(`/v1/investmentcategory/users/${dbUser.userId}`);
         if (res.data?.success) {
           setInvestmentCategories(res.data.data);
         }
